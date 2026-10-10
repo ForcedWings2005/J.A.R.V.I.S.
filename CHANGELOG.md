@@ -21,7 +21,9 @@ jarvis/
 ├── models/
 │   ├── kokoro-v1.0.onnx
 │   └── voices-v1.0.bin
-├── jarvis.db           SQLite database (events and tasks)
+├── jarvis.db           SQLite database (events and tasks; not in git)
+├── .gitignore          Files git should skip
+├── requirements.txt    Pinned package versions
 ├── agent.py            Terminal version of the assistant (not used by the dashboard)
 ├── compare.py          Model comparison test (not used by the dashboard)
 ├── smoke_test.py       First tool-calling test (not used by the dashboard)
@@ -217,6 +219,18 @@ Fix (written; not tested yet):
 - An event with no end time counts as lasting one hour, the same default used when events are added.
 - The system prompt in `brain.py` gained rules: events marked finished have already happened and must not be described as ahead, questions about the rest of the day or evening should check today's events, and if nothing is left the answer is to say so.
 - Checked with a copy of the calendar module and a fake clock at 09:00, 10:30, 12:00, 19:30 and 21:00. The labels and the closing sentence came out as expected. Not yet tried with the real assistant.
+
+## 17. Version control (git)
+
+- The project is now a git repository, with a remote repo for backup and history.
+- A `.gitignore` keeps these out of the repo: `.venv/` (rebuildable), `__pycache__/`, `.DS_Store`, `.env`, `jarvis.db` (your real schedule and tasks, private) and `models/` (the Kokoro files are too large for GitHub).
+- `requirements.txt` (made with `pip freeze`) records the exact package versions, so the environment can be rebuilt with `pip install -r requirements.txt`.
+- To set up on a new machine, the Kokoro model files must be downloaded again into `models/`, because they are not in the repo.
+- Habit from now on: commit after each change that works, so a bad edit can be undone.
+- `models/` and `jarvis.db` are not in git, so git does not back them up. The database needs its own backup.
+- Include `CHANGELOG.md` in each commit, so the log and the code stay in step.
+- The first push succeeded on 2026-10-10. GitHub's repo already held an automatic "Initial commit", so the push was rejected at first; `git pull origin main --rebase` placed the local commit on top of it and the second push worked. The remote is `origin`, and `main` tracks `origin/main`.
+- Status: set up and pushed.
 
 ---
 
