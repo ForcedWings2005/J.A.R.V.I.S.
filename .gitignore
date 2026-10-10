@@ -1,0 +1,20 @@
+# Python environment (can be rebuilt, and it breaks when the folder moves)
+.venv/
+__pycache__/
+*.pyc
+
+# Your real calendar and tasks (personal data)
+jarvis.db
+jarvis.db-journal
+*.db-wal
+*.db-shm
+
+# Large downloaded model files (GitHub rejects files over 100 MB)
+models/
+
+# Mac and editor clutter
+.DS_Store
+.vscode/
+
+# Secrets, in case you ever add any
+.env

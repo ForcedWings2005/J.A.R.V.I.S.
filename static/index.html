@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS</title>
+<style>
+:root { --bg:#050b16; --panel:#0a1424; --line:rgba(76,201,240,.35); --text:#d6f3fb; --muted:#7aa6b8; --accent:#4cc9f0; --mono:ui-monospace,Menlo,monospace; }
+* { box-sizing: border-box; }
+body { margin:0; min-height:100vh; padding:24px; display:grid; grid-template-columns:minmax(220px,300px) 1fr minmax(220px,300px); grid-template-rows:auto 1fr; gap:20px; background:var(--bg); color:var(--text); font-family:-apple-system,system-ui,sans-serif; }
+header { grid-column:1 / 4; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
+.brand { font-family:var(--mono); letter-spacing:6px; font-size:18px; color:var(--accent); }
+.pills { display:flex; gap:8px; flex-wrap:wrap; }
+.pill { font-family:var(--mono); font-size:11px; letter-spacing:1px; color:var(--muted); border:1px solid var(--line); border-radius:20px; padding:5px 10px; display:flex; gap:8px; align-items:center; }
+.pill button { background:none; border:1px solid var(--accent); border-radius:8px; width:30px; height:16px; position:relative; padding:0; cursor:pointer; }
+.pill button::after { content:""; position:absolute; top:2px; left:2px; width:10px; height:10px; border-radius:50%; background:var(--muted); }
+.pill button[aria-checked="true"]::after { left:16px; background:var(--accent); }
+.col { display:flex; flex-direction:column; gap:16px; min-height:0; }
+.panel { flex:1; min-height:0; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:14px 16px; cursor:pointer; overflow:auto; }
+.h { display:flex; justify-content:space-between; font-family:var(--mono); font-size:12px; letter-spacing:2px; color:var(--accent); margin-bottom:8px; }
+.row { font-size:14px; padding:6px 0; border-top:1px solid rgba(76,201,240,.15); }
+.muted { font-family:var(--mono); font-size:12px; color:var(--muted); }
+.panel.focused { position:fixed; inset:90px 12%; z-index:10; cursor:default; overflow:auto; }
+.panel.focused .row { font-size:18px; }
+#scrim { display:none; position:fixed; inset:0; background:rgba(5,11,22,.85); z-index:9; }
+body.has-focus #scrim { display:block; }
+.center { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; min-width:0; }
+#orb { width:min(380px,100%); height:auto; color:var(--accent); }
+.status { font-family:var(--mono); letter-spacing:4px; color:var(--accent); font-size:12px; }
+.tx { text-align:center; max-width:560px; min-height:90px; font-size:17px; }
+.bar { display:flex; gap:10px; width:100%; max-width:560px; }
+#input { flex:1; padding:14px; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:15px; }
+#send { padding:0 22px; border-radius:6px; border:1px solid var(--accent); background:rgba(76,201,240,.14); color:var(--accent); font-weight:600; cursor:pointer; }
+#send:disabled { opacity:.5; cursor:wait; }
+#mic { width:52px; border-radius:6px; border:1px solid var(--accent); background:rgba(76,201,240,.14); color:var(--accent); cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:none; }
+#mic.live { background:var(--accent); color:var(--bg); }
+#mic:disabled { opacity:.35; cursor:not-allowed; }
+#hint { text-align:center; max-width:560px; }
+.ticker { font-family:var(--mono); font-size:12px; color:var(--muted); border:1px solid rgba(76,201,240,.25); border-radius:4px; padding:6px 12px; min-height:32px; width:100%; max-width:560px; display:flex; gap:16px; flex-wrap:wrap; }
+.step.done::before { content:"\2713 "; color:var(--accent); }
+.step.error::before { content:"! "; color:#ff6b6b; }
+.step.waiting::before { content:"... "; color:#f0b429; }
+#confirm { display:none; width:100%; max-width:560px; background:#1a1405; border:1px solid #f0b429; border-radius:6px; padding:14px 16px; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+#confirm.show { display:flex; }
+.warn { font-family:var(--mono); font-size:12px; letter-spacing:2px; color:#f0b429; margin-bottom:4px; }
+.btns { display:flex; gap:8px; }
+.btn { padding:10px 18px; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; }
+.btn.ghost { background:transparent; border:1px solid var(--muted); color:var(--text); }
+.btn.amber { background:#f0b429; border:1px solid #f0b429; color:#1a1405; }
+.task { display:flex; gap:10px; align-items:center; font-size:14px; padding:6px 0; border-top:1px solid rgba(76,201,240,.15); cursor:pointer; }
+.task input { accent-color:var(--accent); width:16px; height:16px; cursor:pointer; }
+.task.done .t { text-decoration:line-through; color:var(--muted); }
+.task .due { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--muted); }
+.panel.focused .task { font-size:18px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 50% { transform: scale(1.15); } }
+#orb g { transform-box:view-box; transform-origin:center; }
+.spin-slow { animation: spin 90s linear infinite; }
+.spin-rev { animation: spin 140s linear infinite reverse; }
+.core { animation: pulse 4s ease-in-out infinite; }
+body[data-state="listening"] .core { animation-duration:1.6s; }
+body[data-state="thinking"] .spin-slow { animation-duration:12s; }
+body[data-state="thinking"] .spin-rev { animation-duration:18s; }
+body[data-state="speaking"] .core { animation-duration:.8s; }
+body.reduce * { animation:none !important; }
+@media (prefers-reduced-motion: reduce) { * { animation:none !important; } }
+/* ---- Schedule: compact ---- */
+#sched-panel { flex:2; }
+#sched .sday { position:sticky; top:0; z-index:1; background:var(--panel); font-family:var(--mono); font-size:12px; letter-spacing:1px; color:var(--accent); padding:12px 0 4px; }
+.evc { padding:8px 10px; margin:4px 0; border-left:3px solid var(--accent); background:rgba(76,201,240,.07); border-radius:0 4px 4px 0; }
+.evc .et { font-size:15px; }
+.evc .em { font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:2px; }
+.sempty { font-size:13px; color:var(--muted); opacity:.7; padding:2px 0 6px; }
+
+/* ---- Schedule: expanded ---- */
+#cal { display:none; }
+#sched-panel.focused { inset:60px 4%; display:flex; flex-direction:column; overflow:hidden; }
+#sched-panel.focused #sched { display:none; }
+#sched-panel.focused #cal { display:flex; flex-direction:column; flex:1; min-height:0; }
+.ctool { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+.ctitle { font-size:20px; font-weight:600; margin:0 10px; }
+.tabs { margin-left:auto; display:flex; gap:6px; }
+.cbtn { background:transparent; border:1px solid var(--line); color:var(--text); border-radius:6px; padding:6px 12px; font-size:14px; font-family:inherit; cursor:pointer; }
+.cbtn:hover { border-color:var(--accent); }
+.cbtn.on { background:rgba(76,201,240,.18); border-color:var(--accent); color:var(--accent); }
+.cbody { flex:1; min-height:0; overflow:auto; }
+
+/* year */
+.ygrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:20px; }
+.ym-title { background:none; border:none; color:var(--accent); font-family:var(--mono); letter-spacing:2px; font-size:13px; cursor:pointer; padding:0 0 6px; }
+.ym-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; text-align:center; font-size:12px; }
+.ym-grid .dow { color:var(--muted); font-size:10px; }
+.yd { padding:4px 0; border-radius:4px; cursor:pointer; }
+.yd.out { cursor:default; }
+.yd.today { outline:1px solid var(--accent); }
+
+/* month */
+.mdow { display:grid; grid-template-columns:repeat(7,1fr); font-family:var(--mono); font-size:11px; letter-spacing:1px; color:var(--muted); padding-bottom:6px; }
+.mgrid { display:grid; grid-template-columns:repeat(7,1fr); grid-auto-rows:minmax(104px,1fr); gap:1px; background:rgba(76,201,240,.15); border:1px solid rgba(76,201,240,.15); }
+.mcell { background:var(--panel); padding:6px; min-width:0; overflow:hidden; cursor:pointer; }
+.mcell:hover { background:#0e1d33; }
+.mcell.out { opacity:.4; }
+.mcell .num { display:inline-block; font-size:13px; color:var(--muted); padding:1px 7px; border-radius:10px; }
+.mcell.today .num { background:var(--accent); color:var(--bg); }
+.chip { font-size:12px; padding:2px 6px; margin-top:3px; border-radius:3px; background:rgba(76,201,240,.16); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.more { font-size:11px; color:var(--muted); margin-top:3px; }
+
+/* week + day (time grid) */
+.tg { display:grid; position:relative; }
+.tgh { position:sticky; top:0; z-index:3; background:var(--panel); border:none; border-bottom:1px solid var(--line); color:var(--text); font-size:14px; font-family:inherit; padding:8px 4px; text-align:center; }
+button.tgh { cursor:pointer; }
+.tgh.today { color:var(--accent); font-weight:700; }
+.gutter { position:relative; }
+.gutter span { position:absolute; right:8px; font-family:var(--mono); font-size:11px; color:var(--muted); }
+.dcol { position:relative; border-left:1px solid rgba(76,201,240,.15); background-image:linear-gradient(to bottom, rgba(76,201,240,.15) 1px, transparent 1px); }
+.tev { position:absolute; padding:3px 6px; border-radius:4px; background:rgba(76,201,240,.22); border-left:3px solid var(--accent); box-shadow:0 0 0 1px var(--panel); font-size:13px; overflow:hidden; }
+.tev .tm { font-family:var(--mono); font-size:11px; color:var(--muted); }
+.nowline { position:absolute; left:0; right:0; height:2px; background:#ff6b6b; z-index:2; }
+@media (max-width:900px) { body { grid-template-columns:1fr; } header { grid-column:1; } .center { order:-1; } }
+</style>
+</head>
+<body data-state="idle">
+<div id="scrim"></div>
+
+<header>
+  <div class="brand">J.A.R.V.I.S.</div>
+  <div class="pills">
+    <div class="pill">MODEL gemma4</div>
+    <div class="pill">MIC <span id="mic-state">OFF</span></div>
+    <div class="pill">VOICE MODE <button id="voice" role="switch" aria-checked="false" aria-label="Voice mode"></button></div>
+    <div class="pill">REDUCE MOTION <button id="motion" role="switch" aria-checked="false" aria-label="Reduce motion"></button></div>
+  </div>
+</header>
+
+<div class="col">
+  <div class="panel" tabindex="0"><div class="h"><span>TO-DO</span><span class="hint">EXPAND +</span></div><div id="tasks"></div></div>
+  <div class="panel" tabindex="0"><div class="h"><span>CURRENT EVENTS</span><span class="hint">EXPAND +</span></div><div class="muted">Coming soon</div></div>
+  <div class="panel" tabindex="0"><div class="h"><span>WEATHER</span><span class="hint">EXPAND +</span></div><div class="muted">Coming soon</div></div>
+</div>
+
+<div class="center">
+  <svg id="orb" viewBox="0 0 460 460" role="img" aria-label="JARVIS orb"></svg>
+  <div class="status" id="status">STANDING BY</div>
+  <div class="tx">
+    <div class="muted">YOU</div><div id="you">&nbsp;</div>
+    <div class="muted" style="margin-top:10px">JARVIS</div><div id="bot">&nbsp;</div>
+  </div>
+  <div class="ticker" id="ticker">&nbsp;</div>
+  <div id="confirm" role="alertdialog" aria-labelledby="confirm-text">
+    <div><div class="warn">CONFIRM ACTION</div><div id="confirm-text"></div></div>
+    <div class="btns">
+      <button id="cancel" class="btn ghost">Cancel</button>
+      <button id="ok" class="btn amber">Confirm</button>
+    </div>
+  </div>
+  <div class="bar">
+    <input id="input" placeholder="Type a command..." autocomplete="off" aria-label="Command">
+    <button id="mic" aria-label="Microphone" title="Hold to talk, or tap to start and tap to stop">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+    </button>
+    <button id="send">Send</button>
+  </div>
+  <div class="muted" id="hint"></div>
+</div>
+
+<div class="col">
+    <div class="panel" id="sched-panel" tabindex="0"><div class="h"><span>SCHEDULE</span><span class="hint">EXPAND +</span></div><div id="sched"></div><div id="cal"></div></div>
+  <div class="panel" tabindex="0"><div class="h"><span>SPORTS</span><span class="hint">EXPAND +</span></div><div class="muted">Coming soon</div></div>
+  <div class="panel" tabindex="0"><div class="h"><span>NOTES AND MEMORY</span><span class="hint">EXPAND +</span></div><div class="muted">Coming soon</div></div>
+</div>
+
+<script>
+// ---------- Orb ----------
+const NS = 'http://www.w3.org/2000/svg';
+let seed = 7;
+function rand() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  parent.appendChild(e);
+  return e;
+}
+
+function buildOrb() {
+  const svg = document.getElementById('orb');
+  const c = 230;
+  const rings = el('g', { class: 'spin-slow' }, svg);
+  const rdefs = [[215,1,.45,'2 6'],[200,3,.5,'60 14 6 20'],[180,1.5,.6,'120 30 8 8'],[160,5,.55,'150 60 40 90'],[138,1,.5,'4 4'],[118,3,.6,'90 40 30 60'],[92,2,.7,'70 30 140 20'],[66,1.5,.7,'30 12']];
+  for (const [r, w, o, dash] of rdefs) {
+    el('circle', { cx:c, cy:c, r:r, fill:'none', stroke:'currentColor', 'stroke-width':w, opacity:o, 'stroke-dasharray':dash }, rings);
+  }
+  const streaks = el('g', { class: 'spin-rev' }, svg);
+  for (let i = 0; i < 260; i++) {
+    const a = rand() * Math.PI * 2;
+    const r = 95 + rand() * 123;
+    const len = 3 + rand() * 13;
+    const x1 = c + r * Math.cos(a), y1 = c + r * Math.sin(a);
+    let x2, y2;
+    if (rand() < 0.6) { x2 = c + (r + len) * Math.cos(a); y2 = c + (r + len) * Math.sin(a); }
+    else { x2 = c + r * Math.cos(a + len / r); y2 = c + r * Math.sin(a + len / r); }
+    el('line', { x1:x1, y1:y1, x2:x2, y2:y2, stroke:'currentColor', 'stroke-width':1 + rand() * 1.5, opacity:0.3 + rand() * 0.65 }, streaks);
+  }
+  const frags = el('g', { class: 'spin-slow' }, svg);
+  for (let i = 0; i < 70; i++) {
+    const a = rand() * Math.PI * 2;
+    const r = 60 + rand() * 140;
+    const x = c + r * Math.cos(a), y = c + r * Math.sin(a);
+    const d = 'M' + x + ' ' + y + 'h' + (6 + rand() * 14) + 'v' + (4 + rand() * 8) + 'h' + (-3 - rand() * 7);
+    el('path', { d:d, fill:'none', stroke:'currentColor', 'stroke-width':1, opacity:0.35 + rand() * 0.45 }, frags);
+  }
+  const arms = el('g', { class: 'spin-rev' }, svg);
+  el('path', { d:'M105 335A140 140 0 0 1 150 120', fill:'none', stroke:'currentColor', 'stroke-width':8, opacity:.45 }, arms);
+  el('path', { d:'M150 120C260 90 330 190 260 250C220 285 175 250 200 215', fill:'none', stroke:'currentColor', 'stroke-width':4, opacity:.85 }, arms);
+  const core = el('g', { class: 'core' }, svg);
+  el('circle', { cx:c, cy:c, r:26, fill:'currentColor', 'fill-opacity':.15, stroke:'currentColor', 'stroke-width':3 }, core);
+  el('circle', { cx:c, cy:c, r:15, fill:'none', stroke:'currentColor', 'stroke-width':2 }, core);
+  el('circle', { cx:c, cy:c, r:6, fill:'currentColor' }, core);
+}
+
+// ---------- Shared elements and state ----------
+const statusEl = document.getElementById('status');
+function setState(name) {
+  document.body.dataset.state = name;
+  statusEl.textContent = name === 'idle' ? 'STANDING BY' : name.toUpperCase();
+}
+
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const youEl = document.getElementById('you');
+const botEl = document.getElementById('bot');
+const tickerEl = document.getElementById('ticker');
+const confirmEl = document.getElementById('confirm');
+const confirmText = document.getElementById('confirm-text');
+let pendingId = null;
+
+// ---------- Ticker and confirmation ----------
+function showSteps(steps) {
+  tickerEl.textContent = '';
+  if (steps.length === 0) { tickerEl.textContent = '\u00a0'; return; }
+  for (const s of steps) {
+    const span = document.createElement('span');
+    span.className = 'step ' + s.status;
+    span.textContent = s.text;
+    tickerEl.appendChild(span);
+  }
+}
+
+function showConfirm(c) {
+  pendingId = c.id;
+  confirmText.textContent = c.text;
+  confirmEl.classList.add('show');
+  document.getElementById('ok').focus();
+}
+
+function hideConfirm() {
+  pendingId = null;
+  confirmEl.classList.remove('show');
+}
+
+// ---------- Chat ----------
+async function send(spoken) {
+  const text = (typeof spoken === 'string' ? spoken : input.value).trim();
+  if (!text) return;
+  if (typeof spoken !== 'string') input.value = '';
+  stopSpeaking();
+  hideConfirm();
+  youEl.textContent = text;
+  botEl.textContent = '';
+  tickerEl.textContent = 'working...';
+  setState('thinking');
+  sendBtn.disabled = true;
+
+  const speaker = createSpeaker();
+  const steps = [];
+  let full = '';        // everything shown on screen
+  let buf = '';         // text not yet sent to speech
+  let confirm = null;
+
+  const feed = (flush) => {
+    const t = takeSentences(buf, flush);
+    buf = t.rest;
+    t.sentences.forEach(s => speaker.push(s));
+  };
+
+  try {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+    if (!res.ok || !res.body) throw new Error('Server error ' + res.status);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let pending = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      pending += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = pending.indexOf('\n')) >= 0) {
+        const line = pending.slice(0, nl).trim();
+        pending = pending.slice(nl + 1);
+        if (!line) continue;
+        const msg = JSON.parse(line);
+        if (msg.type === 'delta') {
+          full += msg.text;
+          buf += msg.text;
+          botEl.textContent = full;
+          feed(false);
+        } else if (msg.type === 'step') {
+          steps.push(msg.step);
+          showSteps(steps);
+        } else if (msg.type === 'break') {
+          feed(true);
+          if (full) full += ' ';
+        } else if (msg.type === 'done') {
+          confirm = msg.confirm;
+          showSteps(msg.steps);
+        } else if (msg.type === 'error') {
+          throw new Error(msg.text);
+        }
+      }
+    }
+    feed(true);
+    speaker.end();
+    if (confirm) showConfirm(confirm);
+  } catch (err) {
+    stopSpeaking();
+    botEl.textContent = full ? full + ' [Error: ' + err.message + ']' : 'Error: ' + err.message;
+    tickerEl.textContent = '\u00a0';
+    setState('idle');
+  }
+  sendBtn.disabled = false;
+  if (!pendingId) input.focus();
+  loadEvents();
+  loadTasks();
+}
+
+async function resolveAction(approve) {
+  if (!pendingId) return;
+  const id = pendingId;
+  hideConfirm();
+  try {
+    const res = await fetch('/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id, approve: approve })
+    });
+    if (!res.ok) throw new Error('Server error ' + res.status);
+    const data = await res.json();
+    botEl.textContent = data.reply;
+    speak(data.reply).catch(() => {});
+  } catch (err) {
+    botEl.textContent = 'Error: ' + err.message;
+  }
+  input.focus();
+  loadEvents();
+}
+
+// ---------- Tasks ----------
+async function loadTasks() {
+  const res = await fetch('/tasks');
+  const data = await res.json();
+  const box = document.getElementById('tasks');
+  box.innerHTML = '';
+  if (data.tasks.length === 0) {
+    const none = document.createElement('div');
+    none.className = 'muted';
+    none.textContent = 'No tasks yet';
+    box.appendChild(none);
+    return;
+  }
+  for (const t of data.tasks) {
+    const label = document.createElement('label');
+    label.className = 'task' + (t.done ? ' done' : '');
+    label.addEventListener('click', e => e.stopPropagation());
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = t.done;
+    cb.addEventListener('change', () => toggleTask(t.id, cb.checked));
+    const name = document.createElement('span');
+    name.className = 't';
+    name.textContent = t.title;
+    label.append(cb, name);
+    if (t.due) {
+      const due = document.createElement('span');
+      due.className = 'due';
+      due.textContent = t.due;
+      label.appendChild(due);
+    }
+    box.appendChild(label);
+  }
+}
+
+async function toggleTask(id, done) {
+  await fetch('/tasks/' + id, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ done: done })
+  });
+  loadTasks();
+}
+
+// ---------- Voice out (spoken replies) ----------
+const voiceBtn = document.getElementById('voice');
+let voiceOn = false;
+
+// Tiny silent WAV, played once on a user click to unlock audio playback
+const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+function unlockAudio() {
+  const a = new Audio(SILENCE);
+  a.play().catch(() => {});
+}
+
+let cancelPlayback = null;
+let speakToken = 0;
+
+function stopSpeaking() {
+  speakToken++;                       // invalidates every queued sentence
+  if (cancelPlayback) cancelPlayback();
+  if (document.body.dataset.state === 'speaking') setState('idle');
+}
+
+async function fetchSpeech(text) {
+  const res = await fetch('/speak', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: text })
+  });
+  if (!res.ok) throw new Error('Speech error ' + res.status);
+  return res.blob();
+}
+
+function playBlob(blob, token) {
+  return new Promise(resolve => {
+    if (token !== speakToken) { resolve(); return; }
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    const done = () => {
+      audio.pause();
+      URL.revokeObjectURL(url);
+      if (cancelPlayback === done) cancelPlayback = null;
+      resolve();
+    };
+    cancelPlayback = done;
+    audio.onplay = () => { if (token === speakToken) setState('speaking'); };
+    audio.onended = done;
+    audio.onerror = done;
+    audio.play().catch(done);
+  });
+}
+
+// Words that end in a period but do not end a sentence
+const ABBREV = /\b(?:Mr|Mrs|Ms|Dr|St|vs|etc|a\.m|p\.m|e\.g|i\.e)\.$/i;
+
+function takeSentences(buf, flush) {
+  const out = [];
+  let start = 0;
+  const re = /[.!?]+["')\]]*\s+|\n+/g;
+  let m;
+  while ((m = re.exec(buf)) !== null) {
+    const end = m.index + m[0].length;
+    const piece = buf.slice(start, end).trim();
+    if (ABBREV.test(piece)) continue;
+    if (piece.length < 12) continue;
+    out.push(piece);
+    start = end;
+  }
+  let rest = buf.slice(start);
+  if (flush && rest.trim()) { out.push(rest.trim()); rest = ''; }
+  return { sentences: out, rest: rest };
+}
+
+function createSpeaker() {
+  stopSpeaking();
+  const token = speakToken;
+  const queue = [];        // promises of audio, in speaking order
+  let finished = false;    // no more text is coming
+  let running = false;
+
+  function settle() {
+    if (token === speakToken && finished && !running && !queue.length) setState('idle');
+  }
+
+  async function run() {
+    if (running) return;
+    running = true;
+    while (token === speakToken && queue.length) {
+      let blob;
+      try { blob = await queue.shift(); }
+      catch (err) { tickerEl.textContent = 'voice error: ' + err.message; continue; }
+      if (token !== speakToken) break;
+      await playBlob(blob, token);
+    }
+    running = false;
+    settle();
+  }
+
+  return {
+    push(text) {
+      text = text.trim();
+      if (!voiceOn || !text || token !== speakToken) return;
+      const p = fetchSpeech(text);
+      p.catch(() => {});   // real handling happens in run()
+      queue.push(p);
+      run();
+    },
+    end() { finished = true; settle(); }
+  };
+}
+
+// Speak a whole piece of text (used for confirmation results)
+function speak(text) {
+  const s = createSpeaker();
+  s.push(text);
+  s.end();
+  return Promise.resolve(true);
+}
+
+// ---------- Voice in (microphone) ----------
+const micBtn = document.getElementById('mic');
+const micState = document.getElementById('mic-state');
+const hintEl = document.getElementById('hint');
+const MAX_RECORD_MS = 30000;
+let stream = null;
+let recorder = null;
+let chunks = [];
+let holding = false;
+let latched = false;
+let discard = false;
+let pointerDown = false;
+let recStart = 0;
+let pressStart = 0;
+let latchTimer = null;
+
+function releaseMic() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+}
+
+async function startRecording() {
+  if (!voiceOn || holding || recorder || sendBtn.disabled) return;
+  stopSpeaking();
+  holding = true;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    holding = false;
+    botEl.textContent = 'Microphone unavailable: ' + err.message;
+    return;
+  }
+  if (!holding || !voiceOn) { holding = false; releaseMic(); return; }
+  chunks = [];
+  recorder = new MediaRecorder(stream);
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  recorder.onstop = finishRecording;
+  recorder.start();
+  recStart = Date.now();
+  latchTimer = setTimeout(stopRecording, MAX_RECORD_MS);
+  micBtn.classList.add('live');
+  micState.textContent = 'LIVE';
+  setState('listening');
+}
+
+function stopRecording() {
+  holding = false;
+  latched = false;
+  clearTimeout(latchTimer);
+  if (recorder && recorder.state === 'recording') recorder.stop();
+}
+
+function cancelRecording() {
+  holding = false;
+  latched = false;
+  clearTimeout(latchTimer);
+  if (recorder && recorder.state === 'recording') {
+    discard = true;
+    recorder.stop();
+  } else {
+    releaseMic();
+  }
+}
+
+async function finishRecording() {
+  const type = recorder.mimeType || 'audio/webm';
+  const tooShort = Date.now() - recStart < 500;
+  const dropped = discard;
+  discard = false;
+  recorder = null;
+  holding = false;
+  latched = false;
+  clearTimeout(latchTimer);
+  releaseMic();
+  micBtn.classList.remove('live');
+  micState.textContent = voiceOn ? 'READY' : 'OFF';
+  if (dropped || tooShort) { setState('idle'); return; }
+
+  const form = new FormData();
+  form.append('file', new Blob(chunks, { type: type }), type.includes('mp4') ? 'speech.mp4' : 'speech.webm');
+  youEl.textContent = '...';
+  botEl.textContent = '';
+  tickerEl.textContent = 'transcribing...';
+  setState('thinking');
+  try {
+    const res = await fetch('/transcribe', { method: 'POST', body: form });
+    if (!res.ok) throw new Error('Server error ' + res.status);
+    const data = await res.json();
+    if (!data.text) {
+      youEl.textContent = '\u00a0';
+      botEl.textContent = "I didn't catch that.";
+      tickerEl.textContent = '\u00a0';
+      setState('idle');
+      return;
+    }
+    await send(data.text);
+  } catch (err) {
+    botEl.textContent = 'Error: ' + err.message;
+    tickerEl.textContent = '\u00a0';
+    setState('idle');
+  }
+}
+
+// ---------- Voice mode master switch ----------
+function setVoice(on) {
+  voiceOn = on;
+  voiceBtn.setAttribute('aria-checked', String(on));
+  micBtn.disabled = !on;
+  micState.textContent = on ? 'READY' : 'OFF';
+  hintEl.textContent = on
+    ? 'HOLD THE MIC OR SPACE TO TALK, OR TAP THE MIC TO START AND TAP AGAIN TO STOP'
+    : 'VOICE MODE IS OFF - SWITCH IT ON TO USE THE MIC AND SPOKEN REPLIES';
+  if (!on) { cancelRecording(); stopSpeaking(); }
+}
+
+// ---------- Calendar ----------
+const WEEK_START = 0;      // 0 = Sunday, 1 = Monday
+const HOUR_PX = 48;        // height of one hour in the week/day views
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DOWS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const REPEAT_LABEL = { daily:'daily', weekdays:'weekdays', weekly:'weekly', biweekly:'every 2 weeks', monthly:'monthly' };
+
+const schedPanel = document.getElementById('sched-panel');
+const calBox = document.getElementById('cal');
+const cal = { open: false, view: 'year', anchor: new Date(), fresh: true };
+let calToken = 0;
+let calBody = null;
+
+// --- small helpers ---
+function h(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function iso(d) { return d.toLocaleDateString('en-CA'); }
+function parseISO(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+function startOfWeek(d) { return addDays(d, -((d.getDay() - WEEK_START + 7) % 7)); }
+function mins(t) { const [H, M] = t.split(':').map(Number); return H * 60 + M; }
+function fmtTime(t) {
+  const [H, M] = t.split(':').map(Number);
+  return (H % 12 || 12) + (M ? ':' + String(M).padStart(2, '0') : '') + ' ' + (H >= 12 ? 'PM' : 'AM');
+}
+function fmtRange(ev) {
+  return ev.end_time ? fmtTime(ev.time) + ' \u2013 ' + fmtTime(ev.end_time) : fmtTime(ev.time);
+}
+function metaLine(ev) {
+    return fmtRange(ev) + (ev.repeat !== 'none' ? '  \u21bb ' + ev.repeat_label : '');
+}
+async function fetchEvents(a, b) {
+  const res = await fetch('/calendar?start=' + iso(a) + '&end=' + iso(b));
+  if (!res.ok) throw new Error('calendar ' + res.status);
+  return (await res.json()).events;
+}
+function groupByDate(events) {
+  const map = {};
+  for (const ev of events) (map[ev.date] ||= []).push(ev);
+  return map;
+}
+
+// --- compact view: the next 7 days ---
+async function loadEvents() {
+  const box = document.getElementById('sched');
+  const today = new Date();
+  let evs;
+  try { evs = await fetchEvents(today, addDays(today, 6)); }
+  catch (e) { box.textContent = 'Could not load the schedule.'; return; }
+  const map = groupByDate(evs);
+  box.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(today, i);
+    const label = i === 0 ? 'TODAY' : i === 1 ? 'TOMORROW' : DOWS[d.getDay()].toUpperCase();
+    box.appendChild(h('div', 'sday', label + ' \u00b7 ' + MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate()));
+    const list = map[iso(d)] || [];
+    if (!list.length) box.appendChild(h('div', 'sempty', 'Nothing scheduled'));
+    for (const ev of list) {
+      const card = h('div', 'evc');
+      card.appendChild(h('div', 'et', ev.title));
+      card.appendChild(h('div', 'em', metaLine(ev)));
+      box.appendChild(card);
+    }
+  }
+  if (cal.open) renderCal();
+}
+
+// --- expanded view ---
+function rangeFor(view, a) {
+  if (view === 'year') return [new Date(a.getFullYear(), 0, 1), new Date(a.getFullYear(), 11, 31)];
+  if (view === 'month') {
+    const first = new Date(a.getFullYear(), a.getMonth(), 1);
+    const last = new Date(a.getFullYear(), a.getMonth() + 1, 0);
+    return [startOfWeek(first), addDays(startOfWeek(last), 6)];
+  }
+  if (view === 'week') { const s = startOfWeek(a); return [s, addDays(s, 6)]; }
+  return [a, a];
+}
+
+function titleFor() {
+  const a = cal.anchor;
+  if (cal.view === 'year') return String(a.getFullYear());
+  if (cal.view === 'month') return MONTHS[a.getMonth()] + ' ' + a.getFullYear();
+  if (cal.view === 'week') {
+    const s = startOfWeek(a), e = addDays(s, 6);
+    return MONTHS[s.getMonth()].slice(0, 3) + ' ' + s.getDate() + ' \u2013 ' +
+           MONTHS[e.getMonth()].slice(0, 3) + ' ' + e.getDate() + ', ' + e.getFullYear();
+  }
+  return DOWS[a.getDay()] + ', ' + MONTHS[a.getMonth()] + ' ' + a.getDate() + ', ' + a.getFullYear();
+}
+
+function zoomTo(view, date) {
+  cal.view = view;
+  cal.anchor = date;
+  cal.fresh = true;
+  renderCal();
+}
+
+function shift(dir) {
+  const a = cal.anchor;
+  if (cal.view === 'year') cal.anchor = new Date(a.getFullYear() + dir, 0, 1);
+  else if (cal.view === 'month') cal.anchor = new Date(a.getFullYear(), a.getMonth() + dir, 1);
+  else if (cal.view === 'week') cal.anchor = addDays(a, 7 * dir);
+  else cal.anchor = addDays(a, dir);
+  renderCal();
+}
+
+function buildToolbar() {
+  const bar = h('div', 'ctool');
+  const prev = h('button', 'cbtn', '\u2039');
+  prev.onclick = () => shift(-1);
+  const today = h('button', 'cbtn', 'Today');
+  today.onclick = () => zoomTo(cal.view, new Date());
+  const next = h('button', 'cbtn', '\u203a');
+  next.onclick = () => shift(1);
+  bar.append(prev, today, next, h('div', 'ctitle', titleFor()));
+  const tabs = h('div', 'tabs');
+  for (const v of ['year', 'month', 'week', 'day']) {
+    const b = h('button', 'cbtn' + (v === cal.view ? ' on' : ''), v[0].toUpperCase() + v.slice(1));
+    b.onclick = () => zoomTo(v, cal.anchor);
+    tabs.appendChild(b);
+  }
+  bar.appendChild(tabs);
+  return bar;
+}
+
+async function renderCal() {
+  const token = ++calToken;
+  const [from, to] = rangeFor(cal.view, cal.anchor);
+  let evs;
+  try { evs = await fetchEvents(from, to); }
+  catch (e) { calBox.textContent = 'Could not load the calendar.'; return; }
+  if (token !== calToken || !cal.open) return;     // a newer render or a close won
+
+  const prevScroll = calBody ? calBody.scrollTop : 0;
+  calBox.innerHTML = '';
+  calBox.appendChild(buildToolbar());
+  calBody = h('div', 'cbody');
+  calBox.appendChild(calBody);
+
+  const map = groupByDate(evs);
+  if (cal.view === 'year') drawYear(calBody, map);
+  else if (cal.view === 'month') drawMonth(calBody, map);
+  else if (cal.view === 'week') {
+    const s = startOfWeek(cal.anchor);
+    drawTimeGrid(calBody, [0, 1, 2, 3, 4, 5, 6].map(i => addDays(s, i)), map);
+  } else drawTimeGrid(calBody, [cal.anchor], map);
+
+  const grid = cal.view === 'week' || cal.view === 'day';
+  calBody.scrollTop = cal.fresh ? (grid ? 7 * HOUR_PX : 0) : prevScroll;
+  cal.fresh = false;
+}
+
+function drawYear(box, map) {
+  const y = cal.anchor.getFullYear();
+  const todayKey = iso(new Date());
+  const grid = h('div', 'ygrid');
+  for (let m = 0; m < 12; m++) {
+    const card = h('div', 'ymonth');
+    const title = h('button', 'ym-title', MONTHS[m].toUpperCase());
+    title.onclick = () => zoomTo('month', new Date(y, m, 1));
+    card.appendChild(title);
+    const g = h('div', 'ym-grid');
+    for (let i = 0; i < 7; i++) g.appendChild(h('div', 'dow', DOWS[(i + WEEK_START) % 7][0]));
+    const lead = (new Date(y, m, 1).getDay() - WEEK_START + 7) % 7;
+    for (let i = 0; i < lead; i++) g.appendChild(h('div', 'yd out'));
+    const count = new Date(y, m + 1, 0).getDate();
+    for (let d = 1; d <= count; d++) {
+      const key = iso(new Date(y, m, d));
+      const cell = h('div', 'yd' + (key === todayKey ? ' today' : ''), String(d));
+      const n = (map[key] || []).length;
+      if (n) cell.style.background = 'rgba(76,201,240,' + (0.18 + Math.min(n, 4) * 0.14) + ')';
+      cell.onclick = () => zoomTo('month', new Date(y, m, 1));
+      g.appendChild(cell);
+    }
+    card.appendChild(g);
+    grid.appendChild(card);
+  }
+  box.appendChild(grid);
+}
+
+function drawMonth(box, map) {
+  const month = cal.anchor.getMonth();
+  const [from, to] = rangeFor('month', cal.anchor);
+  const todayKey = iso(new Date());
+  const dow = h('div', 'mdow');
+  for (let i = 0; i < 7; i++) dow.appendChild(h('div', null, DOWS[(i + WEEK_START) % 7].toUpperCase()));
+  box.appendChild(dow);
+  const grid = h('div', 'mgrid');
+  for (let d = from; d <= to; d = addDays(d, 1)) {
+    const day = d;
+    const key = iso(day);
+    const cell = h('div', 'mcell' + (day.getMonth() !== month ? ' out' : '') + (key === todayKey ? ' today' : ''));
+    cell.appendChild(h('span', 'num', String(day.getDate())));
+    const list = map[key] || [];
+    for (const ev of list.slice(0, 3)) cell.appendChild(h('div', 'chip', fmtTime(ev.time) + ' ' + ev.title));
+    if (list.length > 3) cell.appendChild(h('div', 'more', '+' + (list.length - 3) + ' more'));
+    cell.onclick = () => zoomTo('week', day);
+    grid.appendChild(cell);
+  }
+  box.appendChild(grid);
+}
+
+// Put overlapping events side by side instead of on top of each other
+function layoutDay(evs) {
+  const items = evs.map(ev => {
+    const s = mins(ev.time);
+    const e = ev.end_time ? mins(ev.end_time) : s + 60;
+    return { ev, s, e: Math.max(e, s + 20) };
+  }).sort((a, b) => a.s - b.s || a.e - b.e);
+  let cluster = [], clusterEnd = 0, colEnds = [];
+  const flush = () => {
+    cluster.forEach(it => { it.cols = colEnds.length; });
+    cluster = []; colEnds = []; clusterEnd = 0;
+  };
+  for (const it of items) {
+    if (cluster.length && it.s >= clusterEnd) flush();
+    let c = colEnds.findIndex(end => end <= it.s);
+    if (c === -1) { c = colEnds.length; colEnds.push(it.e); } else colEnds[c] = it.e;
+    it.col = c;
+    cluster.push(it);
+    clusterEnd = Math.max(clusterEnd, it.e);
+  }
+  flush();
+  return items;
+}
+
+function drawTimeGrid(box, days, map) {
+  const todayKey = iso(new Date());
+  const wrap = h('div', 'tg');
+  wrap.style.gridTemplateColumns = '56px repeat(' + days.length + ', minmax(0, 1fr))';
+
+  wrap.appendChild(h('div', 'tgh'));
+  for (const d of days) {
+    const head = h('button', 'tgh' + (iso(d) === todayKey ? ' today' : ''), DOWS[d.getDay()] + ' ' + d.getDate());
+    if (days.length > 1) head.onclick = () => zoomTo('day', d);
+    wrap.appendChild(head);
+  }
+
+  const gutter = h('div', 'gutter');
+  gutter.style.height = (24 * HOUR_PX) + 'px';
+  for (let hr = 1; hr < 24; hr++) {
+    const lab = h('span', null, fmtTime(String(hr).padStart(2, '0') + ':00'));
+    lab.style.top = (hr * HOUR_PX - 7) + 'px';
+    gutter.appendChild(lab);
+  }
+  wrap.appendChild(gutter);
+
+  for (const d of days) {
+    const key = iso(d);
+    const col = h('div', 'dcol');
+    col.style.height = (24 * HOUR_PX) + 'px';
+    col.style.backgroundSize = '100% ' + HOUR_PX + 'px';
+    for (const it of layoutDay(map[key] || [])) {
+      const blk = h('div', 'tev');
+      const top = it.s / 60 * HOUR_PX;
+      const height = (it.e - it.s) / 60 * HOUR_PX - 2;
+      blk.style.cssText = 'top:' + top + 'px;height:' + height + 'px;left:' + (100 * it.col / it.cols) + '%;width:' + (100 / it.cols) + '%';
+      blk.appendChild(h('div', null, it.ev.title + (it.ev.repeat !== 'none' ? ' \u21bb' : '')));
+      if (height >= 38) blk.appendChild(h('div', 'tm', fmtRange(it.ev)));
+      col.appendChild(blk);
+    }
+    if (key === todayKey) {
+      const now = new Date();
+      const line = h('div', 'nowline');
+      line.style.top = ((now.getHours() * 60 + now.getMinutes()) / 60 * HOUR_PX) + 'px';
+      col.appendChild(line);
+    }
+    wrap.appendChild(col);
+  }
+  box.appendChild(wrap);
+}
+
+function openCal() {
+  cal.open = true;
+  cal.view = 'year';
+  cal.anchor = new Date();
+  cal.fresh = true;
+  renderCal();
+}
+function closeCal() {
+  cal.open = false;
+  calBody = null;
+  calBox.innerHTML = '';
+}
+
+// ---------- Panel focus ----------
+let focused = null;
+function focusPanel(p) {
+  if (focused) return;
+  focused = p;
+  p.classList.add('focused');
+  document.body.classList.add('has-focus');
+  p.querySelector('.hint').textContent = 'ESC TO CLOSE';
+  if (p === schedPanel) openCal();          // NEW
+}
+function closeFocus() {
+  if (!focused) return;
+  if (focused === schedPanel) closeCal();   // NEW
+  focused.classList.remove('focused');
+  document.body.classList.remove('has-focus');
+  focused.querySelector('.hint').textContent = 'EXPAND +';
+  focused = null;
+}
+document.querySelectorAll('.panel').forEach(p => {
+  p.addEventListener('click', () => focusPanel(p));
+  p.addEventListener('keydown', e => { if (e.key === 'Enter') focusPanel(p); });
+});
+document.getElementById('scrim').addEventListener('click', closeFocus);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFocus(); });
+
+// ---------- Reduce motion ----------
+const motionBtn = document.getElementById('motion');
+function setReduce(on) {
+  document.body.classList.toggle('reduce', on);
+  motionBtn.setAttribute('aria-checked', String(on));
+  try { localStorage.setItem('reduceMotion', on ? '1' : '0'); } catch (e) {}
+}
+let saved = null;
+try { saved = localStorage.getItem('reduceMotion'); } catch (e) {}
+setReduce(saved === '1');
+motionBtn.addEventListener('click', () => setReduce(!document.body.classList.contains('reduce')));
+
+// ---------- Event listeners ----------
+document.getElementById('ok').addEventListener('click', () => resolveAction(true));
+document.getElementById('cancel').addEventListener('click', () => resolveAction(false));
+
+voiceBtn.addEventListener('click', () => {
+  if (!voiceOn) unlockAudio();
+  setVoice(!voiceOn);
+});
+
+micBtn.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  unlockAudio();
+  if (latched) { stopRecording(); return; }
+  pointerDown = true;
+  pressStart = Date.now();
+  startRecording();
+});
+micBtn.addEventListener('pointerup', () => {
+  if (!pointerDown) return;
+  pointerDown = false;
+  if (!holding) return;
+  if (Date.now() - pressStart < 400) latched = true;
+  else stopRecording();
+});
+const abortHold = () => {
+  if (pointerDown && !latched) { pointerDown = false; stopRecording(); }
+};
+micBtn.addEventListener('pointerleave', abortHold);
+micBtn.addEventListener('pointercancel', abortHold);
+
+document.addEventListener('keydown', e => {
+  if (!voiceOn || e.code !== 'Space' || e.repeat) return;
+  const t = e.target;
+  const typing = t.tagName === 'INPUT' && t.value !== '';
+  if (typing || t.tagName === 'BUTTON' || t.tagName === 'TEXTAREA') return;
+  e.preventDefault();
+  startRecording();
+});
+document.addEventListener('keyup', e => { if (e.code === 'Space') stopRecording(); });
+
+sendBtn.addEventListener('click', send);
+input.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+
+// ---------- Startup ----------
+buildOrb();
+loadEvents();
+loadTasks();
+setVoice(false);
+input.focus();
+</script>
+</body>
+</html>
