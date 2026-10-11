@@ -1,9 +1,10 @@
 """Calendar logic for JARVIS: durations, repeating events, per-date exceptions."""
 import sqlite3
 import threading
+import os
 from datetime import datetime, timedelta
 
-db = sqlite3.connect("jarvis.db", check_same_thread=False)
+db = sqlite3.connect(os.environ.get("JARVIS_DB", "jarvis.db"), check_same_thread=False)
 lock = threading.Lock()
 
 db.execute(
@@ -276,6 +277,33 @@ def add_event(title: str, date: str, start_time: str, end_time: str = "",
         msg += f" until {until}" if until else " with no end date"
     return msg + "."
 
+def find_for_delete(title: str, date: str, scope: str = "this"):
+    """Returns an error string, or {'action': ..., 'text': ...} to confirm."""
+    try:
+        d = _d(date)
+    except ValueError:
+        return "Error: use date YYYY-MM-DD."
+    scope = (scope or "this").lower().strip()
+    if scope not in ("this", "all"):
+        return "Error: scope must be 'this' or 'all'."
+    matches = [ev for ev in events_between(d, d) if title.lower() in ev["title"].lower()]
+    if not matches:
+        return f"Error: no event matching '{title}' on {date}."
+    if len(matches) > 1:
+        names = "; ".join(f"{m['time']} {m['title']}" for m in matches)
+        return f"Error: several events match ({names}). Ask the user which one."
+    ev = matches[0]
+    if ev["repeat"] == "none":
+        action = {"event_id": ev["id"], "date": date, "scope": "all"}
+        text = f"Delete '{ev['title']}' on {date} at {ev['time']}?"
+    elif scope == "all":
+        action = {"event_id": ev["id"], "date": date, "scope": "all"}
+        text = f"Delete ALL occurrences of '{ev['title']}' (repeats {ev['repeat_label']})?"
+    else:
+        action = {"event_id": ev["id"], "date": date, "scope": "this"}
+        text = (f"Delete only the {date} occurrence of '{ev['title']}' "
+                f"(it repeats {ev['repeat_label']})?")
+    return {"action": action, "text": text}
 
 def apply_delete(action: dict) -> None:
     with lock:

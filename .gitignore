@@ -1,6 +1,7 @@
 # Python environment (can be rebuilt, and it breaks when the folder moves)
 .venv/
 __pycache__/
+.pytest_cache
 *.pyc
 
 # Your real calendar and tasks (personal data)
@@ -18,3 +19,4 @@ models/
 
 # Secrets, in case you ever add any
 .env
+.pytest_cache/
