@@ -20,3 +20,7 @@ models/
 # Secrets, in case you ever add any
 .env
 .pytest_cache/
+
+backups/
+.ruff_cache/
+*.log
