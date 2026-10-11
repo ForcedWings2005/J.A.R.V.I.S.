@@ -1,0 +1,16 @@
+# Ruff: a fast linter that spots typos, unused code and missing names.
+line-length = 100
+target-version = "py313"
+
+# Old experiments are not part of the app, and backups are data
+extend-exclude = ["experiments", "backups"]
+
+[lint]
+# E = style errors, F = real mistakes (unused imports, undefined names), B = likely bugs
+select = ["E", "F", "B"]
+# Long lines are fine in this project
+ignore = ["E501"]
+
+[lint.flake8-bugbear]
+# FastAPI's File(...) in a function signature is normal, not a bug
+extend-immutable-calls = ["fastapi.File", "fastapi.Depends", "fastapi.Query"]

@@ -1,6 +1,9 @@
 import sqlite3
 import threading
 import uuid
+import ast
+import math
+import operator
 import ollama
 import jcal
 from datetime import datetime, timedelta
@@ -109,10 +112,6 @@ def set_task_done(task_id: int, done: bool) -> bool:
         )
         db.commit()
         return cur.rowcount > 0
-
-import ast
-import math
-import operator
 
 OPS = {
     ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
@@ -297,34 +296,6 @@ def describe_step(call, result: str) -> dict:
     else:
         status = "done"
     return {"text": f"{call.function.name}({args})", "status": status}
-
-def chat(user_text: str) -> dict:
-    with chat_lock:
-        turn["confirm"] = None
-        steps = []
-        messages[0]["content"] = build_system_prompt()
-        messages.append({"role": "user", "content": user_text})
-        resp = ollama.chat(model=MODEL, messages=messages, tools=tools)
-        messages.append(resp.message)
-
-        rounds = 0
-        while resp.message.tool_calls and rounds < MAX_ROUNDS:
-            rounds += 1
-            for call in resp.message.tool_calls:
-                print(f"  [tool call] {call.function.name}({call.function.arguments})")
-                result = run_tool(call)
-                print(f"  [tool result] {result}")
-                steps.append(describe_step(call, result))
-                messages.append({
-                    "role": "tool",
-                    "tool_name": call.function.name,
-                    "content": result,
-                })
-            resp = ollama.chat(model=MODEL, messages=messages, tools=tools)
-            messages.append(resp.message)
-
-        reply = resp.message.content or "Sorry, I could not finish that."
-        return {"reply": reply, "steps": steps, "confirm": turn["confirm"]}
     
 def chat_stream(user_text: str):
     # """Generator: yields small dicts as the reply is produced."""
