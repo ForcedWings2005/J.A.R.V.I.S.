@@ -10,8 +10,16 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-import brain, jcal
-import speech
+import backup_db
+
+try:
+    backup_db.backup(overwrite=False)   # first start of the day only
+except Exception as e:                  # a backup problem must never stop JARVIS
+    print(f"backup failed: {e}")
+
+import brain  # noqa: E402
+import jcal  # noqa: E402
+import speech  # noqa: E402
 
 app = FastAPI()
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
