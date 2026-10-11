@@ -3,7 +3,7 @@
 A local, private personal assistant with a web dashboard, calendar, to-do list and voice.
 Runs on a MacBook Pro (M3 Max, 64 GB). Everything runs on this machine.
 
-Written 2026-10-08, last updated 2026-10-09. Entries are in the order the work was done.
+Written 2026-10-08, last updated 2026-10-10. Entries are in the order the work was done.
 
 ---
 
@@ -27,6 +27,10 @@ jarvis/
 ├── agent.py            Terminal version of the assistant (not used by the dashboard)
 ├── compare.py          Model comparison test (not used by the dashboard)
 ├── smoke_test.py       First tool-calling test (not used by the dashboard)
+├── tests/
+│   ├── conftest.py     Test setup: temporary database and frozen clock
+│   └── test_jcal.py    Automated tests for the calendar logic
+├── pytest.ini          Tells pytest where the tests are
 └── CHANGELOG.md        This file
 ```
 
@@ -42,10 +46,13 @@ Then open http://127.0.0.1:8000 and hard refresh with Cmd+Shift+R.
 
 Note: the project now lives in `~/Desktop/jarvis`. A virtual environment cannot be moved with its folder, so after moving the project it has to be rebuilt (`rm -rf .venv`, `python3 -m venv .venv`, activate, then `pip install ollama fastapi uvicorn mlx-whisper python-multipart kokoro-onnx`). Always start the server from inside the project folder, because the code uses relative paths such as `jarvis.db`, `static/index.html` and `models/`.
 
+Run the tests (from the project folder, venv active): `python -m pytest`. They never touch the real `jarvis.db`.
+
 ## Dependencies
 
 - Ollama with the `gemma4:latest` model (also pulled: `mistral:latest`, `qwen3.5:latest`)
 - Python packages: `ollama`, `fastapi`, `uvicorn`, `mlx-whisper`, `python-multipart`, `kokoro-onnx`
+- Development only: `pytest` (to run the tests)
 - System: `ffmpeg` (via Homebrew)
 - Downloaded models: Whisper `mlx-community/whisper-large-v3-turbo`, Kokoro `kokoro-v1.0.onnx` and `voices-v1.0.bin`
 
@@ -211,7 +218,7 @@ What we learned:
 - **JARVIS's explanation is not a diagnosis.** The model writes a plausible reason after the fact. It cannot see why it answered as it did, and it cannot change itself. Nothing was changed, and the conversation resets when the server restarts, so no "measures" were taken.
 - **Likely real cause:** `get_events` returns everything on a date with no sign of which events have already ended. The model had to compare each event's time with the current time in the system prompt, and it did not. This fits the earlier finding that the model is unreliable at date and time arithmetic (sections 2, 3 and 14).
 
-Fix (written; not tested yet):
+Fix (written; the logic is covered by automated tests, but not yet confirmed in a real conversation with JARVIS):
 
 - The time comparison now happens in code. In `jcal.py`, a new helper `_status()` labels each event as `finished`, `in progress` or `upcoming` by comparing its start and end time with the current time. Events on earlier dates are `finished`; events on later dates get no label.
 - `get_events` now adds that label to each event (for example `10:00-11:15 Biological anthropology class [finished]`) and states the current day and time at the start of its result.
@@ -232,6 +239,20 @@ Fix (written; not tested yet):
 - The first push succeeded on 2026-10-10. GitHub's repo already held an automatic "Initial commit", so the push was rejected at first; `git pull origin main --rebase` placed the local commit on top of it and the second push worked. The remote is `origin`, and `main` tracks `origin/main`.
 - Status: set up and pushed.
 
+## 18. Automated tests for the calendar
+
+- Added `tests/test_jcal.py` (51 checks) and `tests/conftest.py`, run with `python -m pytest`. `pytest.ini` points pytest at the `tests` folder.
+- **One change to `jcal.py`:** the database file name now comes from the `JARVIS_DB` environment variable and falls back to `jarvis.db`. Normal use is unchanged. The tests set it to an in-memory database, so they can never touch the real calendar.
+- **Frozen clock:** every test runs as if it were Monday 2030-01-07 at 08:00 (a replacement for `datetime` inside `jcal`). Results do not depend on the real date, and times that would normally be "in the past" can be tested.
+- **What is covered:** adding events (defaults, end times, bad input, past times), overlap and back-to-back conflicts, every repeat rule, `repeat_days` (the Wednesday and Friday bug), repeat end dates, conflicts checked into the future, deleting one occurrence or a whole series, sorting, range limits, and the finished / in progress / upcoming labels (the "how are we tonight" bug), including the exact minute boundaries.
+- **Known limit pinned by a test:** a monthly repeat on the 31st skips short months.
+- Checked by breaking the code on purpose (labels one minute late, back-to-back counted as a clash, `repeat_days` ignored, weekdays including Saturday, deleting one occurrence deleting all, past-time check removed). Every break made at least one test fail.
+- Not covered yet: the model's behavior (whether it picks the right tool and arguments), `brain.py`, and the web endpoints.
+- `.gitignore` should also list `.pytest_cache/`.
+- **First run on the real project (2026-10-10): 46 passed, 5 failed.** All five failures are the delete tests, with the same error: `jcal` has no attribute `find_for_delete`. The copy of `jcal.py` on the Mac is missing that function, and probably `apply_delete`, which sits next to it. This means deleting an event through JARVIS would also have failed. The tests found it before it showed up in use.
+- All of the other checks pass on the real code, including repeats, `repeat_days` and the finished / upcoming labels.
+- **Fixed:** `find_for_delete` and `apply_delete` were restored in `jcal.py`, and all 51 tests now pass on the Mac. Lesson: the tests caught a lost function that would have broken deleting in real use, which is the reason to keep them and run them before every commit.
+
 ---
 
 ## Status
@@ -243,9 +264,10 @@ Fix (written; not tested yet):
 | Host protection | Tested and working |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
-| Event durations and repeating events | Written; the weekday fix (`repeat_days`) has not been tested yet |
+| Event durations and repeating events | Logic tested (51 automated tests pass); real requests to JARVIS, such as "every Wednesday and Friday", not yet re-checked |
 | Streaming replies into speech | Written; not tested yet |
-| Time-of-day awareness when listing today's events | Fix written (section 16); not tested with JARVIS yet |
+| Automated tests for `jcal.py` | Tested and working: 51 of 51 pass |
+| Time-of-day awareness when listing today's events | Logic tested; not yet confirmed in a real conversation (section 16) |
 
 ## Known limits
 
