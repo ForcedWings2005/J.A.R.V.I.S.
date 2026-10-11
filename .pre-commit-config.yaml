@@ -1,0 +1,16 @@
+# Runs before every `git commit`. If a check fails, the commit is stopped.
+# Uses the tools already installed in your virtual environment (activate it first).
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff (lint)
+        entry: ruff check --force-exclude
+        language: system
+        types: [python]
+      - id: pytest
+        name: pytest
+        entry: python -m pytest -q
+        language: system
+        types: [python]
+        pass_filenames: false
