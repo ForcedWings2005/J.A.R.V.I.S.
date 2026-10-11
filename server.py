@@ -73,8 +73,12 @@ def calendar_range(start: str, end: str):
     try:
         a = datetime.strptime(start, "%Y-%m-%d").date()
         b = datetime.strptime(end, "%Y-%m-%d").date()
-    except ValueError:
-        raise HTTPException(status_code=400, detail="dates must be YYYY-MM-DD")
+    except ValueError as err:
+        raise HTTPException(
+            status_code=400,
+            detail="dates must be YYYY-MM-DD",
+        ) from err
+        
     if b < a or (b - a).days > 400:
         raise HTTPException(status_code=400, detail="range must be 0 to 400 days")
     return {"events": jcal.events_between(a, b)}
