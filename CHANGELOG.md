@@ -3,7 +3,7 @@
 A local, private personal assistant with a web dashboard, calendar, to-do list and voice.
 Runs on a MacBook Pro (M3 Max, 64 GB). Everything runs on this machine.
 
-Written 2026-10-08, last updated 2026-10-10. Entries are in the order the work was done.
+Written 2026-10-08, last updated 2026-10-12. Entries are in the order the work was done.
 
 ---
 
@@ -27,10 +27,17 @@ jarvis/
 ├── agent.py            Terminal version of the assistant (not used by the dashboard)
 ├── compare.py          Model comparison test (not used by the dashboard)
 ├── smoke_test.py       First tool-calling test (not used by the dashboard)
+├── backup_db.py        Backs up jarvis.db (SQLite backup API, 7 days kept)
+├── backups/            The backups (not in git)
 ├── tests/
 │   ├── conftest.py     Test setup: temporary database and frozen clock
 │   └── test_jcal.py    Automated tests for the calendar logic
 ├── pytest.ini          Tells pytest where the tests are
+├── ruff.toml           Lint settings
+├── .pre-commit-config.yaml  Checks that run before every commit
+├── .github/workflows/tests.yml  Runs lint and tests on GitHub for every push
+├── experiments/        Old scripts, not part of the app (agent.py, compare.py, smoke_test.py)
+├── README.md           Setup, run, tests, backups, pinned model
 └── CHANGELOG.md        This file
 ```
 
@@ -253,6 +260,22 @@ Fix (written; the logic is covered by automated tests, but not yet confirmed in 
 - All of the other checks pass on the real code, including repeats, `repeat_days` and the finished / upcoming labels.
 - **Fixed:** `find_for_delete` and `apply_delete` were restored in `jcal.py`, and all 51 tests now pass on the Mac. Lesson: the tests caught a lost function that would have broken deleting in real use, which is the reason to keep them and run them before every commit.
 
+## 19. Phase 1: protect what exists
+
+Applied on the Mac on the branch `phase1-protect` (as of 2026-10-12): the first backup file was created, the dead code is removed and the old scripts are in `experiments/`, `ruff check .` passes with no findings, and the pre-commit hook is installed. Still to confirm: the first GitHub Actions run, the model ID in the README, the optional nightly job, and the merge into `main`.
+
+- **Database backups.** New `backup_db.py` uses SQLite's backup API, which is safe while the server runs (a plain file copy is not). It writes one file per day to `backups/`, checks the copy with `PRAGMA integrity_check` before keeping it, and keeps the newest 7 days. `python backup_db.py` takes a fresh backup now. `server.py` also calls it at startup, before `brain` and `jcal` open the database, but only if today has no backup yet, so the first start of the day keeps a snapshot from before anything changed. If a backup fails, the server still starts and prints the error.
+- **Automatic checks on GitHub.** `.github/workflows/tests.yml` runs `ruff check .` and `python -m pytest` on every push and pull request. It installs only `pytest` and `ruff`, which is enough because `jcal` uses only the standard library.
+- **Ruff linter.** `ruff.toml` selects the E (style), F (real mistakes) and B (likely bugs) rule sets, ignores long lines, skips `experiments/` and `backups/`, and tells the bugbear rules that FastAPI's `File(...)` default is fine.
+- **Pre-commit hook.** `.pre-commit-config.yaml` runs ruff and the tests before every commit using the tools already in the venv, so a failing check stops the commit. Commit from the terminal with the venv active.
+- **Dead code removed.** The unused `chat()` function in `brain.py` is deleted (`chat_stream()` replaced it). `agent.py`, `compare.py` and `smoke_test.py` move to `experiments/` with `git mv`, so their history is kept. `agent.py` opens `jarvis.db` in the current folder when run, which is a reason not to leave it in the project root. `static/index_old.html` is removed, since git history already holds it.
+- **Lint fixes expected from the change:** the `import ast`, `math` and `operator` lines in the middle of `brain.py` move to the top (E402); `raise HTTPException` inside an `except` in `server.py` gets `from None` (B904); `conftest.py` marks its imports after the environment setting with `# noqa: E402`.
+- **Model pinned.** The README records the Ollama model ID, so a change in how JARVIS behaves can be checked against a model update.
+- **README added**, with setup, run, tests, backups and restore steps, and a diagram of how the pieces fit.
+- `.gitignore` gains `backups/`, `.ruff_cache/` and `*.log`.
+- Checked in the sandbox: the backup script (snapshot, no-overwrite, overwrite, 7-day cleanup, missing database), the YAML and TOML files parse, and all 51 tests still pass with the changed `conftest.py`.
+- Optional extra: a macOS nightly job (launchd) running `backup_db.py` at 03:00. macOS may block background access to the Desktop folder, so the startup snapshot is the main protection.
+
 ---
 
 ## Status
@@ -267,6 +290,7 @@ Fix (written; the logic is covered by automated tests, but not yet confirmed in 
 | Event durations and repeating events | Logic tested (51 automated tests pass); real requests to JARVIS, such as "every Wednesday and Friday", not yet re-checked |
 | Streaming replies into speech | Written; not tested yet |
 | Automated tests for `jcal.py` | Tested and working: 51 of 51 pass |
+| Phase 1 (backups, CI, ruff, pre-commit, cleanup, model pin) | Applied on a branch; ruff passes; CI run, model ID and merge to `main` still to confirm (section 19) |
 | Time-of-day awareness when listing today's events | Logic tested; not yet confirmed in a real conversation (section 16) |
 
 ## Known limits
@@ -283,9 +307,12 @@ Fix (written; the logic is covered by automated tests, but not yet confirmed in 
 
 ## Possible next steps
 
-1. Edit and move events (change time, title or length without deleting and re-adding).
-2. Real data for weather, news and sports panels.
-3. Notes and memory tool.
-4. Login and HTTPS before using it from a phone (Tailscale).
-5. Google Calendar in place of the local database.
-6. Morning briefing view and a phone layout.
+1. Phase 2: an evaluation suite for the model (turn `compare.py` into real cases), and tests for `brain.py`.
+2. Phase 3: one shared database module, versioned migrations, one tool registry, history trimming, logging and a `config.py`.
+3. Edit and move events (change time, title or length without deleting and re-adding).
+4. Reminders and timers.
+5. Real data for weather, news and sports panels.
+6. Notes and memory tool.
+7. Login and HTTPS before using it from a phone (Tailscale).
+8. Google Calendar in place of the local database.
+9. Morning briefing view and a phone layout.

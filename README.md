@@ -76,7 +76,7 @@ differently, check this first.
 
 | Model | ID (from `ollama list`) | Date recorded |
 |---|---|---|
-| gemma4:latest | `PASTE_ID_HERE` | PASTE_DATE_HERE |
+| gemma4:latest | `Gemma4` | 10/12/26 |
 
 ## Project history
 
