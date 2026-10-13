@@ -314,7 +314,7 @@ Real failures it found:
 
 ## 22. Fixes found by the evals, and decimals in speech
 
-Still on `phase2-evals`.
+Done on `phase2-evals`, which was merged into `main` on 2026-10-12 (a fast-forward) and then deleted. With this, Phase 2 of `plan.md` is complete.
 
 - **Delete matching works both ways.** "Cancel my dentist appointment" now finds an event titled "Dentist". Before, `find_for_delete` only matched when the words the user said were inside the title. New helper `_title_matches` in `jcal.py`.
 - **Deleting a whole series no longer needs a date.** `delete_event` takes the date as optional when the scope is "all". Without a date it looks only at events that still have something ahead (a one-off that is today or later, or a series whose end date has not passed), and asks which one if several match. Deleting one occurrence still needs its date. The tool description says never to ask the user for a date just to delete a series.
@@ -345,7 +345,7 @@ Still on `phase2-evals`.
 | Automated tests for `jcal.py` | Tested and working: 51 of 51 pass |
 | Phase 1 (backups, CI, ruff, pre-commit, cleanup, model pin) | Done: merged into `main`, ruff passes, CI green; optional nightly job still open (section 19) |
 | Time-of-day awareness when listing today's events | Logic tested; passes in the evals (section 21), not yet confirmed in a real conversation (section 16) |
-| Model eval suite (Phase 2) | Built on `phase2-evals`; baseline 80/90 runs, 90/90 after fixes (sections 21, 22) |
+| Model eval suite (Phase 2) | Done, merged into `main`; baseline 80/90 runs, 90/90 after fixes (sections 21, 22) |
 | Decimals in speech | Fixed and tested against Kokoro's phonemes; not yet heard in a real conversation (section 22) |
 
 ## Known limits
