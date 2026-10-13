@@ -1,33 +1,17 @@
-import sqlite3
 import threading
 import uuid
 import ast
 import math
 import operator
 import ollama
+import config
 import jcal
-import os
+from database import conn as db, lock as db_lock
 from datetime import datetime, timedelta
 
-MODEL = "gemma4:latest"
-MAX_ROUNDS = 4
+MODEL = config.MODEL
+MAX_ROUNDS = config.MAX_ROUNDS
 
-db = sqlite3.connect(os.environ.get("JARVIS_DB", "jarvis.db"), check_same_thread=False)
-db.execute(
-    "CREATE TABLE IF NOT EXISTS events ("
-    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-    "title TEXT NOT NULL, date TEXT NOT NULL, time TEXT NOT NULL)"
-)
-db.commit()
-
-db.execute(
-    "CREATE TABLE IF NOT EXISTS tasks ("
-    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-    "title TEXT NOT NULL, due TEXT, done INTEGER NOT NULL DEFAULT 0)"
-)
-db.commit()
-
-db_lock = threading.Lock()
 chat_lock = threading.Lock()
 
 pending = {}

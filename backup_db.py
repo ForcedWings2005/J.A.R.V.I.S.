@@ -10,16 +10,16 @@ Called from server.py with overwrite=False, so the first start of each day
 keeps a snapshot of how the database looked BEFORE anything touched it.
 Backups live in backups/, one file per day, newest 7 days kept.
 """
-import os
 import sqlite3
 import sys
 from datetime import date
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-DB = Path(os.environ.get("JARVIS_DB", ROOT / "jarvis.db"))
-BACKUP_DIR = ROOT / "backups"
-KEEP_DAYS = 7
+import config
+
+DB = Path(config.DB_PATH)
+BACKUP_DIR = config.BACKUP_DIR
+KEEP_DAYS = config.BACKUP_KEEP_DAYS
 
 
 def backup(overwrite: bool = True) -> Path | None:
