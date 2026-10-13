@@ -458,6 +458,15 @@ Findings (Ollama 0.33.1, gemma4 on this Mac):
 - **Measurement lesson:** sending the exact same conversation to Ollama twice in a row gave worse answers (3/6) than the real `Assistant` path on the same messages (6/6). Measure through the real code path, with a fresh conversation for each run.
 - The prompt is unchanged, and trimming never triggers in the evals (each case is short), so no eval rerun was needed for this step. Not tested: a real conversation long enough to reach 60,000 tokens.
 
+**Step 4: a "new conversation" button, and delete cards that expire.**
+
+- **NEW CONVERSATION** button in the header. It calls the new `POST /reset`, which runs `Assistant.reset()`: the history goes back to just the system prompt, and any waiting confirmation is dropped (its card disappears, and its id stops working). If a reply is still streaming, the reset waits for it to finish.
+- `/reset` takes an empty JSON body (`{}`) on purpose. Without a body, any other website open in the browser could send it and wipe the conversation; requiring JSON keeps the protection from section 23 (other sites cannot send JSON without the browser asking first). A test pins this.
+- **Delete cards expire after 5 minutes** (`config.CONFIRM_TIMEOUT_SECONDS = 300`). Clicking Confirm on an older card answers "That request has expired, so nothing was changed. Ask me again if you still want it." The age is measured with a clock that only counts forward (`time.monotonic()`), so changing the Mac's clock cannot affect it.
+- 5 new tests (211 in total): an expired card does nothing, a card just inside the limit still works, reset clears the history and the waiting card, `/reset` clears the conversation, and `/reset` refuses requests without a JSON body.
+- **Checked in a real browser** against a server on a spare port with a copy of the database: told JARVIS "My favourite colour is teal", clicked NEW CONVERSATION (the page showed "New conversation started."), asked "What is my favourite colour?", and JARVIS said it did not have that detail. The log showed `conversation reset` in between.
+- **Noticed, not fixed:** before the reset JARVIS said "I shall ensure this detail is logged for future reference". It has no way to remember anything between conversations, so that is a promise it cannot keep. For the notes and memory tool (Phase 5), or a prompt rule.
+
 ---
 
 ## Status

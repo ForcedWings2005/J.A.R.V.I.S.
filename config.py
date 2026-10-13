@@ -33,6 +33,8 @@ MODEL_KEEP_ALIVE = "1h"
 # first. Each trim makes Ollama re-read everything once, so it cuts a lot, rarely.
 HISTORY_MAX_TOKENS = 60_000
 HISTORY_KEEP_TOKENS = 30_000
+# A delete card left unanswered this long can no longer be confirmed (ask again instead).
+CONFIRM_TIMEOUT_SECONDS = 300
 
 # Speech
 STT_MODEL = "mlx-community/whisper-large-v3-turbo"

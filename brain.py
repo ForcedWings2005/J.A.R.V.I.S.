@@ -157,7 +157,7 @@ class Assistant:
         self.keep_tokens = keep_tokens
         self.max_rounds = max_rounds
         self.messages = [{"role": "system", "content": build_system_prompt()}]
-        self.pending = None         # (id, NeedsConfirmation) waiting for the buttons
+        self.pending = None         # (id, NeedsConfirmation, made at) waiting for the buttons
         self.confirm = None         # the card to show for the current turn, if any
         self.last_prompt_tokens = None  # tokens the model read on its last call (from Ollama)
         self.lock = threading.Lock()
@@ -176,7 +176,7 @@ class Assistant:
         if isinstance(result, tools.NeedsConfirmation):
             # Only one request can wait at a time; a new one replaces it
             pid = uuid.uuid4().hex[:8]
-            self.pending = (pid, result)
+            self.pending = (pid, result, time.monotonic())
             self.confirm = {"id": pid, "text": result.card}
             return result.reply
         return result
@@ -229,13 +229,26 @@ class Assistant:
                  sum(sizes[i] for i in [0, *range(cut, len(sizes))]) * per_char)
         return dropped
 
+    def reset(self) -> None:
+        """Start a new conversation: forget the history and any waiting confirmation."""
+        with self.lock:                     # waits for a reply that is still streaming
+            self.messages = [{"role": "system", "content": build_system_prompt()}]
+            self.pending = None
+            self.confirm = None
+            self.last_prompt_tokens = None
+        log.info("conversation reset")
+
     def resolve_pending(self, pid: str, approve: bool) -> str:
         """Called only by the Confirm and Cancel buttons, never by the model."""
         with self.lock:
             if self.pending is None or self.pending[0] != pid:
                 return "That request has expired or was already handled."
-            _, request = self.pending
+            _, request, made = self.pending
             self.pending = None
+            # monotonic() only counts forward, so changing the Mac's clock cannot affect this
+            if time.monotonic() - made > config.CONFIRM_TIMEOUT_SECONDS:
+                log.info("confirmation expired unanswered: %s", request.card)
+                return "That request has expired, so nothing was changed. Ask me again if you still want it."
             text = request.apply() if approve else "Okay, I left it alone."
             log.info("confirmation %s: %s -> %s", "approved" if approve else "cancelled",
                      request.card, text)

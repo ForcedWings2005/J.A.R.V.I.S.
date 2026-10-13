@@ -9,6 +9,7 @@ import ollama
 import pytest
 
 import brain
+import config
 import jcal
 import tasks
 import tools
@@ -326,3 +327,30 @@ def test_trimming_is_logged(caplog):
     for i in range(6):
         run(a, f"message {i}")
     assert "trimmed the conversation" in caplog.text
+
+
+# --- expiring confirmations and starting over --------------------------------
+
+def test_an_old_confirmation_can_no_longer_be_used():
+    a, events = _delete_turn()
+    pid, request, made = a.pending
+    a.pending = (pid, request, made - config.CONFIRM_TIMEOUT_SECONDS - 1)
+    assert a.resolve_pending(pid, True).startswith("That request has expired, so nothing was changed")
+    assert "Dentist" in jcal.get_events("2030-01-08")
+    assert a.resolve_pending(pid, True) == "That request has expired or was already handled."
+
+
+def test_a_confirmation_just_inside_the_time_limit_still_works():
+    a, events = _delete_turn()
+    pid, request, made = a.pending
+    a.pending = (pid, request, made - config.CONFIRM_TIMEOUT_SECONDS + 5)
+    assert a.resolve_pending(pid, True) == "Done. The event has been deleted."
+
+
+def test_reset_starts_a_new_conversation():
+    a, events = _delete_turn()
+    pid = events[-1]["confirm"]["id"]
+    a.reset()
+    assert [m["role"] for m in a.messages] == ["system"]
+    assert a.resolve_pending(pid, True) == "That request has expired or was already handled."
+    assert "Dentist" in jcal.get_events("2030-01-08")

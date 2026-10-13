@@ -194,3 +194,22 @@ def test_starting_the_server_starts_the_log_file(monkeypatch, tmp_path):
         for h in root.handlers[len(before):]:
             h.close()
             root.removeHandler(h)
+
+
+# ---------- starting a new conversation ----------
+
+def test_reset_clears_the_conversation(client, model):
+    fake = model(say("Hello, sir."), say("Hello again."))
+    chat(client, "Hello")
+    assert client.post("/reset", json={}).json() == {"ok": True}
+    chat(client, "Hello")
+    assert [m["role"] for m in fake.seen[1]] == ["system", "user"]       # nothing from before
+
+
+def test_reset_cannot_be_sent_by_another_website(client, model):
+    model(say("Hello, sir."))
+    chat(client, "Hello")
+    assert client.post("/reset").status_code == 422                      # no JSON body
+    r = client.post("/reset", content="{}", headers={"Content-Type": "text/plain"})
+    assert r.status_code == 422
+    assert len(server.assistant.messages) == 3                           # still there
