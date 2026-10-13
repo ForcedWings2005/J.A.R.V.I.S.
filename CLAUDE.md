@@ -14,7 +14,7 @@ Read `README.md` (setup, running), `CHANGELOG.md` (history, incidents, status) a
 static/index.html ──HTTP, 127.0.0.1 only──> server.py (FastAPI)
                                               ├─ brain.Assistant ── ollama.chat(stream=True, tools=tools.SCHEMAS)
                                               │     └─ runs tools from tools.FUNCTIONS
-                                              │          ├─ jcal.py   get_events, add_event, delete_event
+                                              │          ├─ jcal.py   get_events, add_event, delete_event, update_event
                                               │          ├─ tasks.py  add_task, list_tasks, complete_task
                                               │          └─ calc.py   calculate
                                               ├─ speech.py (Kokoro, loaded on first use) + speech_text.py
@@ -49,7 +49,8 @@ each one, appends the result as a `tool` message, and the model is called again,
 `MAX_ROUNDS` tool rounds. Events streamed to the page: `delta`, `step`, `break`, `done`, `error`.
 
 ### Destructive actions: the confirmation path
-`delete_event` never deletes. It returns `NeedsConfirmation(card, apply, reply)`. `Assistant`
+`delete_event` never deletes and `update_event` never changes anything. Each returns
+`NeedsConfirmation(card, apply, reply)`. `Assistant`
 stores it under a random id and shows a card; only `POST /confirm` (the on-screen buttons)
 calls `apply()`. **The model must never be able to confirm, skip or trigger `apply()` itself.**
 Any new tool that deletes, overwrites or sends something must use this same path.
@@ -89,7 +90,9 @@ of the risk and the owner's agreement first.
   audio file is always deleted;
   `/speak` text capped at 2000 characters; `/calendar` range at most 400 days; `get_events` at
   most 62 days; calculator exponents ≤ 1000 and results ≤ 10^300.
-- Deletes go only through `NeedsConfirmation` and `/confirm` (see above).
+- Deletes and changes to events go only through `NeedsConfirmation` and `/confirm` (see above).
+  `update_event` checks everything again inside `apply()`, in case the calendar changed
+  while the card was waiting; a new destructive tool should do the same.
 - Personal data: `jarvis.db`, `backups/`, `logs/` (the log holds what was said to JARVIS) and
   `evals/results/` are in `.gitignore`. Never commit them, paste their contents into docs or
   commit messages, or log secrets. There are no API keys today; if one is ever needed it goes
@@ -116,7 +119,7 @@ Run from the project folder with the venv active (`source .venv/bin/activate`):
 ruff check .            # lint
 python -m pytest -q     # all tests, under a second; never touches jarvis.db or a model
 python -m evals --runs 1 -k <name>   # quick live check of some model cases (needs Ollama)
-python -m evals         # full suite, 36 cases x 3 runs, about 12 minutes
+python -m evals         # full suite, 43 cases x 3 runs, about 15 minutes
 ```
 
 - The pre-commit hook (installed) runs ruff and pytest on every commit with Python files.

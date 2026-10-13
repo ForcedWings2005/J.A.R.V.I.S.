@@ -354,3 +354,19 @@ def test_reset_starts_a_new_conversation():
     assert [m["role"] for m in a.messages] == ["system"]
     assert a.resolve_pending(pid, True) == "That request has expired or was already handled."
     assert "Dentist" in jcal.get_events("2030-01-08")
+
+
+# --- changing an event goes through the same confirmation ---------------------
+
+def test_changing_an_event_waits_for_confirm_and_cancel_leaves_it():
+    jcal.add_event("Dentist", "2030-01-08", "15:00")
+    for approve, expected in ((False, "15:00-16:00 Dentist"), (True, "16:00-17:00 Dentist")):
+        model = FakeModel(use(call("update_event", title="dentist", date="2030-01-08",
+                                   new_start_time="16:00")), say("Please confirm, sir."))
+        a = brain.Assistant(chat=model)
+        events, _ = run(a, "Move the dentist to 4pm")
+        step = next(e["step"] for e in events if e["type"] == "step")
+        assert step["status"] == "waiting"
+        assert "15:00-16:00 Dentist" in jcal.get_events("2030-01-08")      # not yet
+        a.resolve_pending(events[-1]["confirm"]["id"], approve)
+        assert expected in jcal.get_events("2030-01-08")

@@ -34,7 +34,7 @@ class Case:
 
 # JARVIS often asks politely without a question mark: "I will require a specific time."
 ASKING = ["?", "require", "need", "clarify", "let me know", "please tell", "please specify",
-          "please confirm", "could you", "would you"]
+          "please confirm", "could you", "would you", "advise"]
 
 
 class Pred:

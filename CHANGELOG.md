@@ -469,6 +469,27 @@ Findings (Ollama 0.33.1, gemma4 on this Mac):
 
 **Not done: saving the conversation across restarts.** Considered and deferred (reasons in `plan.md`, Phase 4 item 4). Events and tasks already survive restarts; only the chat wording is lost, and the notes and memory tool in Phase 5 is the better way to keep what matters.
 
+
+## 28. Phase 5: editing and moving events
+
+Work on the branch `phase5-edit-events`. Before this, the only way to change an event was to delete it and add it again.
+
+- **New tool `update_event`** (in `jcal.py`): change an event's time, length, date or title. It finds the event the same way as `delete_event` (titles match both ways; with scope "all" no date is needed) and, like delete, **never changes anything itself**: it returns a confirmation card ("Change 'Dentist' on 2030-01-08 at 15:00-16:00: time to 16:00-17:00?"), and only the Confirm button applies it. Cards expire after 5 minutes like delete cards.
+- **What a change does:** a one-off event is updated in place. One occurrence of a repeating event: that date is skipped (the exceptions table, as for delete) and a one-off event with the change is added in its place; the series is untouched. A whole series: its title and times change (past dates show the new time too). Moving a whole series to other days is refused with a clear message (delete and add again), because it interacts with `repeat_days` and the series' start date in ways that are easy to get wrong.
+- **Checked in code:** moving keeps the event's length; `new_length_minutes` sets a length ("make it last 90 minutes") so the model never adds up times; formats, the end after the start, not past midnight, not in the past, not an occurrence that has already happened, and at least one real change. Conflicts are checked at the new time, ignoring the event being moved (`_find_clash` gained `ignore_id`; moving 30 minutes later no longer clashes with itself), and for a whole series over the next 90 days, as `add_event` does.
+- **Checked again on Confirm.** Everything above runs a second time when the user clicks Confirm. If the slot was taken or the event deleted while the card was waiting, nothing changes and the reply says why ("Nothing was changed. conflicts with 'Dinner' at 18:00 ...").
+- The model is told what the card says, so it can describe the waiting change accurately.
+- The event-finding code is shared with `delete_event` (`_locate`); all delete tests still pass.
+- **Prompt:** changes, like deletes, only ask for confirmation, so JARVIS must never say an event was changed or moved; moves use `update_event`, never delete followed by add; ask when the user has not said when to move it; titles are matched loosely, so never ask for an exact title, date or time the calendar tools can find.
+- **Tests:** 37 new (248 in total): every kind of change, the length kept or set, conflicts (including with itself and across a series), re-checking on Confirm, past and finished events, bad input, and through `Assistant`: nothing changes before Confirm, Cancel leaves it. Checked by breaking the code on purpose three ways (the clash check not ignoring the moved event, no second check on Confirm, length not kept): each break made the right tests fail.
+- **Evals:** 7 new cases (43 in total): moving a one-off, one occurrence, a whole series, changing the length, renaming, a move into a clash (must report it), and "I need to move my dentist appointment" (must ask when).
+  - First full run (prompt `fc52edf3f23e`): 122/129. `edit_whole_series` 0/3 (JARVIS asked for the title, date or days) and `edit_length` 1/3 (it asked for the start time so it could add 90 minutes itself). Fixed with `new_length_minutes` and clearer wording in the tool description and prompt.
+  - Second (`1be6fecda01f`): **127/129**; `edit_whole_series` 1/3. One more sentence in the tool description ("For 'all my piano lessons' or 'from now on', call this straight away with scope 'all' and the title") took it to 6/6 on its own.
+  - Final (`d3af1e9e7cc8`): **124/129**. Of the 5 misses, 3 were the rare empty reply (below), 1 was `repeat_weekdays` saving Mon-Fri with `repeat_days` instead of `weekdays` (the same result; the check is too strict), and 1 was a real miss: `edit_move_one_off` once put tomorrow's date in `new_date` instead of `date`.
+- Eval checks: "beyond the scope" accepted as "I don't know", "advise" accepted as asking.
+- **The rare empty reply, now explained.** The warning added in section 27 caught it 4 times: `done_reason=stop`, the model wrote 24-220 tokens of hidden thinking and then stopped without any answer. It is model behaviour, not a JARVIS bug, and it is now the most common failure in the evals (3 of 129 runs in the final run). Not fixed here; proposed separately.
+- Not yet tried in the real app.
+
 ---
 
 ## Status

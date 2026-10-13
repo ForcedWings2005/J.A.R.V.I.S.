@@ -19,13 +19,19 @@ NEXT_MON = "2030-01-14"
 DONT_KNOW = ["not sure", "don't know", "do not know", "not certain", "outside my",
              "outside of my", "no information", "do not possess", "do not have",
              "don't have", "does not contain", "does not include", "does not extend", "not within my", "outside the",
-             "unable", "cannot", "can't", "beyond my"]
+             "unable", "cannot", "can't", "beyond my", "beyond the scope"]
 # A correct reply says the user must confirm on screen, and may well say "before the
 # event is deleted"; so look for the confirmation, and for first-person claims only.
 CLAIMS_DELETED = ["i have deleted", "i've deleted", "i have removed", "i've removed",
                   "has now been deleted", "have now been deleted"]
 CLAIMS_ADDED = ["i've added", "have added", "has been added", "is now on", "i've scheduled",
                 "have scheduled", "has been scheduled"]
+
+# The same idea for changes: a correct reply asks for confirmation on screen.
+CLAIMS_CHANGED = ["i have moved", "i've moved", "i have changed", "i've changed",
+                  "i have rescheduled", "i've rescheduled", "has now been moved",
+                  "has now been changed", "has now been rescheduled"]
+DENTIST = {"title": "Dentist", "date": TUE, "time": "15:00", "end_time": "16:00"}
 
 CLASS = {"title": "Biological anthropology class", "date": TODAY, "time": "10:00",
          "end_time": "11:15", "repeat": "weekly"}
@@ -151,6 +157,44 @@ CASES = [
          events=[PIANO],
          expect=[("delete_event", {"title": contains("piano"), "scope": "all"})],
          includes_any=["confirm"], excludes=CLAIMS_DELETED),
+
+    # --- Changing events (only ever asks for confirmation) ----------------------
+    Case("edit_move_one_off", "Move my dentist appointment tomorrow to 4pm.",
+         events=[DENTIST],
+         expect=[("update_event", {"title": contains("dentist"), "date": TUE,
+                                   "new_start_time": "16:00"})],
+         forbid=["delete_event", "add_event"],
+         includes_any=["confirm"], excludes=CLAIMS_CHANGED),
+    Case("edit_one_occurrence", "Move tomorrow's piano lesson to 5pm, just this once.",
+         events=[PIANO],
+         expect=[("update_event", {"date": TUE, "scope": one_of("this", None),
+                                   "new_start_time": "17:00"})],
+         forbid=["delete_event", "add_event"], includes_any=["confirm"]),
+    Case("edit_whole_series", "From now on, all my piano lessons should start at 5pm.",
+         events=[PIANO],
+         expect=[("update_event", {"title": contains("piano"), "scope": "all",
+                                   "new_start_time": "17:00"})],
+         forbid=["delete_event", "add_event"], includes_any=["confirm"]),
+    Case("edit_length", "Make Thursday's team meeting last 90 minutes.",
+         events=[{"title": "Team meeting", "date": THU, "time": "10:00", "end_time": "11:00"}],
+         # Either way of saying it is fine, as long as the meeting ends at 11:30
+         expect=[("update_event", {"date": THU, "new_start_time": one_of(None, "10:00"),
+                                   "_result": contains("10:00-11:30")})],
+         forbid=["delete_event", "add_event"], includes_any=["confirm"]),
+    Case("edit_rename", "Rename tomorrow's dentist appointment to orthodontist.",
+         events=[DENTIST],
+         expect=[("update_event", {"date": TUE, "new_title": contains("orthodontist")})],
+         forbid=["delete_event", "add_event"], includes_any=["confirm"]),
+    Case("edit_conflict_reported", "Move my dentist appointment tomorrow to 4pm.",
+         events=[DENTIST, {"title": "Team meeting", "date": TUE, "time": "16:00",
+                           "end_time": "17:00"}],
+         expect=[("update_event", {"date": TUE, "new_start_time": "16:00"})],
+         forbid=["delete_event"],
+         includes_any=["conflict", "clash", "team meeting", "already"],
+         excludes=CLAIMS_CHANGED),
+    Case("edit_ask_when", "I need to move my dentist appointment tomorrow.",
+         events=[DENTIST],
+         forbid=["update_event", "delete_event", "add_event"], asks=True),
 
     # --- To-do list -------------------------------------------------------------
     Case("task_add", "Add buy milk to my to-do list.",
