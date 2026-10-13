@@ -5,7 +5,6 @@ import wave
 import numpy as np
 from kokoro_onnx import Kokoro
 
-VOICE = None
 LANG = "en-gb"
 SPEED = 1.1
 
@@ -14,7 +13,7 @@ VOICE = kokoro.get_voice_style("bm_daniel") * 0.5 + kokoro.get_voice_style("bm_l
 lock = threading.Lock()
 
 PRONUNCIATIONS = {
-    "Hephaestus": "Heh-fess-tus",    
+    "Hephaestus": "Heh-fess-tus",
     "Trastevere": "Trah-stay-veh-reh",
     "piazza": "pee-aht-sah",
 }

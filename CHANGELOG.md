@@ -15,19 +15,15 @@ jarvis/
 ├── jcal.py             Calendar logic: durations, repeats, exceptions, conflicts
 ├── server.py           Web server (FastAPI): endpoints for the page
 ├── speech.py           Text-to-speech (Kokoro)
+├── backup_db.py        Backs up jarvis.db (SQLite backup API, 7 days kept)
 ├── static/
-│   ├── index.html      The dashboard page
-│   └── index_old.html  Backup of the first plain chat page
+│   └── index.html      The dashboard page
 ├── models/
 │   ├── kokoro-v1.0.onnx
 │   └── voices-v1.0.bin
 ├── jarvis.db           SQLite database (events and tasks; not in git)
 ├── .gitignore          Files git should skip
 ├── requirements.txt    Pinned package versions
-├── agent.py            Terminal version of the assistant (not used by the dashboard)
-├── compare.py          Model comparison test (not used by the dashboard)
-├── smoke_test.py       First tool-calling test (not used by the dashboard)
-├── backup_db.py        Backs up jarvis.db (SQLite backup API, 7 days kept)
 ├── backups/            The backups (not in git)
 ├── tests/
 │   ├── conftest.py     Test setup: temporary database and frozen clock
@@ -36,7 +32,7 @@ jarvis/
 ├── ruff.toml           Lint settings
 ├── .pre-commit-config.yaml  Checks that run before every commit
 ├── .github/workflows/tests.yml  Runs lint and tests on GitHub for every push
-├── experiments/        Old scripts, not part of the app (agent.py, compare.py, smoke_test.py)
+├── experiments/        Old scripts, not part of the app (agent.py, compare.py)
 ├── README.md           Setup, run, tests, backups, pinned model
 └── CHANGELOG.md        This file
 ```
@@ -262,7 +258,7 @@ Fix (written; the logic is covered by automated tests, but not yet confirmed in 
 
 ## 19. Phase 1: protect what exists
 
-Applied on the Mac on the branch `phase1-protect` (as of 2026-10-12): the first backup file was created, the dead code is removed and the old scripts are in `experiments/`, `ruff check .` passes with no findings, and the pre-commit hook is installed. Still to confirm: the first GitHub Actions run, the model ID in the README, the optional nightly job, and the merge into `main`.
+Applied on the Mac on the branch `phase1-protect` (as of 2026-10-12): the first backup file was created, the dead code is removed and the old scripts are in `experiments/`, `ruff check .` passes with no findings, and the pre-commit hook is installed. The branch was merged into `main` on 2026-10-12 (a fast-forward, 13 files changed) and pushed, and the branch was deleted. Still to confirm: that the GitHub Actions run on `main` is green, and the optional nightly job. The model ID was recorded in section 20.
 
 - **Database backups.** New `backup_db.py` uses SQLite's backup API, which is safe while the server runs (a plain file copy is not). It writes one file per day to `backups/`, checks the copy with `PRAGMA integrity_check` before keeping it, and keeps the newest 7 days. `python backup_db.py` takes a fresh backup now. `server.py` also calls it at startup, before `brain` and `jcal` open the database, but only if today has no backup yet, so the first start of the day keeps a snapshot from before anything changed. If a backup fails, the server still starts and prints the error.
 - **Automatic checks on GitHub.** `.github/workflows/tests.yml` runs `ruff check .` and `python -m pytest` on every push and pull request. It installs only `pytest` and `ruff`, which is enough because `jcal` uses only the standard library.
@@ -275,6 +271,16 @@ Applied on the Mac on the branch `phase1-protect` (as of 2026-10-12): the first 
 - `.gitignore` gains `backups/`, `.ruff_cache/` and `*.log`.
 - Checked in the sandbox: the backup script (snapshot, no-overwrite, overwrite, 7-day cleanup, missing database), the YAML and TOML files parse, and all 51 tests still pass with the changed `conftest.py`.
 - Optional extra: a macOS nightly job (launchd) running `backup_db.py` at 03:00. macOS may block background access to the Desktop folder, so the startup snapshot is the main protection.
+
+## 20. Cleanup after Phase 1
+
+- **`brain.py` respects `JARVIS_DB`**, like `jcal.py` already did, so tests can never open the real database through `brain`.
+- **Calculator size cap.** Results above 10^300 are rejected with "the number is too large to work with". Before, something like `(10**1000)**1000` got past the exponent cap, built a million-digit number, and then crashed the whole turn when it was turned into text.
+- **A crashing tool no longer aborts the turn.** `run_tool` used to catch only bad arguments. Any other error now becomes an `Error:` tool result the model can report, and the crash is printed in the server log. Before, the stream stopped and left the conversation with a tool call that had no result.
+- **`complete_task` matches literally.** It used SQL `LIKE`, so `%` or `_` in the title acted as wildcards. It now uses a plain substring match.
+- **Model ID recorded** in the README: `gemma4:latest` is `dc35e8d9c606` (from `ollama list`, 2026-10-12).
+- Small tidying: an unused `VOICE = None` in `speech.py`, a commented-out docstring in `brain.py`, and trailing whitespace.
+- The file layout above is updated: `agent.py` and `compare.py` live in `experiments/`, `index_old.html` is gone, and `smoke_test.py` is no longer in the project (it never made it into git).
 
 ---
 
@@ -290,7 +296,7 @@ Applied on the Mac on the branch `phase1-protect` (as of 2026-10-12): the first 
 | Event durations and repeating events | Logic tested (51 automated tests pass); real requests to JARVIS, such as "every Wednesday and Friday", not yet re-checked |
 | Streaming replies into speech | Written; not tested yet |
 | Automated tests for `jcal.py` | Tested and working: 51 of 51 pass |
-| Phase 1 (backups, CI, ruff, pre-commit, cleanup, model pin) | Applied on a branch; ruff passes; CI run, model ID and merge to `main` still to confirm (section 19) |
+| Phase 1 (backups, CI, ruff, pre-commit, cleanup, model pin) | Merged into `main`; ruff passes; green CI run on `main` and nightly job still to confirm (section 19) |
 | Time-of-day awareness when listing today's events | Logic tested; not yet confirmed in a real conversation (section 16) |
 
 ## Known limits

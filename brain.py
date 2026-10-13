@@ -6,12 +6,13 @@ import math
 import operator
 import ollama
 import jcal
+import os
 from datetime import datetime, timedelta
 
 MODEL = "gemma4:latest"
 MAX_ROUNDS = 4
 
-db = sqlite3.connect("jarvis.db", check_same_thread=False)
+db = sqlite3.connect(os.environ.get("JARVIS_DB", "jarvis.db"), check_same_thread=False)
 db.execute(
     "CREATE TABLE IF NOT EXISTS events ("
     "id INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -93,8 +94,8 @@ def list_tasks() -> str:
 def complete_task(title: str) -> str:
     with db_lock:
         rows = db.execute(
-            "SELECT id, title FROM tasks WHERE done = 0 AND lower(title) LIKE ?",
-            (f"%{title.lower()}%",),
+            "SELECT id, title FROM tasks WHERE done = 0 AND instr(lower(title), ?) > 0",
+            (title.lower(),),
         ).fetchall()
         if not rows:
             return f"Error: no open task matching '{title}'."
@@ -123,6 +124,17 @@ FUNCS = {
     "log": math.log, "log10": math.log10, "abs": abs, "round": round,
 }
 CONSTS = {"pi": math.pi, "e": math.e}
+MAX_RESULT = 10 ** 300  # stops runaway numbers like (10**1000)**1000
+
+
+class TooLarge(Exception):
+    pass
+
+
+def _check(value):
+    if abs(value) > MAX_RESULT:
+        raise TooLarge
+    return value
 
 def _eval(node):
     if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
@@ -132,12 +144,12 @@ def _eval(node):
     if isinstance(node, ast.BinOp) and type(node.op) in OPS:
         left, right = _eval(node.left), _eval(node.right)
         if isinstance(node.op, ast.Pow) and abs(right) > 1000:
-            raise ValueError("exponent too large")
-        return OPS[type(node.op)](left, right)
+            raise TooLarge
+        return _check(OPS[type(node.op)](left, right))
     if isinstance(node, ast.UnaryOp) and type(node.op) in OPS:
         return OPS[type(node.op)](_eval(node.operand))
     if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in FUNCS:
-        return FUNCS[node.func.id](*[_eval(a) for a in node.args])
+        return _check(FUNCS[node.func.id](*[_eval(a) for a in node.args]))
     raise ValueError("unsupported expression")
 
 def calculate(expression: str) -> str:
@@ -145,6 +157,8 @@ def calculate(expression: str) -> str:
         result = _eval(ast.parse(expression, mode="eval").body)
     except ZeroDivisionError:
         return "Error: division by zero."
+    except (TooLarge, OverflowError):
+        return "Error: the number is too large to work with."
     except Exception:
         return "Error: could not evaluate that. Use plain numbers and operators like + - * / ** and functions like sqrt()."
     if isinstance(result, float):
@@ -286,6 +300,9 @@ def run_tool(call) -> str:
         return func(**call.function.arguments)
     except TypeError as e:
         return f"Error: bad arguments ({e})."
+    except Exception as e:  # a broken tool must not abort the whole turn
+        print(f"  [tool crashed] {call.function.name}: {e!r}")
+        return f"Error: the {call.function.name} tool failed ({e})."
 
 def describe_step(call, result: str) -> dict:
     args = ", ".join(f"{k}={v}" for k, v in call.function.arguments.items())
@@ -296,9 +313,9 @@ def describe_step(call, result: str) -> dict:
     else:
         status = "done"
     return {"text": f"{call.function.name}({args})", "status": status}
-    
+
 def chat_stream(user_text: str):
-    # """Generator: yields small dicts as the reply is produced."""
+    """Generator: yields small dicts as the reply is produced."""
     with chat_lock:
         try:
             turn["confirm"] = None
