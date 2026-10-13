@@ -1,213 +1,21 @@
+"""The assistant: talks to the model, runs the tools it asks for, keeps the conversation.
+
+The tools themselves live in jcal.py (calendar), tasks.py (to-do list) and calc.py
+(calculator), registered with tools.py. Importing them below is what registers them.
+"""
 import threading
 import uuid
-import ast
-import math
-import operator
-import ollama
-import config
-import jcal
-from database import conn as db, lock as db_lock
 from datetime import datetime, timedelta
 
-MODEL = config.MODEL
-MAX_ROUNDS = config.MAX_ROUNDS
+import ollama
 
-chat_lock = threading.Lock()
+import config
+import tools
+# Importing these registers their tools. The order is the order the model sees them.
+import jcal  # noqa: F401, E402
+import tasks  # noqa: F401, E402
+import calc  # noqa: F401, E402
 
-pending = {}
-turn = {"confirm": None}
-
-def delete_event(title: str, date: str = "", scope: str = "this") -> str:
-    found = jcal.find_for_delete(title, date, scope)
-    if isinstance(found, str):
-        return found
-    pid = uuid.uuid4().hex[:8]
-    pending.clear()
-    pending[pid] = found["action"]
-    turn["confirm"] = {"id": pid, "text": found["text"]}
-    return "Confirmation required. The event has NOT been deleted yet. Tell the user to confirm on screen."
-
-def resolve_pending(pid: str, approve: bool) -> str:
-    with chat_lock:
-        action = pending.pop(pid, None)
-        if action is None:
-            return "That request has expired or was already handled."
-        if approve:
-            jcal.apply_delete(action)
-            text = "Done. The event has been deleted."
-        else:
-            text = "Okay, I left it alone."
-        messages.append({"role": "assistant", "content": text})
-        return text
-
-def tasks_list() -> list:
-    with db_lock:
-        rows = db.execute(
-            "SELECT id, title, due, done FROM tasks "
-            "ORDER BY done, due IS NULL, due, id LIMIT 50"
-        ).fetchall()
-    return [{"id": i, "title": t, "due": d, "done": bool(n)} for i, t, d, n in rows]
-
-def add_task(title: str, due: str = "") -> str:
-    title = title.strip()
-    if not title:
-        return "Error: the task needs a title."
-    if due:
-        try:
-            datetime.strptime(due, "%Y-%m-%d")
-        except ValueError:
-            return "Error: due must be YYYY-MM-DD."
-    with db_lock:
-        dup = db.execute(
-            "SELECT 1 FROM tasks WHERE done = 0 AND lower(title) = ?",
-            (title.lower(),),
-        ).fetchone()
-        if dup:
-            return f"Error: '{title}' is already on the list."
-        db.execute("INSERT INTO tasks (title, due) VALUES (?, ?)", (title, due or None))
-        db.commit()
-    return f"Added task '{title}'" + (f", due {due}." if due else ".")
-
-def list_tasks() -> str:
-    open_tasks = [t for t in tasks_list() if not t["done"]]
-    if not open_tasks:
-        return "No open tasks."
-    parts = [t["title"] + (f" (due {t['due']})" if t["due"] else "") for t in open_tasks]
-    return "Open tasks: " + "; ".join(parts)
-
-def complete_task(title: str) -> str:
-    with db_lock:
-        rows = db.execute(
-            "SELECT id, title FROM tasks WHERE done = 0 AND instr(lower(title), ?) > 0",
-            (title.lower(),),
-        ).fetchall()
-        if not rows:
-            return f"Error: no open task matching '{title}'."
-        if len(rows) > 1:
-            names = "; ".join(name for _, name in rows)
-            return f"Error: several tasks match ({names}). Ask the user which one."
-        db.execute("UPDATE tasks SET done = 1 WHERE id = ?", (rows[0][0],))
-        db.commit()
-    return f"Marked '{rows[0][1]}' as done."
-
-def set_task_done(task_id: int, done: bool) -> bool:
-    with db_lock:
-        cur = db.execute(
-            "UPDATE tasks SET done = ? WHERE id = ?", (1 if done else 0, task_id)
-        )
-        db.commit()
-        return cur.rowcount > 0
-
-OPS = {
-    ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
-    ast.Div: operator.truediv, ast.Pow: operator.pow, ast.Mod: operator.mod,
-    ast.FloorDiv: operator.floordiv, ast.USub: operator.neg, ast.UAdd: operator.pos,
-}
-FUNCS = {
-    "sqrt": math.sqrt, "sin": math.sin, "cos": math.cos, "tan": math.tan,
-    "log": math.log, "log10": math.log10, "abs": abs, "round": round,
-}
-CONSTS = {"pi": math.pi, "e": math.e}
-MAX_RESULT = 10 ** 300  # stops runaway numbers like (10**1000)**1000
-
-
-class TooLarge(Exception):
-    pass
-
-
-def _check(value):
-    if abs(value) > MAX_RESULT:
-        raise TooLarge
-    return value
-
-def _eval(node):
-    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
-        return node.value
-    if isinstance(node, ast.Name) and node.id in CONSTS:
-        return CONSTS[node.id]
-    if isinstance(node, ast.BinOp) and type(node.op) in OPS:
-        left, right = _eval(node.left), _eval(node.right)
-        if isinstance(node.op, ast.Pow) and abs(right) > 1000:
-            raise TooLarge
-        return _check(OPS[type(node.op)](left, right))
-    if isinstance(node, ast.UnaryOp) and type(node.op) in OPS:
-        return OPS[type(node.op)](_eval(node.operand))
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in FUNCS:
-        return _check(FUNCS[node.func.id](*[_eval(a) for a in node.args]))
-    raise ValueError("unsupported expression")
-
-def calculate(expression: str) -> str:
-    try:
-        result = _eval(ast.parse(expression, mode="eval").body)
-    except ZeroDivisionError:
-        return "Error: division by zero."
-    except (TooLarge, OverflowError):
-        return "Error: the number is too large to work with."
-    except Exception:
-        return "Error: could not evaluate that. Use plain numbers and operators like + - * / ** and functions like sqrt()."
-    if isinstance(result, float):
-        result = round(result, 10)
-    return f"{expression} = {result}"
-
-available_functions = {
-    "get_events": jcal.get_events,
-    "add_event": jcal.add_event,
-    "delete_event": delete_event,
-    "add_task": add_task,
-    "list_tasks": list_tasks,
-    "complete_task": complete_task,
-    "calculate": calculate,
-}
-
-tools = jcal.EVENT_TOOLS + [
-    {
-        "type": "function",
-        "function": {
-            "name": "add_task",
-            "description": "Add an item to the to-do list. Tasks have no time of day. Use add_event instead for anything with a specific time.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string"},
-                    "due": {"type": "string", "description": "Optional due date, YYYY-MM-DD"},
-                },
-                "required": ["title"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_tasks",
-            "description": "List the open items on the to-do list.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "complete_task",
-            "description": "Mark a to-do item as finished, matched by its title.",
-            "parameters": {
-                "type": "object",
-                "properties": {"title": {"type": "string"}},
-                "required": ["title"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "calculate",
-            "description": "Evaluate a math expression exactly, for example '15 * 23 + 7' or 'sqrt(144) / 3'. Use for any arithmetic beyond trivial.",
-            "parameters": {
-                "type": "object",
-                "properties": {"expression": {"type": "string"}},
-                "required": ["expression"],
-            },
-        },
-    },
-]
 
 def build_system_prompt() -> str:
     now = datetime.now().astimezone()
@@ -278,21 +86,9 @@ def build_system_prompt() -> str:
         "does not make it clear, ask which one instead of assuming."
     )
 
-messages = [{"role": "system", "content": build_system_prompt()}]
-
-def run_tool(call) -> str:
-    func = available_functions.get(call.function.name)
-    if func is None:
-        return f"Error: unknown tool {call.function.name}."
-    try:
-        return func(**call.function.arguments)
-    except TypeError as e:
-        return f"Error: bad arguments ({e})."
-    except Exception as e:  # a broken tool must not abort the whole turn
-        print(f"  [tool crashed] {call.function.name}: {e!r}")
-        return f"Error: the {call.function.name} tool failed ({e})."
 
 def describe_step(call, result: str) -> dict:
+    """One line for the activity ticker under the transcript."""
     args = ", ".join(f"{k}={v}" for k, v in call.function.arguments.items())
     if result.startswith("Error"):
         status = "error"
@@ -302,50 +98,102 @@ def describe_step(call, result: str) -> dict:
         status = "done"
     return {"text": f"{call.function.name}({args})", "status": status}
 
-def chat_stream(user_text: str):
-    """Generator: yields small dicts as the reply is produced."""
-    with chat_lock:
+
+class Assistant:
+    """One conversation with JARVIS: its history, a pending confirmation, and the model.
+
+    `chat` is the function that talks to the model (ollama.chat). Tests pass a fake
+    one that plays back scripted replies, so no model is needed.
+    """
+
+    def __init__(self, chat=None, model: str = config.MODEL, max_rounds: int = config.MAX_ROUNDS):
+        self.chat = chat or ollama.chat
+        self.model = model
+        self.max_rounds = max_rounds
+        self.messages = [{"role": "system", "content": build_system_prompt()}]
+        self.pending = None         # (id, NeedsConfirmation) waiting for the buttons
+        self.confirm = None         # the card to show for the current turn, if any
+        self.lock = threading.Lock()
+
+    def run_tool(self, call) -> str:
+        func = tools.FUNCTIONS.get(call.function.name)
+        if func is None:
+            return f"Error: unknown tool {call.function.name}."
         try:
-            turn["confirm"] = None
-            steps = []
-            messages[0]["content"] = build_system_prompt()
-            messages.append({"role": "user", "content": user_text})
-            wrote_text = False
+            result = func(**call.function.arguments)
+        except TypeError as e:
+            return f"Error: bad arguments ({e})."
+        except Exception as e:  # a broken tool must not abort the whole turn
+            print(f"  [tool crashed] {call.function.name}: {e!r}")
+            return f"Error: the {call.function.name} tool failed ({e})."
+        if isinstance(result, tools.NeedsConfirmation):
+            # Only one request can wait at a time; a new one replaces it
+            pid = uuid.uuid4().hex[:8]
+            self.pending = (pid, result)
+            self.confirm = {"id": pid, "text": result.card}
+            return result.reply
+        return result
 
-            for round_no in range(MAX_ROUNDS + 1):
-                content = ""
-                calls = []
-                for chunk in ollama.chat(model=MODEL, messages=messages, tools=tools, stream=True):
-                    piece = chunk.message.content or ""
-                    if piece:
-                        content += piece
-                        wrote_text = True
-                        yield {"type": "delta", "text": piece}
-                    if chunk.message.tool_calls:
-                        calls.extend(chunk.message.tool_calls)
+    def resolve_pending(self, pid: str, approve: bool) -> str:
+        """Called only by the Confirm and Cancel buttons, never by the model."""
+        with self.lock:
+            if self.pending is None or self.pending[0] != pid:
+                return "That request has expired or was already handled."
+            _, request = self.pending
+            self.pending = None
+            text = request.apply() if approve else "Okay, I left it alone."
+            self.messages.append({"role": "assistant", "content": text})
+            return text
 
-                messages.append(
-                    ollama.Message(role="assistant", content=content, tool_calls=calls or None)
-                )
-                if not calls or round_no == MAX_ROUNDS:
-                    break
+    def chat_stream(self, user_text: str):
+        """Generator: yields small dicts as the reply is produced.
 
-                for call in calls:
-                    print(f"  [tool call] {call.function.name}({call.function.arguments})")
-                    result = run_tool(call)
-                    print(f"  [tool result] {result}")
-                    step = describe_step(call, result)
-                    steps.append(step)
-                    messages.append({
-                        "role": "tool",
-                        "tool_name": call.function.name,
-                        "content": result,
-                    })
-                    yield {"type": "step", "step": step}
-                yield {"type": "break"}
+        delta (a piece of text), step (a tool ran), break (a tool round ended),
+        done (steps and any confirmation card), error.
+        """
+        with self.lock:
+            try:
+                self.confirm = None
+                steps = []
+                self.messages[0]["content"] = build_system_prompt()
+                self.messages.append({"role": "user", "content": user_text})
+                wrote_text = False
 
-            if not wrote_text:
-                yield {"type": "delta", "text": "Sorry, I could not finish that."}
-            yield {"type": "done", "steps": steps, "confirm": turn["confirm"]}
-        except Exception as e:
-            yield {"type": "error", "text": str(e)}
+                for round_no in range(self.max_rounds + 1):
+                    content = ""
+                    calls = []
+                    for chunk in self.chat(model=self.model, messages=self.messages,
+                                           tools=tools.SCHEMAS, stream=True):
+                        piece = chunk.message.content or ""
+                        if piece:
+                            content += piece
+                            wrote_text = True
+                            yield {"type": "delta", "text": piece}
+                        if chunk.message.tool_calls:
+                            calls.extend(chunk.message.tool_calls)
+
+                    self.messages.append(
+                        ollama.Message(role="assistant", content=content, tool_calls=calls or None)
+                    )
+                    if not calls or round_no == self.max_rounds:
+                        break
+
+                    for call in calls:
+                        print(f"  [tool call] {call.function.name}({call.function.arguments})")
+                        result = self.run_tool(call)
+                        print(f"  [tool result] {result}")
+                        step = describe_step(call, result)
+                        steps.append(step)
+                        self.messages.append({
+                            "role": "tool",
+                            "tool_name": call.function.name,
+                            "content": result,
+                        })
+                        yield {"type": "step", "step": step}
+                    yield {"type": "break"}
+
+                if not wrote_text:
+                    yield {"type": "delta", "text": "Sorry, I could not finish that."}
+                yield {"type": "done", "steps": steps, "confirm": self.confirm}
+            except Exception as e:
+                yield {"type": "error", "text": str(e)}

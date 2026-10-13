@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 
 from database import conn as db, lock
+from tools import NeedsConfirmation, tool
 
 REPEATS = ("none", "daily", "weekdays", "weekly", "biweekly", "monthly")
 DAYS = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
@@ -130,6 +131,9 @@ def _status(ev: dict, now) -> str:
         return "in progress"
     return "upcoming"
 
+@tool("List calendar events for a date (YYYY-MM-DD), or for a range of dates by also giving end_date. Use a range for questions like 'what's my week look like'.",
+      date={"type": "string", "description": "YYYY-MM-DD"},
+      end_date={"type": "string", "description": "Optional last date of a range, YYYY-MM-DD"})
 def get_events(date: str, end_date: str = "") -> str:
     try:
         start = _d(date)
@@ -159,6 +163,14 @@ def get_events(date: str, end_date: str = "") -> str:
     return text
 
 
+@tool("Add a calendar event. Only call when the user has given a title, a date and a start time. If they give an end time or a duration, set end_time (start_time plus the duration). If not, omit end_time and it defaults to one hour. For recurring events like 'every Tuesday', set repeat and use the first occurrence as date.",
+      title={"type": "string"},
+      date={"type": "string", "description": "YYYY-MM-DD, the first occurrence"},
+      start_time={"type": "string", "description": "HH:MM, 24-hour"},
+      end_time={"type": "string", "description": "Optional, HH:MM, 24-hour"},
+      repeat={"type": "string", "enum": list(REPEATS), "description": "How often it repeats. Default none. 'weekdays' means every Monday through Friday ONLY. For specific days like Wednesday and Friday, use repeat_days instead."},
+      repeat_until={"type": "string", "description": "Optional last date of a repeating event, YYYY-MM-DD"},
+      repeat_days={"type": "string", "description": "Comma-separated weekdays for a weekly repeat, e.g. 'wed,fri'. Use this whenever the user names specific days of the week."})
 def add_event(title: str, date: str, start_time: str, end_time: str = "",
               repeat: str = "none", repeat_until: str = "",
               repeat_days: str = "") -> str:
@@ -334,56 +346,23 @@ def apply_delete(action: dict) -> None:
         db.commit()
 
 
-EVENT_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_events",
-            "description": "List calendar events for a date (YYYY-MM-DD), or for a range of dates by also giving end_date. Use a range for questions like 'what's my week look like'.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "date": {"type": "string", "description": "YYYY-MM-DD"},
-                    "end_date": {"type": "string", "description": "Optional last date of a range, YYYY-MM-DD"},
-                },
-                "required": ["date"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "add_event",
-            "description": "Add a calendar event. Only call when the user has given a title, a date and a start time. If they give an end time or a duration, set end_time (start_time plus the duration). If not, omit end_time and it defaults to one hour. For recurring events like 'every Tuesday', set repeat and use the first occurrence as date.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string"},
-                    "date": {"type": "string", "description": "YYYY-MM-DD, the first occurrence"},
-                    "start_time": {"type": "string", "description": "HH:MM, 24-hour"},
-                    "end_time": {"type": "string", "description": "Optional, HH:MM, 24-hour"},
-                    "repeat": {"type": "string", "enum": list(REPEATS), "description": "How often it repeats. Default none. 'weekdays' means every Monday through Friday ONLY. For specific days like Wednesday and Friday, use repeat_days instead."},
-                    "repeat_until": {"type": "string", "description": "Optional last date of a repeating event, YYYY-MM-DD"},
-                    "repeat_days": {"type": "string", "description": "Comma-separated weekdays for a weekly repeat, e.g. 'wed,fri'. Use this whenever the user names specific days of the week."},
-                },
-                "required": ["title", "date", "start_time"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "delete_event",
-            "description": "Request deletion of the calendar event whose title matches. This only asks the user to confirm on screen; nothing is deleted until they click Confirm. For a repeating event, scope 'this' removes only that date's occurrence, and scope 'all' removes the whole series. Use 'all' only if the user says every occurrence or the whole series. With scope 'all' the date can be left out, so never ask the user for a date just to delete a whole series.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string"},
-                    "date": {"type": "string", "description": "YYYY-MM-DD, the occurrence to delete. Optional when scope is 'all'."},
-                    "scope": {"type": "string", "enum": ["this", "all"]},
-                },
-                "required": ["title"],
-            },
-        },
-    },
-]
+@tool("Request deletion of the calendar event whose title matches. This only asks the user to confirm on screen; nothing is deleted until they click Confirm. For a repeating event, scope 'this' removes only that date's occurrence, and scope 'all' removes the whole series. Use 'all' only if the user says every occurrence or the whole series. With scope 'all' the date can be left out, so never ask the user for a date just to delete a whole series.",
+      title={"type": "string"},
+      date={"type": "string", "description": "YYYY-MM-DD, the occurrence to delete. Optional when scope is 'all'."},
+      scope={"type": "string", "enum": ["this", "all"]})
+def delete_event(title: str, date: str = "", scope: str = "this"):
+    """Never deletes anything itself: returns a request the user must confirm."""
+    found = find_for_delete(title, date, scope)
+    if isinstance(found, str):
+        return found
+    action = found["action"]
+
+    def apply() -> str:
+        apply_delete(action)
+        return "Done. The event has been deleted."
+
+    return NeedsConfirmation(
+        card=found["text"], apply=apply,
+        reply="Confirmation required. The event has NOT been deleted yet. "
+              "Tell the user to confirm on screen.",
+    )
