@@ -344,7 +344,7 @@ Done on `phase2-evals`, which was merged into `main` on 2026-10-12 (a fast-forwa
 
 ## 23. Phase 3: make the code testable
 
-Work on the branch `phase3-testable`. Goal from `plan.md`: the code around the model gets tested as well as the calendar.
+Done on `phase3-testable`, merged into `main` on 2026-10-12 (a fast-forward) and then deleted. Goal from `plan.md`: the code around the model gets tested as well as the calendar.
 
 **Step 1: settings in one place.** New `config.py` holds the model name, `MAX_ROUNDS`, the database path, the folders (backups, logs, static, models), the Whisper model, the upload limit, and the voice language and speed (speed is now `VOICE_SPEED` in `config.py`). Every path is built from the project folder, so the server can be started from any folder. `JARVIS_DB` still overrides the database path.
 
@@ -401,6 +401,7 @@ Work on the branch `phase3-testable`. Goal from `plan.md`: the code around the m
 | Automated tests for `jcal.py` | Tested and working: 51 of 51 pass |
 | Phase 1 (backups, CI, ruff, pre-commit, cleanup, model pin) | Done: merged into `main`, ruff passes, CI green; optional nightly job still open (section 19) |
 | Time-of-day awareness when listing today's events | Logic tested; passes in the evals (section 21), not yet confirmed in a real conversation (section 16) |
+| Phase 3 (config, one database with migrations, tool registry, Assistant, endpoint tests, logging) | Done, merged into `main`; 191 tests; evals 87/90 with unchanged prompt (section 23) |
 | Model eval suite (Phase 2) | Done, merged into `main`; baseline 80/90 runs, 90/90 after fixes (sections 21, 22) |
 | Decimals in speech | Fixed and tested against Kokoro's phonemes; not yet heard in a real conversation (section 22) |
 
