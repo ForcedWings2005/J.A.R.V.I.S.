@@ -229,6 +229,48 @@ def test_delete_errors_come_back_as_text():
     assert jcal.find_for_delete("Gym", day(1), scope="sometimes").startswith("Error")
 
 
+def test_delete_matches_when_the_user_says_more_than_the_title():
+    """'Cancel my dentist appointment' must find an event titled 'Dentist'."""
+    jcal.add_event("Dentist", day(1), "14:00")
+    found = jcal.find_for_delete("dentist appointment", day(1))
+    assert isinstance(found, dict)
+    assert "Dentist" in found["text"]
+
+
+def test_delete_still_matches_part_of_the_title():
+    jcal.add_event("Biological anthropology class", day(1), "10:00")
+    assert isinstance(jcal.find_for_delete("anthropology", day(1)), dict)
+
+
+def test_delete_whole_series_without_a_date():
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    found = jcal.find_for_delete("piano lessons", scope="all")
+    assert "ALL" in found["text"]
+    jcal.apply_delete(found["action"])
+    assert dates(0, 60) == []
+
+
+def test_delete_one_occurrence_needs_a_date():
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    assert jcal.find_for_delete("piano", scope="this").startswith("Error")
+
+
+def test_delete_without_a_date_ignores_events_that_are_over(clock):
+    jcal.add_event("Yoga", day(1), "18:00", repeat="weekly", repeat_until=day(8))
+    jcal.add_event("Yoga", day(30), "18:00", repeat="weekly")
+    clock.set(9, day=20)            # the first series ended on day 8
+    found = jcal.find_for_delete("yoga", scope="all")
+    assert isinstance(found, dict)
+    assert found["action"]["date"] == day(30)
+
+
+def test_delete_without_a_date_with_two_series_asks_which_one():
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    jcal.add_event("Piano practice", day(2), "08:00", repeat="daily")
+    found = jcal.find_for_delete("piano", scope="all")
+    assert isinstance(found, str) and "several" in found
+
+
 def test_delete_with_two_matches_asks_which_one():
     jcal.add_event("Study group", day(1), "10:00")
     jcal.add_event("Study hall", day(1), "14:00")
