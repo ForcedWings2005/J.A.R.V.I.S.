@@ -88,15 +88,20 @@ Goal: the code around the model is as well tested as the calendar.
 Done when: CI runs tests for `brain` and `server` as well as `jcal`, and coverage is
 reported.
 
-## Phase 4: Conversation memory that holds up
+## Phase 4: Conversation memory that holds up (done, CHANGELOG section 27)
 
-1. **Trim the history.** Keep the system prompt and the last N exchanges (start with about 20
-   messages). Never cut between a tool call and its result. Rerun the evals after making this
-   change.
-2. **A "new conversation" button** on the page, plus an endpoint that resets the history.
-3. **Save the conversation to SQLite**, so a server restart (including every `--reload`) does
-   not wipe what was just said. Pending confirmations should expire after a few minutes
-   instead of living forever.
+1. **Measure first.** Done: the context window (131,072 tokens) was never the problem; the
+   current time in the system prompt was, because it stopped Ollama reusing its work. It moved
+   to a stamp on each user message, and replies now start in about 0.15 s instead of 2.7 s.
+2. **Trim the history.** Done, as a safety net above 60,000 tokens, cutting in big steps
+   before a user message so a tool call never loses its result.
+3. **A "new conversation" button** and `POST /reset`. Done. Delete cards also expire after
+   5 minutes.
+4. **Save the conversation to SQLite.** Considered and deferred. Events and tasks already
+   survive restarts; only the chat wording is lost, mostly on `--reload` during development.
+   Restoring old chat days later is more likely to confuse than help, and it would mean a
+   schema change and more copies of personal text. Deliberate memory (the notes and memory
+   tool in Phase 5) covers what is worth keeping. Revisit if restarts become a real problem.
 
 ## Phase 5: Features, in order of value
 
