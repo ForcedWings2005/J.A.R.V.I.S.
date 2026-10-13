@@ -414,6 +414,19 @@ Done on `small-followups`, merged into `main` on 2026-10-13 (a fast-forward) and
 - **After** (prompt `98d8bc80df43`): the two new cases **10/10**, `repeat_until_date` 5/5. Full suite (34 cases × 3): **101/102**. The one miss: "Am I free on Friday?" on a Monday once checked the Friday a week later. Rerun 8 times it passed 8/8, so it is treated as run-to-run variation, but it is worth watching since the new rule talks about "the next such date".
 - These requests take longer now (about 11-17 s instead of a quick refusal), because the model actually calls the tool.
 
+
+## 27. Phase 4: conversation memory
+
+Work on the branch `phase4-memory`. `plan.md` planned to trim the conversation history because it grows until the server restarts. Step 1 was to measure first.
+
+**Step 1: measure.** Each model call now logs how many tokens the model was given, how long it took to read them, and how many it wrote (from the counts Ollama sends with its last chunk), and `Assistant.last_prompt_tokens` keeps the latest count. 1 new test; it also caught a crash I introduced when the model's stream sends nothing at all.
+
+Findings (Ollama 0.33.1, gemma4 on this Mac):
+
+- **The context window is not the problem.** Ollama loads gemma4 with its full window of 131,072 tokens (`ollama ps`). A first turn uses 2,056 tokens, almost all of it the system prompt (4,412 characters) and the 7 tool descriptions, and each short exchange adds about 60-90 tokens. A normal session will not come close to filling it.
+- **The clock in the system prompt slows every reply.** Ollama can reuse the work it did on the previous call, but only up to the first point where the text differs, and the current time (to the minute) sits near the very start of the system prompt. An experiment with 12-turn conversations through the real `Assistant`: with the clock fixed, the first words came after 0.11 s from turn 8 on (the earlier work was reused); with the clock moving one minute per turn, as in real use, they came after 2.5-2.9 s every turn, creeping up as the conversation grew.
+- Ollama's `prompt_eval_count` counts the whole conversation on every call, even the part it reuses, so it measures how full the context is, not the time spent.
+
 ---
 
 ## Status
