@@ -34,6 +34,7 @@ jarvis/
 ├── .github/workflows/tests.yml  Runs lint and tests on GitHub for every push
 ├── experiments/        Old scripts, not part of the app (agent.py, compare.py)
 ├── README.md           Setup, run, tests, backups, pinned model
+├── plan.md             The plan from Phase 2 onward
 └── CHANGELOG.md        This file
 ```
 
@@ -258,7 +259,7 @@ Fix (written; the logic is covered by automated tests, but not yet confirmed in 
 
 ## 19. Phase 1: protect what exists
 
-Applied on the Mac on the branch `phase1-protect` (as of 2026-10-12): the first backup file was created, the dead code is removed and the old scripts are in `experiments/`, `ruff check .` passes with no findings, and the pre-commit hook is installed. The branch was merged into `main` on 2026-10-12 (a fast-forward, 13 files changed) and pushed, and the branch was deleted. Still to confirm: that the GitHub Actions run on `main` is green, and the optional nightly job. The model ID was recorded in section 20.
+Applied on the Mac on the branch `phase1-protect` (as of 2026-10-12): the first backup file was created, the dead code is removed and the old scripts are in `experiments/`, `ruff check .` passes with no findings, and the pre-commit hook is installed. The branch was merged into `main` on 2026-10-12 (a fast-forward, 13 files changed) and pushed, and the branch was deleted. The GitHub Actions run on `main` is green (confirmed 2026-10-12). Still open: the optional nightly job. The model ID was recorded in section 20.
 
 - **Database backups.** New `backup_db.py` uses SQLite's backup API, which is safe while the server runs (a plain file copy is not). It writes one file per day to `backups/`, checks the copy with `PRAGMA integrity_check` before keeping it, and keeps the newest 7 days. `python backup_db.py` takes a fresh backup now. `server.py` also calls it at startup, before `brain` and `jcal` open the database, but only if today has no backup yet, so the first start of the day keeps a snapshot from before anything changed. If a backup fails, the server still starts and prints the error.
 - **Automatic checks on GitHub.** `.github/workflows/tests.yml` runs `ruff check .` and `python -m pytest` on every push and pull request. It installs only `pytest` and `ruff`, which is enough because `jcal` uses only the standard library.
@@ -296,7 +297,7 @@ Applied on the Mac on the branch `phase1-protect` (as of 2026-10-12): the first 
 | Event durations and repeating events | Logic tested (51 automated tests pass); real requests to JARVIS, such as "every Wednesday and Friday", not yet re-checked |
 | Streaming replies into speech | Written; not tested yet |
 | Automated tests for `jcal.py` | Tested and working: 51 of 51 pass |
-| Phase 1 (backups, CI, ruff, pre-commit, cleanup, model pin) | Merged into `main`; ruff passes; green CI run on `main` and nightly job still to confirm (section 19) |
+| Phase 1 (backups, CI, ruff, pre-commit, cleanup, model pin) | Done: merged into `main`, ruff passes, CI green; optional nightly job still open (section 19) |
 | Time-of-day awareness when listing today's events | Logic tested; not yet confirmed in a real conversation (section 16) |
 
 ## Known limits

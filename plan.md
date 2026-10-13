@@ -1,0 +1,152 @@
+# JARVIS: Plan from here
+
+Written 2026-10-12, after Phase 1 (backups, CI, ruff, pre-commit, cleanup) was merged and CI went green.
+
+## Where the project stands
+
+The calendar logic is in good shape: it is checked in code, covered by 51 tests, and has
+already caught one real bug. The rest of the system is not at that level yet:
+
+- **The model is the least reliable part, and nothing measures it.** Every incident so far
+  (wrong dates, "every Wednesday and Friday" saved as weekdays, a finished class described
+  as still ahead) came from the model, not from the code. When `gemma4:latest` changes, or the
+  prompt is edited, there is no way to tell whether JARVIS got better or worse.
+- **`brain.py` cannot be tested as it is.** The database connection, the conversation,
+  the pending confirmation and the Ollama call are all module-level globals. A test cannot
+  give it a fake model or a fixed clock.
+- **The conversation grows forever.** `messages` is never trimmed. Over a long session it
+  will become slow, and eventually it will overflow the model's context and the model will
+  start forgetting its own system prompt.
+- **The same knowledge lives in two places.** Tool schemas sit in one list and the functions
+  in another (`tools` and `available_functions`), and two modules each open the database
+  and create an `events` table. Nothing checks that the two copies match.
+- **The server only works when started from the project folder.** Paths like `jarvis.db`,
+  `models/` and `static/index.html` are relative.
+
+The order below follows one rule: **measure before changing, and make it testable before
+adding features.** Each phase ends with something that can be checked.
+
+---
+
+## Phase 2: Measure the model
+
+Goal: one command that says how well JARVIS handles real requests, so any prompt or model
+change can be judged by numbers instead of by feel.
+
+1. **An evaluation suite** (`evals/`), built from `experiments/compare.py`.
+   - Each case is a user message plus what should happen: which tool, which arguments,
+     or "no tool at all". Dates are computed from a frozen "now", the same way the tests do it.
+   - Start with about 30 cases taken from the incidents in the changelog: relative dates
+     ("next Friday"), durations, `repeat_days` versus `weekdays`, "until December" (should
+     ask), AM/PM ambiguity (should ask), tonight with finished events, deleting one
+     occurrence versus the series, tasks versus events, greetings (no tool), and arithmetic
+     (should call `calculate`).
+   - Run each case 3 times, because the model is not deterministic. Report the pass rate
+     per case and overall, plus the average time.
+   - Save each run's results as a JSON file with the model ID and the prompt's hash, so two
+     runs can be compared.
+   - It is not part of CI (CI has no Ollama). Run it by hand with `python -m evals`.
+2. **Record the baseline** score for the current prompt and model in the changelog.
+3. From now on, **every prompt edit comes with an eval run**, and the before and after
+   scores go in its commit message.
+
+Done when: `python -m evals` prints a score, and the baseline is recorded.
+
+## Phase 3: Make `brain.py` testable, then test it
+
+Goal: the code around the model is as well tested as the calendar.
+
+1. **Configuration in one place** (`config.py`): the model name, the database path, the
+   models folder, the static folder, `MAX_ROUNDS`, and the history limit. All paths are built
+   from the project folder (`Path(__file__).parent`), so the server can be started from
+   anywhere. `JARVIS_DB` keeps working.
+2. **One database module** (`db.py`): one connection, one lock, used by `brain` and `jcal`.
+3. **Versioned migrations.** Replace the "add a column if it is missing" code with numbered
+   steps tracked in `PRAGMA user_version`. Adding a column later then becomes a numbered
+   step that runs once and can be tested.
+4. **One tool registry.** Each tool is written once, as its function and its schema side by
+   side (a small `@tool(...)` decorator, or a dict of `{name: (func, schema)}`). Then the
+   schema and the function cannot drift apart. Add a test that every schema has a matching
+   function and that every required argument exists in the function's signature.
+5. **An `Assistant` object** that holds the conversation, the pending confirmation and a
+   model client that can be swapped out. `server.py` makes one instance. Tests create their
+   own, with a fake client that plays back scripted stream chunks and tool calls.
+6. **Tests for `brain.py`:**
+   - tasks: add, duplicates, complete, ambiguous matches, the checkbox toggle
+   - calculator: the safe-eval rules, the size caps, bad input
+   - `run_tool`: unknown tool, bad arguments, a tool that crashes
+   - `chat_stream` with the fake client: a plain reply; one tool round; several rounds;
+     hitting `MAX_ROUNDS`; a model error partway through; the delete confirmation flow
+     from request to Confirm or Cancel
+7. **Tests for the endpoints** with FastAPI's `TestClient`, with Whisper and Kokoro stubbed
+   out. To make that possible, load both models the first time they are used, not when the
+   module is imported. That also makes the server start faster.
+8. **Replace `print` with `logging`**, written to a file that rotates, with each tool call,
+   its result and how long it took. When JARVIS misbehaves, the log shows what it actually
+   did, which is better evidence than asking JARVIS why (see section 16 of the changelog).
+
+Done when: CI runs tests for `brain` and `server` as well as `jcal`, and coverage is
+reported.
+
+## Phase 4: Conversation memory that holds up
+
+1. **Trim the history.** Keep the system prompt and the last N exchanges (start with about 20
+   messages). Never cut between a tool call and its result. Rerun the evals after making this
+   change.
+2. **A "new conversation" button** on the page, plus an endpoint that resets the history.
+3. **Save the conversation to SQLite**, so a server restart (including every `--reload`) does
+   not wipe what was just said. Pending confirmations should expire after a few minutes
+   instead of living forever.
+
+## Phase 5: Features, in order of value
+
+1. **Edit and move events** (`update_event`). This is the largest gap in the calendar today.
+   It needs the same confirmation card as delete, and must handle "this occurrence" versus
+   "the whole series". A "this occurrence" change can reuse the exceptions table: add an
+   exception for that date and insert a one-off event in its place.
+2. **Reminders.** A small scheduler inside the server checks every minute, and the page
+   receives reminders through server-sent events, shows them, and speaks them when voice
+   mode is on. Store reminders in the database so a restart does not lose them.
+3. **Notes and memory.** `remember` and `recall` tools backed by a table with SQLite's FTS5
+   full-text search. Start with that before reaching for embeddings.
+4. **Morning briefing.** Today's events, overdue tasks and open reminders in one reply. Most
+   of it can be put together in code, with the model only writing the sentences.
+5. **Weather, then news and sports**, as plain read-only tools with a timeout and a cached
+   result, so a slow API never blocks a reply.
+
+Each new tool gets its own eval cases before it ships.
+
+## Phase 6: Leaving 127.0.0.1 (phone access)
+
+Not before Phases 3 and 4. In this order:
+
+1. **Check that other websites cannot reach the API.** `TrustedHostMiddleware` stops DNS
+   rebinding, but a page open in another tab can still send requests to `127.0.0.1:8000`.
+   Test whether `/chat` or `/tasks/{id}` accept a cross-site POST, and add a check that rejects
+   requests from any other `Origin`. This is worth doing even while the server stays local.
+2. **A login** (a single user, with the session held in a cookie) on every endpoint.
+3. **Tailscale** for the network, with HTTPS from `tailscale serve`. Never port forwarding.
+4. **A phone layout** for the page.
+
+## Ongoing upkeep (small, any time)
+
+- **Split the requirements.** `requirements.txt` is a `pip freeze` dump (it includes `torch`).
+  Keep a short `requirements.in` listing what the project uses directly, a
+  `requirements-dev.txt` (pytest, ruff, pre-commit), and a generated lock file.
+- **Keep backups off this disk.** `backups/` sits next to `jarvis.db`, so a disk failure or
+  a lost laptop takes both. Copy them to iCloud Drive or Time Machine, and test a restore
+  once.
+- **Split up `index.html`.** At over 1000 lines, move the scripts into `static/js/` modules
+  (orb, chat, speech, calendar). No build step is needed.
+- **Check model latency.** Measure the time to the first spoken word. Try Ollama's
+  `keep_alive` setting so the model stays loaded between requests.
+- **Changelog status table:** mark "Streaming replies into speech" as tested, since every
+  chat now goes through it.
+
+## What I would not do yet
+
+- **Switch to Google Calendar.** The local calendar is the tested core. Sync can come once
+  editing events works and Phase 6 is done.
+- **Fine-tune or swap models.** Build the eval suite first, so any switch is measured.
+- **Add a frontend framework.** The page works. Splitting it into modules gives most of the
+  benefit for little risk.
