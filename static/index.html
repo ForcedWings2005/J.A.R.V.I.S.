@@ -15,6 +15,9 @@ header { grid-column:1 / 4; display:flex; justify-content:space-between; align-i
 .pill button { background:none; border:1px solid var(--accent); border-radius:8px; width:30px; height:16px; position:relative; padding:0; cursor:pointer; }
 .pill button::after { content:""; position:absolute; top:2px; left:2px; width:10px; height:10px; border-radius:50%; background:var(--muted); }
 .pill button[aria-checked="true"]::after { left:16px; background:var(--accent); }
+button.pill { background:none; color:var(--accent); cursor:pointer; }
+button.pill:hover { border-color:var(--accent); }
+button.pill:disabled { opacity:.5; cursor:wait; }
 .col { display:flex; flex-direction:column; gap:16px; min-height:0; }
 .panel { flex:1; min-height:0; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:14px 16px; cursor:pointer; overflow:auto; }
 .h { display:flex; justify-content:space-between; font-family:var(--mono); font-size:12px; letter-spacing:2px; color:var(--accent); margin-bottom:8px; }
@@ -129,6 +132,7 @@ button.tgh { cursor:pointer; }
     <div class="pill">MIC <span id="mic-state">OFF</span></div>
     <div class="pill">VOICE MODE <button id="voice" role="switch" aria-checked="false" aria-label="Voice mode"></button></div>
     <div class="pill">REDUCE MOTION <button id="motion" role="switch" aria-checked="false" aria-label="Reduce motion"></button></div>
+    <button class="pill" id="newchat" title="Forget this conversation and start again">NEW CONVERSATION</button>
   </div>
 </header>
 
@@ -1001,6 +1005,33 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => { if (e.code === 'Space') stopRecording(); });
 
 sendBtn.addEventListener('click', send);
+
+// ---------- New conversation ----------
+// Asks the server to forget the conversation and any waiting confirmation.
+const newChatBtn = document.getElementById('newchat');
+async function newConversation() {
+  if (sendBtn.disabled) return;           // a reply is still coming in
+  stopSpeaking();
+  hideConfirm();
+  newChatBtn.disabled = true;
+  try {
+    const res = await fetch('/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    if (!res.ok) throw new Error('Server error ' + res.status);
+    youEl.textContent = '\u00a0';
+    botEl.textContent = 'New conversation started.';
+    tickerEl.textContent = '\u00a0';
+    setState('idle');
+  } catch (err) {
+    botEl.textContent = 'Error: ' + err.message;
+  }
+  newChatBtn.disabled = false;
+  input.focus();
+}
+newChatBtn.addEventListener('click', newConversation);
 input.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
 
 // ---------- Startup ----------

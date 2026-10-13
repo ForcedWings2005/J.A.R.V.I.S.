@@ -79,6 +79,10 @@ class SpeakRequest(BaseModel):
     text: str
 
 
+class ResetRequest(BaseModel):
+    """Empty, but requiring a JSON body keeps other websites from sending this request."""
+
+
 @app.get("/")
 def home():
     return FileResponse(config.STATIC_DIR / "index.html")
@@ -99,6 +103,12 @@ def chat_endpoint(req: ChatRequest):
 @app.post("/confirm")
 def confirm_endpoint(req: ConfirmRequest):
     return {"reply": assistant.resolve_pending(req.id, req.approve)}
+
+
+@app.post("/reset")
+def reset_endpoint(req: ResetRequest):
+    assistant.reset()
+    return {"ok": True}
 
 
 @app.get("/calendar")
