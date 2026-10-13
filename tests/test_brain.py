@@ -3,6 +3,7 @@
 The fake plays back scripted rounds: each round is some text and/or tool calls,
 streamed in small chunks the way Ollama sends them.
 """
+import ollama
 import pytest
 
 import brain
@@ -197,3 +198,16 @@ def test_a_crashing_tool_is_logged_with_its_traceback(caplog, monkeypatch):
     monkeypatch.setitem(tools.FUNCTIONS, "boom", boom)
     brain.Assistant(chat=FakeModel()).run_tool(call("boom"))
     assert "tool boom crashed" in caplog.text and "RuntimeError: disk on fire" in caplog.text
+
+
+def test_token_counts_from_ollama_are_logged_and_kept(caplog):
+    def chat(**kwargs):
+        yield ollama.ChatResponse(message=ollama.Message(role="assistant", content="Hello."),
+                                  done=True, prompt_eval_count=2056,
+                                  prompt_eval_duration=1_500_000_000, eval_count=12)
+
+    caplog.set_level("INFO", logger="jarvis")
+    a = brain.Assistant(chat=chat)
+    run(a, "Hi")
+    assert a.last_prompt_tokens == 2056
+    assert "model round 1: read 2056 tokens in 1.50 s, wrote 12 tokens" in caplog.text

@@ -129,6 +129,7 @@ class Assistant:
         self.messages = [{"role": "system", "content": build_system_prompt()}]
         self.pending = None         # (id, NeedsConfirmation) waiting for the buttons
         self.confirm = None         # the card to show for the current turn, if any
+        self.last_prompt_tokens = None  # tokens the model read on its last call (from Ollama)
         self.lock = threading.Lock()
 
     def run_tool(self, call) -> str:
@@ -149,6 +150,22 @@ class Assistant:
             self.confirm = {"id": pid, "text": result.card}
             return result.reply
         return result
+
+    def _log_usage(self, last_chunk, round_no: int) -> None:
+        """Ollama's last chunk of a reply says how much text the model read and wrote.
+
+        prompt_eval_count is the size of the whole conversation the model was given,
+        in tokens. Ollama counts all of it even when it reuses work from the previous
+        call, so it measures how full the context is, not how much time was spent.
+        The fake model in the tests sends no counts, so missing values are skipped.
+        """
+        read = getattr(last_chunk, "prompt_eval_count", None)  # None if no chunk came
+        if read is None:
+            return
+        self.last_prompt_tokens = read
+        seconds = (getattr(last_chunk, "prompt_eval_duration", None) or 0) / 1e9
+        log.info("model round %d: read %d tokens in %.2f s, wrote %s tokens",
+                 round_no + 1, read, seconds, getattr(last_chunk, "eval_count", None))
 
     def resolve_pending(self, pid: str, approve: bool) -> str:
         """Called only by the Confirm and Cancel buttons, never by the model."""
@@ -182,6 +199,7 @@ class Assistant:
                 for round_no in range(self.max_rounds + 1):
                     content = ""
                     calls = []
+                    chunk = None
                     for chunk in self.chat(model=self.model, messages=self.messages,
                                            tools=tools.SCHEMAS, stream=True):
                         piece = chunk.message.content or ""
@@ -193,6 +211,7 @@ class Assistant:
                             yield {"type": "delta", "text": piece}
                         if chunk.message.tool_calls:
                             calls.extend(chunk.message.tool_calls)
+                    self._log_usage(chunk, round_no)
 
                     self.messages.append(
                         ollama.Message(role="assistant", content=content, tool_calls=calls or None)
