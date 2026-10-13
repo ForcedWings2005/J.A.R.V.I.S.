@@ -406,7 +406,7 @@ Found by the Phase 3 eval run (section 23). Asked "What is 1234 times 5678?", th
 
 ## 26. Small follow-ups: nightly backup checked, dates beyond two weeks
 
-On the branch `small-followups`.
+Done on `small-followups`, merged into `main` on 2026-10-13 (a fast-forward) and then deleted. The third follow-up, an `Origin` check for `/transcribe`, was proposed but not done; it stays open in `plan.md` (Phase 6).
 
 - **The nightly backup works.** launchd shows the job ran twice with exit code 0; `/tmp/jarvis-backup.log` says `saved jarvis-2026-10-12.db`, and that file is dated 03:00.
 - **Bug: JARVIS thought the calendar ended two weeks from today.** The "March 31st is outside my immediate reference window" miss from section 25 led to two new eval cases with dates beyond the 14 listed in the prompt. With the old prompt (`65e58bd83ba7`) they passed **2/10**: asked "What do I have on February 20th?", JARVIS refused every time ("my calendar records only extend up to January 21st"), and it refused to add a March 3rd appointment 3 times out of 5. The list of upcoming dates in the prompt was meant as a lookup aid so the model does not count days, but the model read it as the limit of the calendar.
