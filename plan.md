@@ -124,6 +124,11 @@ Not before Phases 3 and 4. In this order:
    rebinding, but a page open in another tab can still send requests to `127.0.0.1:8000`.
    Test whether `/chat` or `/tasks/{id}` accept a cross-site POST, and add a check that rejects
    requests from any other `Origin`. This is worth doing even while the server stays local.
+   *Checked in Phase 3:* the JSON endpoints refuse a body sent as `text/plain` (422), which
+   is the only kind another site can send without a browser preflight, so they are safe
+   today; a test pins this. `/transcribe` takes a form upload, which another site *can*
+   send. It only returns text the other site cannot read, but the `Origin` check should
+   still cover it.
 2. **A login** (a single user, with the session held in a cookie) on every endpoint.
 3. **Tailscale** for the network, with HTTPS from `tailscale serve`. Never port forwarding.
 4. **A phone layout** for the page.

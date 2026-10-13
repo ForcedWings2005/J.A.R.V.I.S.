@@ -30,6 +30,7 @@ jarvis/
 ├── jarvis.db           SQLite database (events and tasks; not in git)
 ├── .gitignore          Files git should skip
 ├── requirements.txt    Pinned package versions
+├── requirements-dev.txt  What the checks need (CI installs only this)
 ├── backups/            The backups (not in git)
 ├── tests/
 │   ├── conftest.py     Test setup: temporary database and frozen clock
@@ -37,6 +38,8 @@ jarvis/
 │   ├── test_database.py  Tests for the schema migrations
 │   ├── test_brain.py   Tests for the assistant loop, with a fake model
 │   ├── test_tasks_calc_tools.py  Tests for the to-do list, calculator and registry
+│   ├── test_server.py  Tests for the web endpoints
+│   ├── fakes.py        A fake model that plays back scripted replies
 │   ├── test_speech_text.py  Tests for the text clean-up before speaking
 │   └── test_evals.py   Tests for the eval suite's matching rules
 ├── evals/              Model evaluation suite (python -m evals)
@@ -361,6 +364,11 @@ Work on the branch `phase3-testable`. Goal from `plan.md`: the code around the m
 
 - New tests: `tests/test_brain.py` (17 checks, with a fake model that streams scripted replies and tool calls): a plain reply, history across turns, the prompt rebuilt each turn, the apology when there is no text, a model error, a tool round and its result fed back, several tools in one round, error steps, the round cap, unknown tools, bad arguments, a crashing tool, and the whole delete confirmation flow (card, Confirm, Cancel, a wrong or reused id, the card only on its own turn). `tests/test_tasks_calc_tools.py` (26 checks) covers the to-do list, the calculator including attempts to escape it (`__import__`, `open`), and the registry.
 - 171 tests in total, all passing. The evals now use `Assistant` too; a quick live run of the three delete cases passed.
+
+**Step 5: tests for the web endpoints.** `tests/test_server.py` (17 checks) drives the real FastAPI app with FastAPI's test client, with the model, Whisper and Kokoro replaced by fakes: the page, the host check (another host name gets 400), chat streaming with and without tools, the delete card through `/confirm` (including a reused id), `/calendar` and its bad ranges, the task checkbox and its 404, `/speak` (trimming, the 2000-character limit, empty text), and `/transcribe` (the result, the temporary file being removed, odd file names, the upload limit). The fake model now lives in `tests/fakes.py`, shared by both test files.
+
+- **Security finding (from Phase 6 of `plan.md`, checked early):** can a web page open in another tab drive JARVIS? The JSON endpoints refuse a body sent as `text/plain` (422), and `text/plain` is the only way another site can send a body here without the browser asking permission first. So `/chat`, `/confirm` and `/tasks` are safe from that today, and a test now pins it. `/transcribe` takes a form upload, which another site can send, but it only returns text that the other site cannot read. Noted in `plan.md` for the `Origin` check.
+- **CI dependencies:** new `requirements-dev.txt` (pytest, ruff, ollama, fastapi, httpx2, python-multipart, pinned to the venv's versions). CI installs it instead of a list in the workflow. Checked in a brand-new virtual environment with only that file installed: 188 passed, no warnings. It uses `httpx2`, because Starlette warns that `httpx` is deprecated for its test client.
 
 ---
 
