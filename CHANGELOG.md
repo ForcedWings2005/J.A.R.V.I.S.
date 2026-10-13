@@ -403,6 +403,17 @@ Found by the Phase 3 eval run (section 23). Asked "What is 1234 times 5678?", th
 - **Full eval with the new prompt:** **95/96 runs (99%)**, 31/32 cases passed every run. The one miss: `repeat_until_date` once asked for the exact end date, saying March 31st was "outside my immediate reference window". The prompt lists only the next 14 dates and says to take dates from that list, which seems to make it wary of dates further out. It passed 3/3 in every earlier run. A possible follow-up, not fixed here.
 - Not yet heard in the real app.
 
+
+## 26. Small follow-ups: nightly backup checked, dates beyond two weeks
+
+On the branch `small-followups`.
+
+- **The nightly backup works.** launchd shows the job ran twice with exit code 0; `/tmp/jarvis-backup.log` says `saved jarvis-2026-10-12.db`, and that file is dated 03:00.
+- **Bug: JARVIS thought the calendar ended two weeks from today.** The "March 31st is outside my immediate reference window" miss from section 25 led to two new eval cases with dates beyond the 14 listed in the prompt. With the old prompt (`65e58bd83ba7`) they passed **2/10**: asked "What do I have on February 20th?", JARVIS refused every time ("my calendar records only extend up to January 21st"), and it refused to add a March 3rd appointment 3 times out of 5. The list of upcoming dates in the prompt was meant as a lookup aid so the model does not count days, but the model read it as the limit of the calendar.
+- **Fix (prompt):** "The list is only a lookup aid; the calendar itself has no end. For a date beyond the list, such as 'March 3rd', use the next such date that is not in the past and call the tool as usual; never tell the user a date is outside your calendar or range."
+- **After** (prompt `98d8bc80df43`): the two new cases **10/10**, `repeat_until_date` 5/5. Full suite (34 cases × 3): **101/102**. The one miss: "Am I free on Friday?" on a Monday once checked the Friday a week later. Rerun 8 times it passed 8/8, so it is treated as run-to-run variation, but it is worth watching since the new rule talks about "the next such date".
+- These requests take longer now (about 11-17 s instead of a quick refusal), because the model actually calls the tool.
+
 ---
 
 ## Status
