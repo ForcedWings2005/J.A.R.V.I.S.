@@ -54,6 +54,22 @@ ruff check .            # lint
 Both also run automatically on GitHub for every push, and before every commit once
 `pre-commit install` has been run.
 
+## Model evals
+
+The tests check the code. The evals check the model: about 30 real requests ("add piano
+every Tuesday at 4pm", "how are we looking tonight") run through the real assistant
+against a frozen clock and a throwaway database, and are scored on the tools it calls
+and what it says. Ollama must be running. A full run takes about 10 minutes.
+
+```bash
+python -m evals                     # every case, 3 runs each
+python -m evals --runs 1 -k delete  # quick: only cases with 'delete' in the name
+python -m evals -v                  # also show the reply and tool calls of failures
+```
+
+Run it before and after every prompt or model change, and put both scores in the commit
+message. Cases live in `evals/cases.py`; results are saved to `evals/results/` (not in git).
+
 ## Backups
 
 `jarvis.db` holds the real calendar and tasks and is not in git.

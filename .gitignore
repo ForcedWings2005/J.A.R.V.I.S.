@@ -24,3 +24,5 @@ models/
 backups/
 .ruff_cache/
 *.log
+# Eval run results (local, one JSON file per run)
+evals/results/
