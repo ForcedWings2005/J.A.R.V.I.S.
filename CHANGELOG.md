@@ -54,6 +54,7 @@ jarvis/
 ├── .github/workflows/tests.yml  Runs lint and tests on GitHub for every push
 ├── experiments/        Old scripts, not part of the app (agent.py, compare.py)
 ├── README.md           Setup, run, tests, backups, pinned model
+├── CLAUDE.md           Instructions for Claude Code when it works on this project
 ├── plan.md             The plan from Phase 2 onward
 └── CHANGELOG.md        This file
 ```
@@ -279,7 +280,7 @@ Fix (written; the logic is covered by automated tests, but not yet confirmed in 
 
 ## 19. Phase 1: protect what exists
 
-Applied on the Mac on the branch `phase1-protect` (as of 2026-10-12): the first backup file was created, the dead code is removed and the old scripts are in `experiments/`, `ruff check .` passes with no findings, and the pre-commit hook is installed. The branch was merged into `main` on 2026-10-12 (a fast-forward, 13 files changed) and pushed, and the branch was deleted. The GitHub Actions run on `main` is green (confirmed 2026-10-12). Still open: the optional nightly job. The model ID was recorded in section 20.
+Applied on the Mac on the branch `phase1-protect` (as of 2026-10-12): the first backup file was created, the dead code is removed and the old scripts are in `experiments/`, `ruff check .` passes with no findings, and the pre-commit hook is installed. The branch was merged into `main` on 2026-10-12 (a fast-forward, 13 files changed) and pushed, and the branch was deleted. The GitHub Actions run on `main` is green (confirmed 2026-10-12). The model ID was recorded in section 20. The nightly job turned out to be in place already (section 24).
 
 - **Database backups.** New `backup_db.py` uses SQLite's backup API, which is safe while the server runs (a plain file copy is not). It writes one file per day to `backups/`, checks the copy with `PRAGMA integrity_check` before keeping it, and keeps the newest 7 days. `python backup_db.py` takes a fresh backup now. `server.py` also calls it at startup, before `brain` and `jcal` open the database, but only if today has no backup yet, so the first start of the day keeps a snapshot from before anything changed. If a backup fails, the server still starts and prints the error.
 - **Automatic checks on GitHub.** `.github/workflows/tests.yml` runs `ruff check .` and `python -m pytest` on every push and pull request. It installs only `pytest` and `ruff`, which is enough because `jcal` uses only the standard library.
@@ -385,6 +386,12 @@ Done on `phase3-testable`, merged into `main` on 2026-10-12 (a fast-forward) and
 | `calc_multiply` | 1/3 | The calculator returned 7006652 correctly, but JARVIS wrote it out in words wrongly: "seven million sixty-six thousand five hundred two". It spoke a wrong number although the tool had the right one. Likely fix: tell the model to keep numbers as digits, since `speech_text.py` now handles how they are spoken. |
 | `ask_am_pm` | 2/3 | Once it assumed 8 AM for "Thursday at 8" instead of asking. |
 
+
+## 24. CLAUDE.md, and the nightly backup job
+
+- **New `CLAUDE.md`**: project instructions that Claude Code reads at the start of every session. It covers the architecture and what each file does, the coding conventions taken from the code, the security boundaries that exist today (and the gaps: no login, no HTTPS, no `Origin` check on `/transcribe`), the database migration rules, the test, lint and eval commands, dependencies and configuration, logging and documentation, working rules (read before editing, minimal changes, explain risky changes first, commit only when asked) and how to report finished work (exact commands and real results, what could not be verified, mistakes stated plainly). Every claim in it was checked against the code; the review caught one error in the draft (unknown upload extensions are saved as `.webm`, not refused).
+- **The nightly backup job already exists.** `~/Library/LaunchAgents/com.jarvis.backup.plist` runs `.venv/bin/python backup_db.py` at 03:00 and is loaded in launchd. Section 19 and the Status table listed it as still open; they are corrected. Not yet checked: whether it has run successfully (its output goes to `/tmp/jarvis-backup.log`). It uses absolute paths, so moving the project folder, the venv or `backup_db.py` breaks it.
+
 ---
 
 ## Status
@@ -399,7 +406,7 @@ Done on `phase3-testable`, merged into `main` on 2026-10-12 (a fast-forward) and
 | Event durations and repeating events | Logic tested (51 automated tests pass); real requests to JARVIS, such as "every Wednesday and Friday", not yet re-checked |
 | Streaming replies into speech | Written; not tested yet |
 | Automated tests for `jcal.py` | Tested and working: 51 of 51 pass |
-| Phase 1 (backups, CI, ruff, pre-commit, cleanup, model pin) | Done: merged into `main`, ruff passes, CI green; optional nightly job still open (section 19) |
+| Phase 1 (backups, CI, ruff, pre-commit, cleanup, model pin) | Done: merged into `main`, ruff passes, CI green; nightly backup job in place (sections 19, 24) |
 | Time-of-day awareness when listing today's events | Logic tested; passes in the evals (section 21), not yet confirmed in a real conversation (section 16) |
 | Phase 3 (config, one database with migrations, tool registry, Assistant, endpoint tests, logging) | Done, merged into `main`; 191 tests; evals 87/90 with unchanged prompt (section 23) |
 | Model eval suite (Phase 2) | Done, merged into `main`; baseline 80/90 runs, 90/90 after fixes (sections 21, 22) |
