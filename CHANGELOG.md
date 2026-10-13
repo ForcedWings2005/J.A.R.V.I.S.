@@ -27,7 +27,13 @@ jarvis/
 ├── backups/            The backups (not in git)
 ├── tests/
 │   ├── conftest.py     Test setup: temporary database and frozen clock
-│   └── test_jcal.py    Automated tests for the calendar logic
+│   ├── test_jcal.py    Automated tests for the calendar logic
+│   └── test_evals.py   Tests for the eval suite's matching rules
+├── evals/              Model evaluation suite (python -m evals)
+│   ├── cases.py        The 30 cases
+│   ├── check.py        How a run is scored
+│   ├── __main__.py     The runner
+│   └── results/        One JSON file per run (not in git)
 ├── pytest.ini          Tells pytest where the tests are
 ├── ruff.toml           Lint settings
 ├── .pre-commit-config.yaml  Checks that run before every commit
@@ -283,6 +289,28 @@ Applied on the Mac on the branch `phase1-protect` (as of 2026-10-12): the first 
 - Small tidying: an unused `VOICE = None` in `speech.py`, a commented-out docstring in `brain.py`, and trailing whitespace.
 - The file layout above is updated: `agent.py` and `compare.py` live in `experiments/`, `index_old.html` is gone, and `smoke_test.py` is no longer in the project (it never made it into git).
 
+## 21. Phase 2: model evaluation suite
+
+Work on the branch `phase2-evals`. See `plan.md` for why: every incident so far came from the model, and nothing measured it.
+
+- **`python -m evals`** runs 30 real requests through the real `brain.chat_stream`, 3 times each. Every run uses a frozen clock (Monday 2030-01-07) and a throwaway in-memory database, so the real calendar is never touched and the expected dates never change.
+- **What is scored:** which tools were called and with which arguments, what a tool reported back (for repeats, where `repeat: weekly` and `repeat_days: tue` both save the same thing), and simple checks on the reply (must mention, must not claim, must ask). A run passes only if every check passes.
+- **Cases** cover chat with no tools, admitting it does not know, the calculator, reading the calendar (including the "how are we tonight" incident), adding events (default hour, durations, end times, conflicts), asking when the time, AM/PM or end date is unclear, every repeat rule (including the Wednesday and Friday incident), deleting (one-off, one occurrence, a whole series), and the to-do list.
+- **Results** are saved to `evals/results/` as JSON with the model ID and a hash of the system prompt and tool descriptions, so two runs can be compared.
+- **`tests/test_evals.py`** (50 checks) tests the scoring rules, and that every case only names tools and arguments that really exist. CI now also installs `ollama`, because the test imports `brain`.
+- **Lesson from the first runs:** a reply check written as exact phrases is too strict. JARVIS speaks numbers as words ("four hundred nine and a half"), asks without a question mark ("I will require a specific time"), and says "outside of my knowledge" rather than "outside my knowledge". Six apparent failures were the checks, not JARVIS, and the checks were widened. Phrase lists will keep needing care; a model-graded check is a possible later step.
+
+**Baseline (2026-10-12):** `gemma4:latest` (`dc35e8d9c606`), prompt `e3265f593ce4`: **80/90 runs (89%), 26/30 cases pass every run**, about 7 s per request on average, 10.7 min for the whole suite.
+
+Real failures it found:
+
+| Case | Score | What happens |
+|---|---|---|
+| `delete_one_off` | 0/3 | "Cancel my dentist appointment" fails when the event is titled "Dentist". `find_for_delete` only matches when the words the user said are inside the title, not the other way round. A code bug. Sometimes the model also asks for the title instead of trying. |
+| `delete_series` | 0/3 | "Delete all my piano lessons": `delete_event` requires a date even for the whole series, so JARVIS asks the user for a date instead of acting. |
+| `task_complete` | 0/3 | "I bought the milk" gets a witty reply, but `complete_task` is never called. Once it even said "that item has been duly noted" without doing anything. |
+| `repeat_weekdays` | 2/3 | "A standup every weekday at 9:30am": once it asked for a start date instead of using the next weekday. |
+
 ---
 
 ## Status
@@ -298,7 +326,8 @@ Applied on the Mac on the branch `phase1-protect` (as of 2026-10-12): the first 
 | Streaming replies into speech | Written; not tested yet |
 | Automated tests for `jcal.py` | Tested and working: 51 of 51 pass |
 | Phase 1 (backups, CI, ruff, pre-commit, cleanup, model pin) | Done: merged into `main`, ruff passes, CI green; optional nightly job still open (section 19) |
-| Time-of-day awareness when listing today's events | Logic tested; not yet confirmed in a real conversation (section 16) |
+| Time-of-day awareness when listing today's events | Logic tested; passes in the evals (section 21), not yet confirmed in a real conversation (section 16) |
+| Model eval suite (Phase 2) | Built on `phase2-evals`; baseline 80/90 runs (section 21) |
 
 ## Known limits
 
