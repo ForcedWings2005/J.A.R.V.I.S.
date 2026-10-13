@@ -4,13 +4,13 @@ import threading
 import json
 from datetime import datetime
 
-import mlx_whisper
 from fastapi import FastAPI, HTTPException, UploadFile, File, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 import backup_db
+import config
 
 try:
     backup_db.backup(overwrite=False)   # first start of the day only
@@ -24,8 +24,6 @@ import speech  # noqa: E402
 app = FastAPI()
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
 
-STT_MODEL = "mlx-community/whisper-large-v3-turbo"
-MAX_AUDIO_BYTES = 10_000_000
 stt_lock = threading.Lock()
 
 
@@ -48,7 +46,7 @@ class SpeakRequest(BaseModel):
 
 @app.get("/")
 def home():
-    return FileResponse("static/index.html")
+    return FileResponse(config.STATIC_DIR / "index.html")
 
 
 @app.post("/chat")
@@ -98,8 +96,8 @@ def set_task(task_id: int, req: TaskToggle):
 
 @app.post("/transcribe")
 def transcribe_endpoint(file: UploadFile = File(...)):
-    data = file.file.read(MAX_AUDIO_BYTES + 1)
-    if len(data) > MAX_AUDIO_BYTES:
+    data = file.file.read(config.MAX_AUDIO_BYTES + 1)
+    if len(data) > config.MAX_AUDIO_BYTES:
         raise HTTPException(status_code=413, detail="recording too large")
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in (".webm", ".mp4", ".m4a", ".wav", ".ogg", ".mp3"):
@@ -109,7 +107,8 @@ def transcribe_endpoint(file: UploadFile = File(...)):
         path = tmp.name
     try:
         with stt_lock:
-            result = mlx_whisper.transcribe(path, path_or_hf_repo=STT_MODEL, language="en")
+            import mlx_whisper  # loaded on first use, like Kokoro in speech.py
+            result = mlx_whisper.transcribe(path, path_or_hf_repo=config.STT_MODEL, language="en")
     finally:
         os.remove(path)
     return {"text": result["text"].strip()}

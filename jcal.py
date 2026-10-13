@@ -1,33 +1,7 @@
 """Calendar logic for JARVIS: durations, repeating events, per-date exceptions."""
-import sqlite3
-import threading
-import os
 from datetime import datetime, timedelta
 
-db = sqlite3.connect(os.environ.get("JARVIS_DB", "jarvis.db"), check_same_thread=False)
-lock = threading.Lock()
-
-db.execute(
-    "CREATE TABLE IF NOT EXISTS events ("
-    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-    "title TEXT NOT NULL, date TEXT NOT NULL, time TEXT NOT NULL)"
-)
-db.execute(
-    "CREATE TABLE IF NOT EXISTS event_exceptions ("
-    "event_id INTEGER NOT NULL, date TEXT NOT NULL, "
-    "PRIMARY KEY (event_id, date))"
-)
-# Upgrade an existing events table in place (keeps your current events)
-_cols = {r[1] for r in db.execute("PRAGMA table_info(events)")}
-for _name, _ddl in (
-    ("end_time", "TEXT"),
-    ("repeat_rule", "TEXT NOT NULL DEFAULT 'none'"),
-    ("repeat_until", "TEXT"),
-    ("repeat_days", "TEXT"),  # NEW: e.g. "2,4" for Wed and Fri
-):
-    if _name not in _cols:
-        db.execute(f"ALTER TABLE events ADD COLUMN {_name} {_ddl}")
-db.commit()
+from database import conn as db, lock
 
 REPEATS = ("none", "daily", "weekdays", "weekly", "biweekly", "monthly")
 DAYS = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}

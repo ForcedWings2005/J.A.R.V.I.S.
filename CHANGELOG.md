@@ -12,6 +12,8 @@ Written 2026-10-08, last updated 2026-10-12. Entries are in the order the work w
 ```
 jarvis/
 ├── brain.py            Assistant logic: model calls, tools, tasks, calculator, rules
+├── config.py           Settings: model, paths, limits, voice
+├── database.py         The shared database connection and schema migrations
 ├── jcal.py             Calendar logic: durations, repeats, exceptions, conflicts
 ├── server.py           Web server (FastAPI): endpoints for the page
 ├── speech.py           Text-to-speech (Kokoro)
@@ -29,6 +31,8 @@ jarvis/
 ├── tests/
 │   ├── conftest.py     Test setup: temporary database and frozen clock
 │   ├── test_jcal.py    Automated tests for the calendar logic
+│   ├── test_database.py  Tests for the schema migrations
+│   ├── test_speech_text.py  Tests for the text clean-up before speaking
 │   └── test_evals.py   Tests for the eval suite's matching rules
 ├── evals/              Model evaluation suite (python -m evals)
 │   ├── cases.py        The 30 cases
@@ -328,6 +332,18 @@ Done on `phase2-evals`, which was merged into `main` on 2026-10-12 (a fast-forwa
 - Cause: espeak, which Kokoro uses to turn text into sounds, takes the decimal point for a full stop when the text also ends with one. "The result is 38.4444444444." was read as "thirty-eight. four billion four hundred and forty-four million ...". Without the final full stop the same number was read correctly, which is why it only happened sometimes.
 - Fix: new `speech_text.py` rewrites numbers before speaking: "38.4444444444" becomes "38 point 4 4 4 4" (the word "point", then each digit, rounded to 4 decimal places), and commas inside numbers are dropped ("7,006,652" becomes "7006652"). Checked against Kokoro's phonemes: it now says "thirty-eight point four four four four". The text on screen still shows the full number.
 - The pronunciation table moved from `speech.py` to `speech_text.py`, so the text clean-up is tested (14 checks in `tests/test_speech_text.py`) without loading Kokoro, which CI does not have.
+
+## 23. Phase 3: make the code testable
+
+Work on the branch `phase3-testable`. Goal from `plan.md`: the code around the model gets tested as well as the calendar.
+
+**Step 1: settings in one place.** New `config.py` holds the model name, `MAX_ROUNDS`, the database path, the folders (backups, logs, static, models), the Whisper model, the upload limit, and the voice language and speed (speed is now `VOICE_SPEED` in `config.py`). Every path is built from the project folder, so the server can be started from any folder. `JARVIS_DB` still overrides the database path.
+
+**Step 2: one database, versioned migrations.** New `database.py` opens the one connection and lock that `brain.py` and `jcal.py` now share (before, each opened its own and both created an `events` table). The schema version is kept in SQLite's `PRAGMA user_version`, and `migrate()` runs each step newer than it, once, in order, each inside a transaction so a failed step leaves nothing half done. Step 1 is the original tables; step 2 is durations, repeats and exceptions, written so it also adopts a database from before versioning whose columns were already added by the old code. A database newer than the code is refused instead of being damaged. To change the schema later, add a step to the end of `MIGRATIONS`.
+
+- `speech.py` loads Kokoro and `server.py` loads Whisper the first time they are used instead of on import, so the server starts faster and tests can import it without the model files.
+- 6 tests in `tests/test_database.py`: a new database, running twice, a first-version database keeping its events, adopting a pre-versioning database, rolling back a failed step, and refusing a newer schema.
+- The real `jarvis.db` is now at schema version 2. This happened by mistake while checking the migration on a copy (importing `database` opens the real file). Nothing else changed: same tables and rows as that morning's backup, integrity check ok. The server would have done the same on its next start.
 
 ---
 
