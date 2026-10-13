@@ -392,6 +392,17 @@ Done on `phase3-testable`, merged into `main` on 2026-10-12 (a fast-forward) and
 - **New `CLAUDE.md`**: project instructions that Claude Code reads at the start of every session. It covers the architecture and what each file does, the coding conventions taken from the code, the security boundaries that exist today (and the gaps: no login, no HTTPS, no `Origin` check on `/transcribe`), the database migration rules, the test, lint and eval commands, dependencies and configuration, logging and documentation, working rules (read before editing, minimal changes, explain risky changes first, commit only when asked) and how to report finished work (exact commands and real results, what could not be verified, mistakes stated plainly). Every claim in it was checked against the code; the review caught one error in the draft (unknown upload extensions are saved as `.webm`, not refused).
 - **The nightly backup job already exists.** `~/Library/LaunchAgents/com.jarvis.backup.plist` runs `.venv/bin/python backup_db.py` at 03:00 and is loaded in launchd. Section 19 and the Status table listed it as still open; they are corrected. Not yet checked: whether it has run successfully (its output goes to `/tmp/jarvis-backup.log`). It uses absolute paths, so moving the project folder, the venv or `backup_db.py` breaks it.
 
+
+## 25. Fix: JARVIS spoke wrong numbers
+
+Found by the Phase 3 eval run (section 23). Asked "What is 1234 times 5678?", the calculator returned 7006652 correctly, but JARVIS wrote the answer out in words and got it wrong: "seven million sixty-six thousand five hundred two", and in another run "seven million and sixty-six thousand, six hundred and fifty-two" (that is 7066652). The tool was right; the model's conversion of a long number into words was not. The prompt asked for replies that can be spoken, so the model spelled numbers out itself.
+
+- **Fix (prompt):** "Always write numbers as digits, never as words, and copy them exactly as a tool result gives them, for example 7006652 or 38.4444; the speech system reads digits aloud correctly." This works because of section 22: `speech_text.py` makes sure digits are spoken correctly. Checked against Kokoro's phonemes: `7006652` is read "seven million six thousand six hundred and fifty-two", `426763565` "four hundred and twenty-six million seven hundred and sixty-three thousand five hundred and sixty-five".
+- **Eval cases:** the calculator cases now require the digits (they used to accept words), and two were added: 346 divided by 9 (the decimal bug from section 22) and 98765 times 4321. 32 cases now.
+- **Before and after**, the 4 calculator cases × 5 runs: **18/20** with the old prompt (`cd7cf58d721e`), including the wrong 7066652 again, and **20/20** with the new one (`65e58bd83ba7`).
+- **Full eval with the new prompt:** **95/96 runs (99%)**, 31/32 cases passed every run. The one miss: `repeat_until_date` once asked for the exact end date, saying March 31st was "outside my immediate reference window". The prompt lists only the next 14 dates and says to take dates from that list, which seems to make it wary of dates further out. It passed 3/3 in every earlier run. A possible follow-up, not fixed here.
+- Not yet heard in the real app.
+
 ---
 
 ## Status

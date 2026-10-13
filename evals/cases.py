@@ -39,16 +39,17 @@ CASES = [
          no_tools=True, includes_any=DONT_KNOW),
 
     # --- Calculator -------------------------------------------------------------
-    # Replies are written to be spoken, so numbers may come back in words
+    # Numbers must stay as digits copied from the tool result. Spelled out in words, the
+    # model got 7006652 wrong ("seven million sixty-six thousand ..."); speech_text.py
+    # makes sure digits are spoken correctly. Commas in the reply are ignored.
     Case("calc_percent", "What is 17.5 percent of 2,340?",
-         expect=[("calculate", {})],
-         includes_any=["409.5", "four hundred and nine point five",
-                       "four hundred nine point five", "four hundred and nine and a half",
-                       "four hundred nine and a half"]),
+         expect=[("calculate", {})], includes=["409.5"]),
     Case("calc_multiply", "What is 1234 times 5678?",
-         expect=[("calculate", {})],
-         includes_any=["7006652", "seven million six thousand six hundred and fifty-two",
-                       "seven million six thousand six hundred fifty-two"]),
+         expect=[("calculate", {})], includes=["7006652"]),
+    Case("calc_divide", "What is 346 divided by 9?",
+         expect=[("calculate", {})], includes=["38.4"]),
+    Case("calc_large", "What is 98765 times 4321?",
+         expect=[("calculate", {})], includes=["426763565"]),
 
     # --- Reading the calendar ---------------------------------------------------
     Case("events_tomorrow", "What do I have tomorrow?",
