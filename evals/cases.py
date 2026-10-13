@@ -111,6 +111,13 @@ CASES = [
          expect=[("add_event", {"date": one_of(TODAY, NEXT_MON), "start_time": "18:00",
                                 "repeat_until": "2030-03-31",
                                 "_result": contains("repeating weekly")})]),
+    # Dates beyond the 14 listed in the prompt: JARVIS once asked the user to confirm
+    # "March 31st" because it was "outside my immediate reference window".
+    Case("far_date_add", "Add a dentist appointment on March 3rd at 2pm.",
+         expect=[("add_event", {"date": "2030-03-03", "start_time": "14:00"})],
+         max_calls={"add_event": 1}),
+    Case("far_date_events", "What do I have on February 20th?",
+         expect=[("get_events", {"date": "2030-02-20"})]),
     Case("ask_until_month", "Add choir practice every Thursday at 7pm until December.",
          forbid=["add_event"], asks=True),
 
