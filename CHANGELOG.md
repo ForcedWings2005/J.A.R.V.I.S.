@@ -417,7 +417,7 @@ Done on `small-followups`, merged into `main` on 2026-10-13 (a fast-forward) and
 
 ## 27. Phase 4: conversation memory
 
-Work on the branch `phase4-memory`. `plan.md` planned to trim the conversation history because it grows until the server restarts. Step 1 was to measure first.
+Done on `phase4-memory`, merged into `main` on 2026-10-13 (a fast-forward) and then deleted. `plan.md` planned to trim the conversation history because it grows until the server restarts. Step 1 was to measure first.
 
 **Step 1: measure.** Each model call now logs how many tokens the model was given, how long it took to read them, and how many it wrote (from the counts Ollama sends with its last chunk), and `Assistant.last_prompt_tokens` keeps the latest count. 1 new test; it also caught a crash I introduced when the model's stream sends nothing at all.
 
@@ -467,6 +467,8 @@ Findings (Ollama 0.33.1, gemma4 on this Mac):
 - **Checked in a real browser** against a server on a spare port with a copy of the database: told JARVIS "My favourite colour is teal", clicked NEW CONVERSATION (the page showed "New conversation started."), asked "What is my favourite colour?", and JARVIS said it did not have that detail. The log showed `conversation reset` in between.
 - **Noticed, not fixed:** before the reset JARVIS said "I shall ensure this detail is logged for future reference". It has no way to remember anything between conversations, so that is a promise it cannot keep. For the notes and memory tool (Phase 5), or a prompt rule.
 
+**Not done: saving the conversation across restarts.** Considered and deferred (reasons in `plan.md`, Phase 4 item 4). Events and tasks already survive restarts; only the chat wording is lost, and the notes and memory tool in Phase 5 is the better way to keep what matters.
+
 ---
 
 ## Status
@@ -484,6 +486,7 @@ Findings (Ollama 0.33.1, gemma4 on this Mac):
 | Phase 1 (backups, CI, ruff, pre-commit, cleanup, model pin) | Done: merged into `main`, ruff passes, CI green; nightly backup job in place (sections 19, 24) |
 | Time-of-day awareness when listing today's events | Logic tested; passes in the evals (section 21), not yet confirmed in a real conversation (section 16) |
 | Phase 3 (config, one database with migrations, tool registry, Assistant, endpoint tests, logging) | Done, merged into `main`; 191 tests; evals 87/90 with unchanged prompt (section 23) |
+| Phase 4 (time stamps, thinking kept on, trimming, new conversation, expiring cards) | Done, merged into `main`; 211 tests; evals 108/108 (section 27); not yet tried in the real app |
 | Model eval suite (Phase 2) | Done, merged into `main`; baseline 80/90 runs, 90/90 after fixes (sections 21, 22) |
 | Decimals in speech | Fixed and tested against Kokoro's phonemes; not yet heard in a real conversation (section 22) |
 
