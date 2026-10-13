@@ -28,6 +28,11 @@ MODEL_THINK = True
 # How long Ollama keeps the model loaded after the last request (its default is 5 minutes).
 # Reloading costs about 2.4 s on the first message after a pause; the model uses ~1.4 GB.
 MODEL_KEEP_ALIVE = "1h"
+# The conversation is trimmed when the model was given more than HISTORY_MAX_TOKENS
+# (the model's window is 131072), down to about HISTORY_KEEP_TOKENS, oldest exchanges
+# first. Each trim makes Ollama re-read everything once, so it cuts a lot, rarely.
+HISTORY_MAX_TOKENS = 60_000
+HISTORY_KEEP_TOKENS = 30_000
 
 # Speech
 STT_MODEL = "mlx-community/whisper-large-v3-turbo"

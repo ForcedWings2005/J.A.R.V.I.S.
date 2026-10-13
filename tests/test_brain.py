@@ -261,3 +261,68 @@ def test_an_empty_model_round_is_logged(caplog):
     _, reply = run(a, "Hm")
     assert reply == "Sorry, I could not finish that."
     assert "model round 1 returned nothing" in caplog.text
+
+
+# --- trimming a long conversation --------------------------------------------
+
+def counting_model(tokens_per_message):
+    """A fake model that reports a token count growing with the conversation."""
+    def chat(model, messages, tools, stream, **options):
+        yield ollama.ChatResponse(message=ollama.Message(role="assistant", content="Noted, sir."),
+                                  done=True, prompt_eval_count=tokens_per_message * len(messages))
+    return chat
+
+
+def user_texts(a):
+    return [m["content"].split("] ", 1)[1] for m in a.messages
+            if isinstance(m, dict) and m["role"] == "user"]
+
+
+def test_a_short_conversation_is_never_trimmed():
+    a = brain.Assistant(chat=counting_model(100))
+    for i in range(5):
+        run(a, f"message {i}")
+    assert user_texts(a) == [f"message {i}" for i in range(5)]
+
+
+def test_a_long_conversation_is_trimmed_oldest_first_in_one_go():
+    # 100 tokens per message; trim above 2000 (20 messages) down to about 1000
+    a = brain.Assistant(chat=counting_model(100), max_tokens=2000, keep_tokens=1000)
+    sizes = []
+    for i in range(30):
+        run(a, f"message {i:02d}")
+        sizes.append(len(a.messages))
+    assert a.messages[0]["role"] == "system"
+    assert user_texts(a)[-1] == "message 29"               # the latest is always kept
+    assert user_texts(a) == sorted(user_texts(a))          # oldest went first, order kept
+    assert max(sizes) <= 21                                # never far over the limit
+    drops = sum(1 for before, after in zip(sizes, sizes[1:], strict=False) if after < before)
+    assert 1 <= drops <= 3                                 # rarely, a big cut each time
+
+
+def test_trimming_never_separates_a_tool_call_from_its_result():
+    a = brain.Assistant(chat=FakeModel(), max_tokens=10, keep_tokens=5)
+    tool_call = ollama.Message(role="assistant", content="", tool_calls=[call("list_tasks")])
+    a.messages = [
+        {"role": "system", "content": "S"},
+        {"role": "user", "content": "[t] first " + "x" * 400},
+        tool_call,
+        {"role": "tool", "tool_name": "list_tasks", "content": "No open tasks." + "y" * 400},
+        ollama.Message(role="assistant", content="Nothing to do."),
+        {"role": "user", "content": "[t] second"},
+        tool_call,
+        {"role": "tool", "tool_name": "list_tasks", "content": "No open tasks."},
+        ollama.Message(role="assistant", content="Still nothing."),
+    ]
+    a.last_prompt_tokens = 500
+    assert a.trim_history() == 4
+    assert [brain._role(m) for m in a.messages] == ["system", "user", "assistant", "tool", "assistant"]
+    assert a.messages[1]["content"] == "[t] second"
+
+
+def test_trimming_is_logged(caplog):
+    caplog.set_level("INFO", logger="jarvis")
+    a = brain.Assistant(chat=counting_model(100), max_tokens=500, keep_tokens=300)
+    for i in range(6):
+        run(a, f"message {i}")
+    assert "trimmed the conversation" in caplog.text
