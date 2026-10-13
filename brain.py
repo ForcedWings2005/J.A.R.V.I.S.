@@ -33,7 +33,7 @@ chat_lock = threading.Lock()
 pending = {}
 turn = {"confirm": None}
 
-def delete_event(title: str, date: str, scope: str = "this") -> str:
+def delete_event(title: str, date: str = "", scope: str = "this") -> str:
     found = jcal.find_for_delete(title, date, scope)
     if isinstance(found, str):
         return found
@@ -245,7 +245,9 @@ def build_system_prompt() -> str:
         "If they give neither, omit end_time and it defaults to one hour. "
         "For events that repeat, such as 'every Tuesday at 3', call add_event ONCE "
         "with repeat set to daily, weekdays, weekly, biweekly or monthly, and date "
-        "set to the first occurrence. Never add the same event several times. "
+        "set to the first occurrence. If they give no start date, the first "
+        "occurrence is the next matching day; do not ask for a start date. "
+        "Never add the same event several times. "
         "If they say 'until' a date, set repeat_until. "
         "To delete one date of a repeating event use scope 'this'. Use scope 'all' "
         "only if they say every occurrence or the whole series. "
@@ -266,7 +268,9 @@ def build_system_prompt() -> str:
         "wants to add or delete an event. Events have a specific time; to-do "
         "tasks do not. Use add_task for things to remember or do without a "
         "time, list_tasks to read the to-do list, and complete_task when the "
-        "user says something is done. For greetings and general questions, "
+        "user says something is done, even casually, such as 'I bought the milk' "
+        "or 'called the bank'. Never say a task is noted, done or ticked off "
+        "unless the tool returned success. For greetings and general questions, "
         "answer directly without using any tool. If the user wants to add an "
         "event but has not given a time, ask for the time instead of guessing. "
         "Only say an event or task was added if the tool returned success. "

@@ -15,6 +15,7 @@ jarvis/
 ├── jcal.py             Calendar logic: durations, repeats, exceptions, conflicts
 ├── server.py           Web server (FastAPI): endpoints for the page
 ├── speech.py           Text-to-speech (Kokoro)
+├── speech_text.py      Text clean-up before speaking: numbers, pronunciations
 ├── backup_db.py        Backs up jarvis.db (SQLite backup API, 7 days kept)
 ├── static/
 │   └── index.html      The dashboard page
@@ -311,6 +312,23 @@ Real failures it found:
 | `task_complete` | 0/3 | "I bought the milk" gets a witty reply, but `complete_task` is never called. Once it even said "that item has been duly noted" without doing anything. |
 | `repeat_weekdays` | 2/3 | "A standup every weekday at 9:30am": once it asked for a start date instead of using the next weekday. |
 
+## 22. Fixes found by the evals, and decimals in speech
+
+Still on `phase2-evals`.
+
+- **Delete matching works both ways.** "Cancel my dentist appointment" now finds an event titled "Dentist". Before, `find_for_delete` only matched when the words the user said were inside the title. New helper `_title_matches` in `jcal.py`.
+- **Deleting a whole series no longer needs a date.** `delete_event` takes the date as optional when the scope is "all". Without a date it looks only at events that still have something ahead (a one-off that is today or later, or a series whose end date has not passed), and asks which one if several match. Deleting one occurrence still needs its date. The tool description says never to ask the user for a date just to delete a series.
+- **Prompt: completing tasks.** Saying something is done, even casually ("I bought the milk"), now means calling `complete_task`, and JARVIS must never say a task is noted or done unless the tool succeeded.
+- **Prompt: repeat start dates.** With no start date given, the first occurrence is the next matching day; JARVIS no longer asks.
+- **Tests:** 6 new `jcal` tests for the delete changes (73 jcal checks now).
+- **Eval result:** 30 cases × 3 runs went from **80/90 to 90/90** (prompt `cd7cf58d721e`, same model `dc35e8d9c606`). The run itself scored 88/90; the two misses were "outside of my current knowledge base", an honest answer that the phrase check did not accept, so the check was widened and the saved run rescored.
+
+**Bug report from real use: decimals read as huge numbers.** Asked 346/9, JARVIS showed 38.4444444444 but said "38 point 44 billion 444 million ...".
+
+- Cause: espeak, which Kokoro uses to turn text into sounds, takes the decimal point for a full stop when the text also ends with one. "The result is 38.4444444444." was read as "thirty-eight. four billion four hundred and forty-four million ...". Without the final full stop the same number was read correctly, which is why it only happened sometimes.
+- Fix: new `speech_text.py` rewrites numbers before speaking: "38.4444444444" becomes "38 point 4 4 4 4" (the word "point", then each digit, rounded to 4 decimal places), and commas inside numbers are dropped ("7,006,652" becomes "7006652"). Checked against Kokoro's phonemes: it now says "thirty-eight point four four four four". The text on screen still shows the full number.
+- The pronunciation table moved from `speech.py` to `speech_text.py`, so the text clean-up is tested (14 checks in `tests/test_speech_text.py`) without loading Kokoro, which CI does not have.
+
 ---
 
 ## Status
@@ -327,7 +345,8 @@ Real failures it found:
 | Automated tests for `jcal.py` | Tested and working: 51 of 51 pass |
 | Phase 1 (backups, CI, ruff, pre-commit, cleanup, model pin) | Done: merged into `main`, ruff passes, CI green; optional nightly job still open (section 19) |
 | Time-of-day awareness when listing today's events | Logic tested; passes in the evals (section 21), not yet confirmed in a real conversation (section 16) |
-| Model eval suite (Phase 2) | Built on `phase2-evals`; baseline 80/90 runs (section 21) |
+| Model eval suite (Phase 2) | Built on `phase2-evals`; baseline 80/90 runs, 90/90 after fixes (sections 21, 22) |
+| Decimals in speech | Fixed and tested against Kokoro's phonemes; not yet heard in a real conversation (section 22) |
 
 ## Known limits
 

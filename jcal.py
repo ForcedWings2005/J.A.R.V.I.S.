@@ -277,22 +277,64 @@ def add_event(title: str, date: str, start_time: str, end_time: str = "",
         msg += f" until {until}" if until else " with no end date"
     return msg + "."
 
-def find_for_delete(title: str, date: str, scope: str = "this"):
-    """Returns an error string, or {'action': ..., 'text': ...} to confirm."""
+def _title_matches(said: str, title: str) -> bool:
+    """'dentist' finds 'Dentist appointment', and 'dentist appointment' finds 'Dentist'."""
+    a, b = said.lower().strip(), title.lower().strip()
+    return bool(a) and (a in b or b in a)
+
+
+def find_for_delete(title: str, date: str = "", scope: str = "this"):
+    """Returns an error string, or {'action': ..., 'text': ...} to confirm.
+
+    The date can be left out only with scope 'all' (the user rarely knows a date
+    when they say "delete all my piano lessons").
+    """
+    scope = (scope or "this").lower().strip()
+    if scope not in ("this", "all"):
+        return "Error: scope must be 'this' or 'all'."
+    if not date:
+        if scope != "all":
+            return ("Error: give the date of the occurrence to delete, "
+                    "or use scope 'all' to delete a whole repeating series.")
+        return _find_series(title)
     try:
         d = _d(date)
     except ValueError:
         return "Error: use date YYYY-MM-DD."
-    scope = (scope or "this").lower().strip()
-    if scope not in ("this", "all"):
-        return "Error: scope must be 'this' or 'all'."
-    matches = [ev for ev in events_between(d, d) if title.lower() in ev["title"].lower()]
+    matches = [ev for ev in events_between(d, d) if _title_matches(title, ev["title"])]
     if not matches:
         return f"Error: no event matching '{title}' on {date}."
     if len(matches) > 1:
         names = "; ".join(f"{m['time']} {m['title']}" for m in matches)
         return f"Error: several events match ({names}). Ask the user which one."
+    return _delete_request(matches[0], date, scope)
+
+
+def _find_series(title: str):
+    """Delete without a date: match events that still have something ahead."""
+    today = datetime.now().date().isoformat()
+    with lock:
+        rows = db.execute(
+            "SELECT id, title, date, time, end_time, repeat_rule, repeat_until, repeat_days "
+            "FROM events"
+        ).fetchall()
+    matches = []
+    for id_, t, ds, tm, et, rule, until, rd in rows:
+        ahead = ds >= today if rule == "none" else (until is None or until >= today)
+        if ahead and _title_matches(title, t):
+            matches.append({"id": id_, "title": t, "date": ds, "time": tm, "end_time": et,
+                            "repeat": rule, "repeat_label": _rep_label(rule, rd)})
+    if not matches:
+        return f"Error: no upcoming event matching '{title}'."
+    if len(matches) > 1:
+        names = "; ".join(f"{m['title']} ({m['repeat_label'] if m['repeat'] != 'none' else m['date']})"
+                          for m in matches)
+        return f"Error: several events match ({names}). Ask the user which one."
     ev = matches[0]
+    return _delete_request(ev, ev["date"], "all")
+
+
+def _delete_request(ev: dict, date: str, scope: str) -> dict:
     if ev["repeat"] == "none":
         action = {"event_id": ev["id"], "date": date, "scope": "all"}
         text = f"Delete '{ev['title']}' on {date} at {ev['time']}?"
@@ -358,15 +400,15 @@ EVENT_TOOLS = [
         "type": "function",
         "function": {
             "name": "delete_event",
-            "description": "Request deletion of the calendar event whose title matches, on a date. This only asks the user to confirm on screen; nothing is deleted until they click Confirm. For a repeating event, scope 'this' removes only that date's occurrence, and scope 'all' removes the whole series. Use 'all' only if the user says every occurrence or the whole series.",
+            "description": "Request deletion of the calendar event whose title matches. This only asks the user to confirm on screen; nothing is deleted until they click Confirm. For a repeating event, scope 'this' removes only that date's occurrence, and scope 'all' removes the whole series. Use 'all' only if the user says every occurrence or the whole series. With scope 'all' the date can be left out, so never ask the user for a date just to delete a whole series.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "title": {"type": "string"},
-                    "date": {"type": "string", "description": "YYYY-MM-DD, the occurrence to delete"},
+                    "date": {"type": "string", "description": "YYYY-MM-DD, the occurrence to delete. Optional when scope is 'all'."},
                     "scope": {"type": "string", "enum": ["this", "all"]},
                 },
-                "required": ["title", "date"],
+                "required": ["title"],
             },
         },
     },
