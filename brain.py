@@ -115,6 +115,17 @@ def time_stamp() -> str:
     return datetime.now().strftime("[%A %Y-%m-%d %H:%M] ")
 
 
+def _role(message) -> str:
+    """Messages are plain dicts or ollama.Message objects (the model's own replies)."""
+    return message["role"] if isinstance(message, dict) else message.role
+
+
+def _message_text(message) -> str:
+    if isinstance(message, dict):
+        return message.get("content") or ""
+    return (message.content or "") + str(message.tool_calls or "")
+
+
 def describe_step(call, result: str) -> dict:
     """One line for the activity ticker under the transcript."""
     args = ", ".join(f"{k}={v}" for k, v in call.function.arguments.items())
@@ -135,11 +146,15 @@ class Assistant:
     """
 
     def __init__(self, chat=None, model: str = config.MODEL, max_rounds: int = config.MAX_ROUNDS,
-                 think=config.MODEL_THINK, keep_alive=config.MODEL_KEEP_ALIVE):
+                 think=config.MODEL_THINK, keep_alive=config.MODEL_KEEP_ALIVE,
+                 max_tokens: int = config.HISTORY_MAX_TOKENS,
+                 keep_tokens: int = config.HISTORY_KEEP_TOKENS):
         self.chat = chat or ollama.chat
         self.model = model
         self.think = think
         self.keep_alive = keep_alive
+        self.max_tokens = max_tokens
+        self.keep_tokens = keep_tokens
         self.max_rounds = max_rounds
         self.messages = [{"role": "system", "content": build_system_prompt()}]
         self.pending = None         # (id, NeedsConfirmation) waiting for the buttons
@@ -181,6 +196,38 @@ class Assistant:
         seconds = (getattr(last_chunk, "prompt_eval_duration", None) or 0) / 1e9
         log.info("model round %d: read %d tokens in %.2f s, wrote %s tokens",
                  round_no + 1, read, seconds, getattr(last_chunk, "eval_count", None))
+
+    def trim_history(self) -> int:
+        """Drop the oldest exchanges once the conversation is too long.
+
+        Only runs when the model was last given more than max_tokens, and then cuts
+        down to about keep_tokens in one go: every trim changes the start of the
+        conversation, so Ollama has to read all of it again once. It cuts only just
+        before a user message, so a tool call is never separated from its result,
+        and it always keeps the system prompt and the latest exchange.
+        Returns how many messages were dropped.
+        """
+        used = self.last_prompt_tokens
+        if used is None or used <= self.max_tokens:
+            return 0
+        # Ollama gives one total; share it out by length to estimate each message
+        sizes = [len(_message_text(m)) for m in self.messages]
+        per_char = used / max(sum(sizes), 1)
+        users = [i for i, m in enumerate(self.messages) if _role(m) == "user"]
+        if len(users) < 2:
+            return 0                            # only one exchange: nothing to drop
+        cut = users[-1]                         # at worst, keep just the latest exchange
+        for i in users[1:]:                     # the oldest cut that fits the budget
+            if (sizes[0] + sum(sizes[i:])) * per_char <= self.keep_tokens:
+                cut = i
+                break
+        dropped = cut - 1
+        self.messages = [self.messages[0]] + self.messages[cut:]
+        self.last_prompt_tokens = None          # unknown until the model is called again
+        log.info("trimmed the conversation: %d tokens was over %d, dropped the oldest "
+                 "%d messages, about %d tokens left", used, self.max_tokens, dropped,
+                 sum(sizes[i] for i in [0, *range(cut, len(sizes))]) * per_char)
+        return dropped
 
     def resolve_pending(self, pid: str, approve: bool) -> str:
         """Called only by the Confirm and Cancel buttons, never by the model."""
@@ -266,6 +313,7 @@ class Assistant:
                          _short(content), round_no + 1, len(steps),
                          f"{first_text:.1f} s" if first_text is not None else "none",
                          time.perf_counter() - started)
+                self.trim_history()
                 yield {"type": "done", "steps": steps, "confirm": self.confirm}
             except Exception as e:
                 log.exception("turn failed")
