@@ -35,9 +35,14 @@ def build_system_prompt() -> str:
         "You are JARVIS, a composed, impeccably polite British butler-style assistant "
         "with dry, understated wit. Address the user as 'sir'. Be calm, precise, and "
         "occasionally wry, but never verbose. "
-        f"The current date and time is {now.strftime('%A, %Y-%m-%d %H:%M')} "
-        f"(timezone {now.tzname()}). "
-        "Resolve relative dates like 'tomorrow' using the current date above. "
+        # Only things that change once a day belong in this prompt. The time of day
+        # goes in a stamp on each user message (see time_stamp), because Ollama can
+        # reuse its work on the earlier conversation only while this text stays the same.
+        f"Today is {now.strftime('%A, %Y-%m-%d')} (timezone {now.tzname()}). "
+        "Each user message starts with the date and time it was sent, in square "
+        "brackets; the stamp on the latest message is the current time. Use it for "
+        "anything that depends on the time of day, and never mention the stamps. "
+        "Resolve relative dates like 'tomorrow' using today's date. "
         f"Upcoming dates for reference: {upcoming}. "
         "Always take dates from this list instead of counting days yourself. "
         "The list is only a lookup aid; the calendar itself has no end. For a date "
@@ -90,7 +95,9 @@ def build_system_prompt() -> str:
         "say plainly that it is outside your knowledge instead of guessing "
         "or making something up. This matters most for specific facts like "
         "names, dates, numbers, quotes, and anything recent. Never invent "
-        "details to fill a gap. "
+        "details to fill a gap. Your knowledge stops well before today's date, so "
+        "you do not know the outcome of recent events such as sports results, "
+        "elections or news; say so instead of answering. "
         "Your replies will be spoken aloud, so "
         "use plain speech with no markdown, bullet points, or emoji. "
         "Always write numbers as digits, never as words, and copy them exactly as "
@@ -101,6 +108,11 @@ def build_system_prompt() -> str:
         "about eight sentences. If a time could be AM or PM and the context "
         "does not make it clear, ask which one instead of assuming."
     )
+
+
+def time_stamp() -> str:
+    """'[Monday 2030-01-07 09:01] ': put in front of each user message in the history."""
+    return datetime.now().strftime("[%A %Y-%m-%d %H:%M] ")
 
 
 def describe_step(call, result: str) -> dict:
@@ -191,7 +203,7 @@ class Assistant:
                 self.confirm = None
                 steps = []
                 self.messages[0]["content"] = build_system_prompt()
-                self.messages.append({"role": "user", "content": user_text})
+                self.messages.append({"role": "user", "content": time_stamp() + user_text})
                 wrote_text = False
                 started, first_text = time.perf_counter(), None
                 log.info("user: %s", _short(user_text))

@@ -18,7 +18,8 @@ NEXT_MON = "2030-01-14"
 
 DONT_KNOW = ["not sure", "don't know", "do not know", "not certain", "outside my",
              "outside of my", "no information", "do not possess", "do not have",
-             "don't have", "does not contain", "unable", "cannot", "can't", "beyond my"]
+             "don't have", "does not contain", "does not include", "not within my", "outside the",
+             "unable", "cannot", "can't", "beyond my"]
 CLAIMS_DELETED = ["has been deleted", "have deleted", "i've deleted",
                   "has been removed", "i've removed", "have removed"]
 CLAIMS_ADDED = ["i've added", "have added", "has been added", "is now on", "i've scheduled",

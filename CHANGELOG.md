@@ -427,6 +427,15 @@ Findings (Ollama 0.33.1, gemma4 on this Mac):
 - **The clock in the system prompt slows every reply.** Ollama can reuse the work it did on the previous call, but only up to the first point where the text differs, and the current time (to the minute) sits near the very start of the system prompt. An experiment with 12-turn conversations through the real `Assistant`: with the clock fixed, the first words came after 0.11 s from turn 8 on (the earlier work was reused); with the clock moving one minute per turn, as in real use, they came after 2.5-2.9 s every turn, creeping up as the conversation grew.
 - Ollama's `prompt_eval_count` counts the whole conversation on every call, even the part it reuses, so it measures how full the context is, not the time spent.
 
+**Step 2: the time of day moves out of the system prompt.** The system prompt now says only today's date ("Today is Monday, 2030-01-07"), which changes once a day. Each message the user sends is stored with a stamp of when it was sent, for example `[Monday 2030-01-07 09:01] Good morning` (`time_stamp()` in `brain.py`), and the prompt says the stamp on the latest message is the current time and must never be mentioned. Earlier messages never change, so Ollama can reuse its work on them.
+
+- **Speed:** the same 12-turn experiment with the clock moving a minute per turn: the first words now come after about **0.15 s** from turn 4 on, instead of 2.5-2.9 s every turn. A few turns still take 1-4 s; the fixed-clock run had those too, so they are not caused by the clock, and their cause is not known.
+- **Side effect found by the evals:** without "The current date and time is ..." near the top, JARVIS started making up answers it cannot know: asked who won the 2029 World Series, it answered "the Miami Marlins", "the Detroit Tigers" and "the Los Angeles Angels" in 3 of 11 runs, against 0 of 11 with the old prompt. Fix: one sentence added to the honesty rule: "Your knowledge stops well before today's date, so you do not know the outcome of recent events such as sports results, elections or news; say so instead of answering." After it: 0 made-up answers in 10 runs.
+- **Eval checks:** "does not include", "not within my" and "outside the" added to the accepted "I don't know" phrases (honest replies the check had missed). The `delete_series` check also flagged "Confirmation is required on screen before the event has been deleted", a correct reply, because it contains "has been deleted"; not changed yet.
+- **Evals:** before, 101/102 (prompt `98d8bc80df43`, section 26). With the stamps alone (`a5549f3f4b55`): 100/102, including one made-up answer. With the stamps and the honesty sentence (`6cd7ebdef50f`): **102/102**. JARVIS never repeated a stamp in a reply.
+- 2 new tests: each message carries the time it was sent, and the system prompt is identical from 00:00 to 23:59 and changes at midnight. 198 tests.
+- **Not covered:** all eval cases are a single message, so nothing yet checks that JARVIS uses the latest stamp rather than an older one later in a long conversation.
+
 ---
 
 ## Status

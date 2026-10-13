@@ -3,6 +3,8 @@
 The fake plays back scripted rounds: each round is some text and/or tool calls,
 streamed in small chunks the way Ollama sends them.
 """
+from datetime import datetime
+
 import ollama
 import pytest
 
@@ -27,7 +29,8 @@ def test_plain_reply_is_streamed_and_kept_in_the_history():
     assert reply == "Good morning, sir."
     assert sum(e["type"] == "delta" for e in events) > 1          # arrived in pieces
     assert events[-1] == {"type": "done", "steps": [], "confirm": None}
-    assert a.messages[-2] == {"role": "user", "content": "Good morning"}
+    assert a.messages[-2]["role"] == "user"
+    assert a.messages[-2]["content"].endswith("] Good morning")
     assert a.messages[-1].content == "Good morning, sir."
 
 
@@ -37,7 +40,7 @@ def test_the_conversation_continues_across_turns():
     run(a, "Hello")
     run(a, "What did I say?")
     contents = [getattr(m, "content", None) or m.get("content") for m in model.seen[1]]
-    assert "Hello" in contents and "Hello, sir." in contents
+    assert any(c and c.endswith("] Hello") for c in contents) and "Hello, sir." in contents
 
 
 def test_system_prompt_is_rebuilt_every_turn(monkeypatch):
@@ -49,6 +52,40 @@ def test_system_prompt_is_rebuilt_every_turn(monkeypatch):
     run(a, "second")
     assert model.seen[0][0]["content"] == "PROMPT A"
     assert model.seen[1][0]["content"] == "PROMPT B"
+
+
+@pytest.fixture
+def brain_clock(monkeypatch):
+    """Freeze datetime.now() inside brain.py; tests move it with brain_clock[0] = ..."""
+    now = [datetime(2030, 1, 7, 9, 0)]
+
+    class FakeDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(*now[0].timetuple()[:6])
+
+    monkeypatch.setattr(brain, "datetime", FakeDateTime)
+    return now
+
+
+def test_each_user_message_is_stamped_with_the_time_it_was_sent(brain_clock):
+    a = brain.Assistant(chat=FakeModel(say("Morning."), say("Evening.")))
+    run(a, "Good morning")
+    brain_clock[0] = datetime(2030, 1, 7, 19, 30)
+    run(a, "Good evening")
+    users = [m["content"] for m in a.messages if isinstance(m, dict) and m["role"] == "user"]
+    assert users == ["[Monday 2030-01-07 09:00] Good morning",
+                     "[Monday 2030-01-07 19:30] Good evening"]
+
+
+def test_system_prompt_stays_the_same_all_day(brain_clock):
+    """So Ollama can reuse its work on the earlier conversation (CHANGELOG section 27)."""
+    morning = brain.build_system_prompt()
+    brain_clock[0] = datetime(2030, 1, 7, 23, 59)
+    assert brain.build_system_prompt() == morning
+    assert "Today is Monday, 2030-01-07" in morning
+    brain_clock[0] = datetime(2030, 1, 8, 0, 0)
+    assert "Today is Tuesday, 2030-01-08" in brain.build_system_prompt()
 
 
 def test_no_text_at_all_gets_an_apology():
