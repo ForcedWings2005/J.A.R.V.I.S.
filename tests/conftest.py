@@ -1,4 +1,4 @@
-"""Shared test setup for jcal.py.
+"""Shared test setup.
 
 Two safety rules live here:
 1. Tests use a throwaway in-memory database, never your real jarvis.db.
@@ -6,14 +6,15 @@ Two safety rules live here:
 """
 import os
 
-# This must happen BEFORE jcal is imported, because jcal opens its database on import.
+# This must happen BEFORE anything imports config, because the database opens on import.
 os.environ["JARVIS_DB"] = ":memory:"
 
-from datetime import datetime
+from datetime import datetime  # noqa: E402
 
-import pytest
+import pytest  # noqa: E402
 
-import jcal
+import database  # noqa: E402
+import jcal  # noqa: E402
 
 
 class Clock:
@@ -29,10 +30,11 @@ class Clock:
 @pytest.fixture(autouse=True)
 def clock(monkeypatch):
     """Runs before every test: empty database, frozen clock."""
-    with jcal.lock:
-        jcal.db.execute("DELETE FROM events")
-        jcal.db.execute("DELETE FROM event_exceptions")
-        jcal.db.commit()
+    with database.lock:
+        database.conn.execute("DELETE FROM events")
+        database.conn.execute("DELETE FROM event_exceptions")
+        database.conn.execute("DELETE FROM tasks")
+        database.conn.commit()
 
     fake = Clock()
 

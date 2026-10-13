@@ -20,11 +20,13 @@ except Exception as e:                  # a backup problem must never stop JARVI
 import brain  # noqa: E402
 import jcal  # noqa: E402
 import speech  # noqa: E402
+import tasks  # noqa: E402
 
 app = FastAPI()
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
 
 stt_lock = threading.Lock()
+assistant = brain.Assistant()
 
 
 class ChatRequest(BaseModel):
@@ -52,7 +54,7 @@ def home():
 @app.post("/chat")
 def chat_endpoint(req: ChatRequest):
     def lines():
-        for event in brain.chat_stream(req.message):
+        for event in assistant.chat_stream(req.message):
             yield json.dumps(event) + "\n"
     return StreamingResponse(
         lines(),
@@ -63,7 +65,7 @@ def chat_endpoint(req: ChatRequest):
 
 @app.post("/confirm")
 def confirm_endpoint(req: ConfirmRequest):
-    return {"reply": brain.resolve_pending(req.id, req.approve)}
+    return {"reply": assistant.resolve_pending(req.id, req.approve)}
 
 
 @app.get("/calendar")
@@ -83,13 +85,13 @@ def calendar_range(start: str, end: str):
 
 
 @app.get("/tasks")
-def tasks():
-    return {"tasks": brain.tasks_list()}
+def list_tasks_endpoint():
+    return {"tasks": tasks.tasks_list()}
 
 
 @app.post("/tasks/{task_id}")
 def set_task(task_id: int, req: TaskToggle):
-    if not brain.set_task_done(task_id, req.done):
+    if not tasks.set_task_done(task_id, req.done):
         raise HTTPException(status_code=404, detail="no such task")
     return {"ok": True}
 

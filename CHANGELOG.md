@@ -11,10 +11,13 @@ Written 2026-10-08, last updated 2026-10-12. Entries are in the order the work w
 
 ```
 jarvis/
-├── brain.py            Assistant logic: model calls, tools, tasks, calculator, rules
+├── brain.py            The assistant: model calls, tool loop, confirmations, system prompt
+├── tools.py            The tool registry (@tool) and NeedsConfirmation
+├── tasks.py            To-do list tools
+├── calc.py             The calculate tool (safe, no eval)
 ├── config.py           Settings: model, paths, limits, voice
 ├── database.py         The shared database connection and schema migrations
-├── jcal.py             Calendar logic: durations, repeats, exceptions, conflicts
+├── jcal.py             Calendar logic and tools: durations, repeats, exceptions, conflicts
 ├── server.py           Web server (FastAPI): endpoints for the page
 ├── speech.py           Text-to-speech (Kokoro)
 ├── speech_text.py      Text clean-up before speaking: numbers, pronunciations
@@ -32,6 +35,8 @@ jarvis/
 │   ├── conftest.py     Test setup: temporary database and frozen clock
 │   ├── test_jcal.py    Automated tests for the calendar logic
 │   ├── test_database.py  Tests for the schema migrations
+│   ├── test_brain.py   Tests for the assistant loop, with a fake model
+│   ├── test_tasks_calc_tools.py  Tests for the to-do list, calculator and registry
 │   ├── test_speech_text.py  Tests for the text clean-up before speaking
 │   └── test_evals.py   Tests for the eval suite's matching rules
 ├── evals/              Model evaluation suite (python -m evals)
@@ -344,6 +349,18 @@ Work on the branch `phase3-testable`. Goal from `plan.md`: the code around the m
 - `speech.py` loads Kokoro and `server.py` loads Whisper the first time they are used instead of on import, so the server starts faster and tests can import it without the model files.
 - 6 tests in `tests/test_database.py`: a new database, running twice, a first-version database keeping its events, adopting a pre-versioning database, rolling back a failed step, and refusing a newer schema.
 - The real `jarvis.db` is now at schema version 2. This happened by mistake while checking the migration on a copy (importing `database` opens the real file). Nothing else changed: same tables and rows as that morning's backup, integrity check ok. The server would have done the same on its next start.
+
+**Step 3: one tool registry.** New `tools.py`. Each tool is now written once, with its schema in a `@tool(...)` decorator right above the function. Required arguments are worked out from the function itself (no default value means required), and the decorator refuses a schema whose arguments differ from the function's, so the two can no longer drift apart. The separate `tools` list and `available_functions` dict are gone.
+
+- The code is split by area: calendar tools stay in `jcal.py` (now including `delete_event`), the to-do list moves to new `tasks.py`, and the calculator to new `calc.py`. `brain.py` is only the assistant.
+- A tool that must wait for the Confirm button returns a `NeedsConfirmation` (the card text, what to do on Confirm, and what the model is told meanwhile). `delete_event` is the first; editing events can use the same path later.
+- Checked: the hash of the system prompt plus tool descriptions is still `cd7cf58d721e`, so the model sees exactly what it saw before the change.
+- Ruff caught a name clash on the way: the `/tasks` endpoint function was also called `tasks`, which would have hidden the new module. It is now `list_tasks_endpoint`.
+
+**Step 4: an `Assistant` object.** The conversation, the pending confirmation and the lock used to be module-level globals in `brain.py`. They now belong to `brain.Assistant`, which also takes the function that talks to the model (`ollama.chat` by default). `server.py` makes one; tests and evals make their own, so a test can pass a fake model.
+
+- New tests: `tests/test_brain.py` (17 checks, with a fake model that streams scripted replies and tool calls): a plain reply, history across turns, the prompt rebuilt each turn, the apology when there is no text, a model error, a tool round and its result fed back, several tools in one round, error steps, the round cap, unknown tools, bad arguments, a crashing tool, and the whole delete confirmation flow (card, Confirm, Cancel, a wrong or reused id, the card only on its own turn). `tests/test_tasks_calc_tools.py` (26 checks) covers the to-do list, the calculator including attempts to escape it (`__import__`, `open`), and the registry.
+- 171 tests in total, all passing. The evals now use `Assistant` too; a quick live run of the three delete cases passed.
 
 ---
 

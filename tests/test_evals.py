@@ -6,7 +6,8 @@ import inspect
 
 import pytest
 
-import brain
+import brain  # noqa: F401  importing it registers every tool
+import tools
 from evals.cases import CASES
 from evals.check import Case, between, check, contains, days, not_, one_of
 
@@ -117,7 +118,7 @@ def test_other_predicates():
 # --- the cases themselves ----------------------------------------------------
 
 def _params(tool):
-    for t in brain.tools:
+    for t in tools.SCHEMAS:
         if t["function"]["name"] == tool:
             return set(t["function"]["parameters"]["properties"])
     raise AssertionError(f"no schema for {tool}")
@@ -131,14 +132,14 @@ def test_case_names_are_unique():
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c.name)
 def test_case_refers_to_real_tools_and_arguments(case):
     for tool, spec in case.expect:
-        assert tool in brain.available_functions
-        func_args = set(inspect.signature(brain.available_functions[tool]).parameters)
+        assert tool in tools.FUNCTIONS
+        func_args = set(inspect.signature(tools.FUNCTIONS[tool]).parameters)
         for arg in spec:
             if arg == "_result":
                 continue
             assert arg in _params(tool), f"{tool} schema has no {arg}"
             assert arg in func_args, f"{tool} function has no {arg}"
     for tool in [*case.forbid, *case.max_calls]:
-        assert tool in brain.available_functions
+        assert tool in tools.FUNCTIONS
     h, m = map(int, case.clock.split(":"))
     assert 0 <= h < 24 and 0 <= m < 60
