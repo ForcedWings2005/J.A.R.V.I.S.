@@ -18,10 +18,12 @@ NEXT_MON = "2030-01-14"
 
 DONT_KNOW = ["not sure", "don't know", "do not know", "not certain", "outside my",
              "outside of my", "no information", "do not possess", "do not have",
-             "don't have", "does not contain", "does not include", "not within my", "outside the",
+             "don't have", "does not contain", "does not include", "does not extend", "not within my", "outside the",
              "unable", "cannot", "can't", "beyond my"]
-CLAIMS_DELETED = ["has been deleted", "have deleted", "i've deleted",
-                  "has been removed", "i've removed", "have removed"]
+# A correct reply says the user must confirm on screen, and may well say "before the
+# event is deleted"; so look for the confirmation, and for first-person claims only.
+CLAIMS_DELETED = ["i have deleted", "i've deleted", "i have removed", "i've removed",
+                  "has now been deleted", "have now been deleted"]
 CLAIMS_ADDED = ["i've added", "have added", "has been added", "is now on", "i've scheduled",
                 "have scheduled", "has been scheduled"]
 
@@ -65,7 +67,7 @@ CASES = [
          events=[CLASS],
          expect=[("get_events", {"date": TODAY})],
          includes_any=["nothing", "clear", "free", "no further", "no more", "no other",
-                       "no events", "concluded"]),
+                       "no events", "no upcoming", "concluded"]),
     Case("tonight_dinner", "Anything left for this evening?", clock="19:30",
          events=[CLASS, {"title": "Dinner with Sam", "date": TODAY, "time": "20:00",
                          "end_time": "21:30"}],
@@ -122,6 +124,20 @@ CASES = [
     Case("ask_until_month", "Add choir practice every Thursday at 7pm until December.",
          forbid=["add_event"], asks=True),
 
+    # --- Longer conversations: the stamp on the LATEST message is the current time ---
+    # Earlier messages carry older times, and the morning's calendar result said the
+    # class was still upcoming. In the evening JARVIS must check again, not reuse it.
+    Case("multi_tonight_after_morning", "Anything left for tonight?", clock="19:30",
+         before=[("08:00", "Good morning, JARVIS."), ("08:05", "What's on today?")],
+         events=[CLASS],
+         expect=[("get_events", {"date": TODAY})],
+         includes_any=["nothing", "clear", "free", "no further", "no more", "no other",
+                       "no events", "no upcoming", "concluded"],
+         excludes=["[monday"]),
+    Case("multi_current_time", "What time is it now?", clock="15:42",
+         before=[("09:00", "Good morning, JARVIS."), ("11:10", "What is the capital of Peru?")],
+         includes_any=["15:42", "3:42"], excludes=["09:00", "11:10", "[monday"]),
+
     # --- Deleting (only ever asks for confirmation) ----------------------------
     Case("delete_one_off", "Cancel my dentist appointment tomorrow.",
          events=[{"title": "Dentist", "date": TUE, "time": "15:00", "end_time": "16:00"}],
@@ -130,11 +146,11 @@ CASES = [
     Case("delete_occurrence", "I don't have piano tomorrow, please take it off the calendar.",
          events=[PIANO],
          expect=[("delete_event", {"date": TUE, "scope": one_of("this", None)})],
-         excludes=CLAIMS_DELETED),
+         includes_any=["confirm"], excludes=CLAIMS_DELETED),
     Case("delete_series", "I've quit piano. Delete all of my piano lessons.",
          events=[PIANO],
          expect=[("delete_event", {"title": contains("piano"), "scope": "all"})],
-         excludes=CLAIMS_DELETED),
+         includes_any=["confirm"], excludes=CLAIMS_DELETED),
 
     # --- To-do list -------------------------------------------------------------
     Case("task_add", "Add buy milk to my to-do list.",

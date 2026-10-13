@@ -42,8 +42,9 @@ is checked in code, never left to the model.** The model chooses tools; code val
 | `experiments/` | Old scripts, not part of the app, excluded from ruff. Do not run `agent.py` from the project root (it opens `jarvis.db`). |
 
 ### How a chat turn works
-`/chat` → `Assistant.chat_stream()` rebuilds the system prompt (current date and time), appends
-the user message, and streams the model's reply. If the model asks for tools, `run_tool()` runs
+`/chat` → `Assistant.chat_stream()` rebuilds the system prompt (today's date only, so it stays
+identical all day and Ollama can reuse its work), appends the user message with a
+`[Monday 2030-01-07 09:01]` time stamp, and streams the model's reply. If the model asks for tools, `run_tool()` runs
 each one, appends the result as a `tool` message, and the model is called again, up to
 `MAX_ROUNDS` tool rounds. Events streamed to the page: `delta`, `step`, `break`, `done`, `error`.
 
@@ -115,7 +116,7 @@ Run from the project folder with the venv active (`source .venv/bin/activate`):
 ruff check .            # lint
 python -m pytest -q     # all tests, under a second; never touches jarvis.db or a model
 python -m evals --runs 1 -k <name>   # quick live check of some model cases (needs Ollama)
-python -m evals         # full suite, 30 cases x 3 runs, about 10 minutes
+python -m evals         # full suite, 36 cases x 3 runs, about 12 minutes
 ```
 
 - The pre-commit hook (installed) runs ruff and pytest on every commit with Python files.
@@ -139,6 +140,10 @@ python -m evals         # full suite, 30 cases x 3 runs, about 10 minutes
 - Settings belong in `config.py`, not as constants scattered through modules.
 - Ollama: model `config.MODEL` (`gemma4:latest`), called through the `ollama` client's default
   address. The pinned model ID is in README; if behaviour changes, check `ollama list` first.
+- Keep `config.MODEL_THINK = True`. Turning gemma4's thinking off made replies 7x faster but
+  dropped the evals from 102/102 to 73/102 (wrong arithmetic, actions claimed without tools).
+- Never put anything that changes more than once a day (like the time) into the system prompt:
+  it stops Ollama reusing its work and slows every reply (CHANGELOG section 27).
 - Large model files live in `models/` (not in git). Kokoro and Whisper must stay lazily loaded
   so the server and tests can start without them.
 - A launchd job (`~/Library/LaunchAgents/com.jarvis.backup.plist`) runs

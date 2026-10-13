@@ -141,5 +141,9 @@ def test_case_refers_to_real_tools_and_arguments(case):
             assert arg in func_args, f"{tool} function has no {arg}"
     for tool in [*case.forbid, *case.max_calls]:
         assert tool in tools.FUNCTIONS
-    h, m = map(int, case.clock.split(":"))
-    assert 0 <= h < 24 and 0 <= m < 60
+    times = [case.clock] + [t for t, _ in case.before]
+    for hhmm in times:
+        h, m = map(int, hhmm.split(":"))
+        assert 0 <= h < 24 and 0 <= m < 60
+    assert times[1:] == sorted(times[1:]) and all(t <= case.clock for t in times[1:]), \
+        "earlier turns must be in time order, before the scored message"

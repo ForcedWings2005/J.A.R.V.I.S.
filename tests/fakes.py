@@ -15,8 +15,9 @@ class FakeModel:
         self.rounds = list(rounds)
         self.seen = []          # the messages the model was shown, per round
 
-    def __call__(self, model, messages, tools, stream):
+    def __call__(self, model, messages, tools, stream, **options):
         assert stream is True
+        self.options = options          # think, keep_alive
         # copies, because the system message is updated in place every turn
         self.seen.append([dict(m) if isinstance(m, dict) else m for m in messages])
         if not self.rounds:
