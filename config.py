@@ -20,6 +20,14 @@ MODELS_DIR = ROOT / "models"
 # Language model (Ollama). Check the pinned ID in README.md after an update.
 MODEL = "gemma4:latest"
 MAX_ROUNDS = 4          # tool rounds per message, so a confused model can't loop forever
+# gemma4 "thinks" (hidden reasoning) before it answers. Keep it ON: with it off, replies
+# came 7x faster but the evals fell from 102/102 to 73/102, with wrong arithmetic stated
+# as fact and tasks claimed as done without any tool call (CHANGELOG section 27).
+# The cost is a pause of up to a few seconds before the first spoken word.
+MODEL_THINK = True
+# How long Ollama keeps the model loaded after the last request (its default is 5 minutes).
+# Reloading costs about 2.4 s on the first message after a pause; the model uses ~1.4 GB.
+MODEL_KEEP_ALIVE = "1h"
 
 # Speech
 STT_MODEL = "mlx-community/whisper-large-v3-turbo"

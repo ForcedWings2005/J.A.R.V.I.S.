@@ -134,9 +134,12 @@ class Assistant:
     one that plays back scripted replies, so no model is needed.
     """
 
-    def __init__(self, chat=None, model: str = config.MODEL, max_rounds: int = config.MAX_ROUNDS):
+    def __init__(self, chat=None, model: str = config.MODEL, max_rounds: int = config.MAX_ROUNDS,
+                 think=config.MODEL_THINK, keep_alive=config.MODEL_KEEP_ALIVE):
         self.chat = chat or ollama.chat
         self.model = model
+        self.think = think
+        self.keep_alive = keep_alive
         self.max_rounds = max_rounds
         self.messages = [{"role": "system", "content": build_system_prompt()}]
         self.pending = None         # (id, NeedsConfirmation) waiting for the buttons
@@ -210,10 +213,12 @@ class Assistant:
 
                 for round_no in range(self.max_rounds + 1):
                     content = ""
+                    thought = 0             # characters of hidden thinking, for the log
                     calls = []
                     chunk = None
                     for chunk in self.chat(model=self.model, messages=self.messages,
-                                           tools=tools.SCHEMAS, stream=True):
+                                           tools=tools.SCHEMAS, stream=True,
+                                           think=self.think, keep_alive=self.keep_alive):
                         piece = chunk.message.content or ""
                         if piece:
                             content += piece
@@ -223,7 +228,14 @@ class Assistant:
                             yield {"type": "delta", "text": piece}
                         if chunk.message.tool_calls:
                             calls.extend(chunk.message.tool_calls)
+                        thought += len(getattr(chunk.message, "thinking", None) or "")
                     self._log_usage(chunk, round_no)
+                    if not content and not calls:
+                        # Seen in the evals: an empty answer after 0.4 s, cause unknown
+                        log.warning("model round %d returned nothing: done_reason=%s, "
+                                    "wrote %s tokens, thought %d characters", round_no + 1,
+                                    getattr(chunk, "done_reason", None),
+                                    getattr(chunk, "eval_count", None), thought)
 
                     self.messages.append(
                         ollama.Message(role="assistant", content=content, tool_calls=calls or None)

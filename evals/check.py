@@ -25,6 +25,9 @@ class Case:
     excludes: list = field(default_factory=list)    # reply must contain none of these
     asks: bool = False                              # reply must ask for something (see ASKING)
     clock: str = "09:00"                            # time of day on NOW's date
+    # Earlier messages in the same conversation, as ("HH:MM", message) pairs. They run
+    # through the real model first, at their own times, and only the last one is scored.
+    before: list = field(default_factory=list)
     events: list = field(default_factory=list)      # events in the calendar beforehand
     tasks: list = field(default_factory=list)       # open tasks beforehand
 

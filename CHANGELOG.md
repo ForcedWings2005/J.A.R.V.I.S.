@@ -436,6 +436,20 @@ Findings (Ollama 0.33.1, gemma4 on this Mac):
 - 2 new tests: each message carries the time it was sent, and the system prompt is identical from 00:00 to 23:59 and changes at midnight. 198 tests.
 - **Not covered:** all eval cases are a single message, so nothing yet checks that JARVIS uses the latest stamp rather than an older one later in a long conversation.
 
+**The three open points from step 2.**
+
+1. **The occasional slow turns are gemma4 thinking.** The model writes hidden reasoning before its answer; Ollama streams it separately and JARVIS discards it. Measured over 16 turns: reading the conversation took about 0.15 s every time, and the first words came after 0.17 s when the model did not think, about 0.9 s after ~200 characters of thinking, and 2.3-3.6 s after 600-800. The first message after a pause also paid 2.4 s to load the model again, because Ollama unloads it after 5 idle minutes.
+   - **Thinking stays on.** With it off (`python -m evals --think off`), replies came 7 times faster (0.9 s against 6.5 s per request), but the evals fell from 102/102 to **73/102**: it skipped the calculator and stated wrong sums as fact ("1234 times 5678 is 7007252"; it is 7006652), said "I have added Buy milk to your to-do list" without calling a tool, and was back to calling March 3rd "outside my immediate calendar range". The pause is the price of JARVIS reasoning before it acts.
+   - New settings in `config.py`: `MODEL_THINK = True` (set explicitly, so an Ollama update cannot quietly turn it off) and `MODEL_KEEP_ALIVE = "1h"` (keeps the model loaded for an hour instead of 5 minutes; it uses about 1.4 GB). `Assistant` passes both to Ollama. The evals have a new `--think default|on|off` option and record the setting in their results. 1 new test.
+2. **Multi-turn eval cases.** A case can now list earlier messages, each sent at its own time (`before=[("08:00", "Good morning, JARVIS."), ...]`). They run through the real model first and only the last message is scored. 2 new cases (36 in total):
+   - `multi_current_time`: messages at 09:00 and 11:10, then "What time is it now?" at 15:42. JARVIS gave the time from the latest stamp in every run.
+   - `multi_tonight_after_morning`: "What's on today?" at 08:05 (the class is then upcoming), then "Anything left for tonight?" at 19:30. Over 21 runs: usually it checked the calendar again and said nothing was left. Once it answered correctly from the morning's result without checking again, which the prompt forbids for "tonight" questions.
+   - **Rare empty replies:** in 2 of those runs the model returned no text and no tool call after 0.4 s, and JARVIS said "Sorry, I could not finish that." It did not happen in 12 direct attempts to reproduce it, so the cause is unknown. Instead of guessing at a fix, `brain.py` now logs a warning with Ollama's stop reason, the tokens written and the length of the thinking whenever a round returns nothing. 1 new test.
+3. **The delete check.** All 84 delete-case replies saved so far were reviewed. The phrase list for "claims it deleted" had 3 hits and all 3 were false ("...confirm on screen before anything is deleted"); every real failure was a reply that did not mention confirming at all. So all three delete cases now require the reply to mention confirming, and only first-person claims ("I've deleted", "has now been deleted") count as false claims. Rescored against the 84 replies: the 3 false failures pass, the 18 real ones still fail.
+
+- **Evals** (prompt `6cd7ebdef50f`, thinking on, 36 cases × 3): **108/108** after adding "does not extend" to the "I don't know" phrases (the run scored 107/108; the miss was the honest "my knowledge does not extend to the outcomes of specific sporting events"). 202 tests.
+- `CLAUDE.md` updated: how the system prompt and stamps work, the eval size, and two rules (keep thinking on; nothing that changes more than once a day in the system prompt).
+
 ---
 
 ## Status

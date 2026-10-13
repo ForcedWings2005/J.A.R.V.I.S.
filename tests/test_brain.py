@@ -248,3 +248,16 @@ def test_token_counts_from_ollama_are_logged_and_kept(caplog):
     run(a, "Hi")
     assert a.last_prompt_tokens == 2056
     assert "model round 1: read 2056 tokens in 1.50 s, wrote 12 tokens" in caplog.text
+
+
+def test_think_and_keep_alive_settings_reach_the_model():
+    model = FakeModel(say("Hello."))
+    run(brain.Assistant(chat=model, think=False, keep_alive="1h"), "Hi")
+    assert model.options == {"think": False, "keep_alive": "1h"}
+
+
+def test_an_empty_model_round_is_logged(caplog):
+    a = brain.Assistant(chat=FakeModel(say("")))
+    _, reply = run(a, "Hm")
+    assert reply == "Sorry, I could not finish that."
+    assert "model round 1 returned nothing" in caplog.text

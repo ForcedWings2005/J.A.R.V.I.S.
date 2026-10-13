@@ -52,6 +52,7 @@ jcal.datetime = FakeDateTime
 
 # Every tool call the model makes in the current run, recorded and then run for real
 calls = []
+THINK = [None]          # set from --think in main()
 
 
 class RecordingAssistant(brain.Assistant):
@@ -62,10 +63,14 @@ class RecordingAssistant(brain.Assistant):
         return result
 
 
+def set_clock(hhmm: str) -> None:
+    h, m = map(int, hhmm.split(":"))
+    Clock.now = NOW.replace(hour=h, minute=m)
+
+
 def reset(case, model: str) -> brain.Assistant:
     """Fresh clock, database and conversation for one run."""
-    h, m = map(int, case.clock.split(":"))
-    Clock.now = NOW.replace(hour=h, minute=m)
+    set_clock(case.before[0][0] if case.before else case.clock)
     db = database.conn
     with database.lock:
         db.execute("DELETE FROM events")
@@ -84,11 +89,18 @@ def reset(case, model: str) -> brain.Assistant:
             db.execute("INSERT INTO tasks (title) VALUES (?)", (title,))
         db.commit()
     calls.clear()
-    return RecordingAssistant(model=model)
+    return RecordingAssistant(model=model, think=THINK[0])
 
 
 def run_once(case, model: str) -> dict:
     assistant = reset(case, model)
+    # Earlier turns of a multi-turn case: real model, each at its own time, not scored
+    for hhmm, message in case.before:
+        set_clock(hhmm)
+        for _ in assistant.chat_stream(message):
+            pass
+    calls.clear()
+    set_clock(case.clock)
     reply, error = "", None
     start = time.perf_counter()
     with contextlib.redirect_stdout(io.StringIO()):  # brain prints every tool call
@@ -125,6 +137,8 @@ def main() -> int:
     ap.add_argument("-k", dest="filter", default="", help="only cases whose name contains this")
     ap.add_argument("--model", default=brain.config.MODEL)
     ap.add_argument("-v", "--verbose", action="store_true")
+    ap.add_argument("--think", choices=["default", "on", "off"], default="default",
+                    help="gemma4's hidden reasoning before it answers")
     args = ap.parse_args()
 
     cases = [c for c in CASES if args.filter in c.name]
@@ -137,8 +151,9 @@ def main() -> int:
         print(f"Cannot reach Ollama ({e}). Is it running?")
         return 1
     phash = prompt_hash()
+    THINK[0] = {"default": brain.config.MODEL_THINK, "on": True, "off": False}[args.think]
 
-    print(f"model {args.model} ({mid})  prompt {phash}  "
+    print(f"model {args.model} ({mid})  prompt {phash}  think {THINK[0]}  "
           f"{len(cases)} cases x {args.runs} runs\n")
     results, total_passed, started = [], 0, time.perf_counter()
     for case in cases:
@@ -168,6 +183,7 @@ def main() -> int:
     out = RESULTS / f"{stamp}_{args.model.replace(':', '-')}.json"
     out.write_text(json.dumps({
         "date": stamp, "model": args.model, "model_id": mid, "prompt_hash": phash,
+        "think": THINK[0],
         "runs_per_case": args.runs, "passed": total_passed, "total": total,
         "filter": args.filter, "results": results,
     }, indent=2))
