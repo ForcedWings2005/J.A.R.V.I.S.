@@ -32,6 +32,7 @@ jarvis/
 ├── requirements.txt    Pinned package versions
 ├── requirements-dev.txt  What the checks need (CI installs only this)
 ├── backups/            The backups (not in git)
+├── logs/               jarvis.log, rotating (not in git)
 ├── tests/
 │   ├── conftest.py     Test setup: temporary database and frozen clock
 │   ├── test_jcal.py    Automated tests for the calendar logic
@@ -369,6 +370,20 @@ Work on the branch `phase3-testable`. Goal from `plan.md`: the code around the m
 
 - **Security finding (from Phase 6 of `plan.md`, checked early):** can a web page open in another tab drive JARVIS? The JSON endpoints refuse a body sent as `text/plain` (422), and `text/plain` is the only way another site can send a body here without the browser asking permission first. So `/chat`, `/confirm` and `/tasks` are safe from that today, and a test now pins it. `/transcribe` takes a form upload, which another site can send, but it only returns text that the other site cannot read. Noted in `plan.md` for the `Origin` check.
 - **CI dependencies:** new `requirements-dev.txt` (pytest, ruff, ollama, fastapi, httpx2, python-multipart, pinned to the venv's versions). CI installs it instead of a list in the workflow. Checked in a brand-new virtual environment with only that file installed: 188 passed, no warnings. It uses `httpx2`, because Starlette warns that `httpx` is deprecated for its test client.
+
+**Step 6: logging.** The `print` lines in `brain.py` are replaced by Python's `logging`. When uvicorn starts the server, everything under the `jarvis` logger goes to `logs/jarvis.log` (rotating at 1 MB, 5 old files kept) and to the terminal. Each turn logs the user's message, every tool call with its arguments, result and time in milliseconds, and the reply with the number of rounds and tools, the time to the first text, and the total time. Confirm and Cancel are logged, a crashing tool is logged with its full traceback, and Whisper logs how long each transcription took.
+
+- Section 16 (the "how are we tonight" incident) showed that JARVIS's own explanation of a mistake is a guess. The log is the record of what it actually did.
+- The log holds what was said to JARVIS, so `logs/` is in `.gitignore`.
+- Logging starts in the server's start-up code, not on import, so the tests never create a log file. 3 new tests: a turn and its tool call are logged, a crash is logged with its traceback, and starting the server writes the log file. 191 tests in total.
+- **Checked with the real server:** started with uvicorn from `/tmp` (a different folder) on a spare port, pointed at a copy of the database. The page, `/calendar`, `/tasks`, a real chat with the model and `/speak` all worked. Kokoro loaded on the first `/speak` (1.5 s), and the log showed the turn: first text after 1.7 s, 1.9 s in total.
+
+**Eval after the restructure:** 87/90 runs (prompt `cd7cf58d721e`, unchanged, so the model saw exactly the same input as in the 90/90 run). The run scored 86/90; one miss was the check matching "before anything is deleted" as a claim of deletion, so "is deleted" was dropped from that phrase list and the run rescored. With identical input, the difference from 90/90 is the model's run-to-run variation; 3 runs per case is a small sample. Two real misses worth fixing next:
+
+| Case | Score | What happened |
+|---|---|---|
+| `calc_multiply` | 1/3 | The calculator returned 7006652 correctly, but JARVIS wrote it out in words wrongly: "seven million sixty-six thousand five hundred two". It spoke a wrong number although the tool had the right one. Likely fix: tell the model to keep numbers as digits, since `speech_text.py` now handles how they are spoken. |
+| `ask_am_pm` | 2/3 | Once it assumed 8 AM for "Thursday at 8" instead of asking. |
 
 ---
 

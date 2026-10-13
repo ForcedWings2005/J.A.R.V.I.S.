@@ -44,6 +44,15 @@ python -m uvicorn server:app --reload
 
 Open http://127.0.0.1:8000 and hard refresh with Cmd+Shift+R.
 
+## Settings and logs
+
+- Settings (model, voice speed, limits, folders) are in `config.py`.
+- Each message, tool call and reply is logged with timings to `logs/jarvis.log`
+  (and the terminal). The file rotates at 1 MB, keeping 5 old ones. It contains what
+  you said to JARVIS, so it stays on this Mac; `logs/` is not in git.
+- When JARVIS does something odd, check the log for what it actually did. Its own
+  explanation afterwards is a guess, not a record.
+
 ## Tests and checks
 
 ```bash

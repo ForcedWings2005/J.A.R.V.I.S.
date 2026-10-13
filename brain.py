@@ -3,7 +3,9 @@
 The tools themselves live in jcal.py (calendar), tasks.py (to-do list) and calc.py
 (calculator), registered with tools.py. Importing them below is what registers them.
 """
+import logging
 import threading
+import time
 import uuid
 from datetime import datetime, timedelta
 
@@ -15,6 +17,13 @@ import tools
 import jcal  # noqa: F401, E402
 import tasks  # noqa: F401, E402
 import calc  # noqa: F401, E402
+
+log = logging.getLogger("jarvis.brain")
+
+
+def _short(text, limit: int = 300) -> str:
+    text = str(text).replace("\n", " ")
+    return text if len(text) <= limit else text[:limit] + "..."
 
 
 def build_system_prompt() -> str:
@@ -124,7 +133,7 @@ class Assistant:
         except TypeError as e:
             return f"Error: bad arguments ({e})."
         except Exception as e:  # a broken tool must not abort the whole turn
-            print(f"  [tool crashed] {call.function.name}: {e!r}")
+            log.exception("tool %s crashed", call.function.name)
             return f"Error: the {call.function.name} tool failed ({e})."
         if isinstance(result, tools.NeedsConfirmation):
             # Only one request can wait at a time; a new one replaces it
@@ -142,6 +151,8 @@ class Assistant:
             _, request = self.pending
             self.pending = None
             text = request.apply() if approve else "Okay, I left it alone."
+            log.info("confirmation %s: %s -> %s", "approved" if approve else "cancelled",
+                     request.card, text)
             self.messages.append({"role": "assistant", "content": text})
             return text
 
@@ -158,6 +169,8 @@ class Assistant:
                 self.messages[0]["content"] = build_system_prompt()
                 self.messages.append({"role": "user", "content": user_text})
                 wrote_text = False
+                started, first_text = time.perf_counter(), None
+                log.info("user: %s", _short(user_text))
 
                 for round_no in range(self.max_rounds + 1):
                     content = ""
@@ -168,6 +181,8 @@ class Assistant:
                         if piece:
                             content += piece
                             wrote_text = True
+                            if first_text is None:
+                                first_text = time.perf_counter() - started
                             yield {"type": "delta", "text": piece}
                         if chunk.message.tool_calls:
                             calls.extend(chunk.message.tool_calls)
@@ -179,9 +194,11 @@ class Assistant:
                         break
 
                     for call in calls:
-                        print(f"  [tool call] {call.function.name}({call.function.arguments})")
+                        t0 = time.perf_counter()
                         result = self.run_tool(call)
-                        print(f"  [tool result] {result}")
+                        log.info("tool %s(%s) -> %s [%.0f ms]", call.function.name,
+                                 _short(call.function.arguments), _short(result),
+                                 (time.perf_counter() - t0) * 1000)
                         step = describe_step(call, result)
                         steps.append(step)
                         self.messages.append({
@@ -193,7 +210,13 @@ class Assistant:
                     yield {"type": "break"}
 
                 if not wrote_text:
+                    log.warning("no reply text after %d rounds", round_no + 1)
                     yield {"type": "delta", "text": "Sorry, I could not finish that."}
+                log.info("reply: %s [%d rounds, %d tools, first text %s, total %.1f s]",
+                         _short(content), round_no + 1, len(steps),
+                         f"{first_text:.1f} s" if first_text is not None else "none",
+                         time.perf_counter() - started)
                 yield {"type": "done", "steps": steps, "confirm": self.confirm}
             except Exception as e:
+                log.exception("turn failed")
                 yield {"type": "error", "text": str(e)}

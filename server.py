@@ -2,7 +2,11 @@ import os
 import tempfile
 import threading
 import json
+import logging
+import time
+from contextlib import asynccontextmanager
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -22,7 +26,36 @@ import jcal  # noqa: E402
 import speech  # noqa: E402
 import tasks  # noqa: E402
 
-app = FastAPI()
+log = logging.getLogger("jarvis.server")
+
+
+def setup_logging() -> None:
+    """Everything under the "jarvis" logger goes to logs/jarvis.log and the terminal.
+
+    The file rotates at 1 MB and keeps 5 old files. It holds what was said to
+    JARVIS, so it stays on this Mac (logs/ is not in git).
+    """
+    config.LOG_DIR.mkdir(exist_ok=True)
+    fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    file = RotatingFileHandler(config.LOG_DIR / "jarvis.log", maxBytes=1_000_000,
+                               backupCount=5, encoding="utf-8")
+    console = logging.StreamHandler()
+    root = logging.getLogger("jarvis")
+    root.setLevel(logging.INFO)
+    for h in (file, console):
+        h.setFormatter(fmt)
+        root.addHandler(h)
+
+
+@asynccontextmanager
+async def lifespan(app):
+    # Runs when uvicorn starts the server, not when tests import this file
+    setup_logging()
+    log.info("JARVIS started: model %s, database %s", config.MODEL, config.DB_PATH)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
 
 stt_lock = threading.Lock()
@@ -110,7 +143,9 @@ def transcribe_endpoint(file: UploadFile = File(...)):
     try:
         with stt_lock:
             import mlx_whisper  # loaded on first use, like Kokoro in speech.py
+            t0 = time.perf_counter()
             result = mlx_whisper.transcribe(path, path_or_hf_repo=config.STT_MODEL, language="en")
+            log.info("transcribed %d bytes in %.1f s", len(data), time.perf_counter() - t0)
     finally:
         os.remove(path)
     return {"text": result["text"].strip()}

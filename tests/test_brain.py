@@ -177,3 +177,23 @@ def test_the_card_is_only_reported_on_its_own_turn():
     a.chat = FakeModel(say("Anything else, sir?"))
     events, _ = run(a, "Thanks")
     assert events[-1]["confirm"] is None
+
+
+# --- logging -----------------------------------------------------------------
+
+def test_turns_and_tool_calls_are_logged(caplog):
+    caplog.set_level("INFO", logger="jarvis")
+    model = FakeModel(use(call("add_task", title="Buy milk")), say("Added, sir."))
+    run(brain.Assistant(chat=model), "Add buy milk")
+    assert "user: Add buy milk" in caplog.text
+    assert "tool add_task({'title': 'Buy milk'}) -> Added task 'Buy milk'." in caplog.text
+    assert "reply: Added, sir. [2 rounds, 1 tools, first text" in caplog.text
+
+
+def test_a_crashing_tool_is_logged_with_its_traceback(caplog, monkeypatch):
+    def boom():
+        raise RuntimeError("disk on fire")
+
+    monkeypatch.setitem(tools.FUNCTIONS, "boom", boom)
+    brain.Assistant(chat=FakeModel()).run_tool(call("boom"))
+    assert "tool boom crashed" in caplog.text and "RuntimeError: disk on fire" in caplog.text
