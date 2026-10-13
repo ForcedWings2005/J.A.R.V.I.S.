@@ -363,3 +363,177 @@ def test_legacy_event_without_end_time_is_labelled_as_one_hour(clock):
     assert "[in progress]" in jcal.get_events(day(0))
     clock.set(11, 0)
     assert "[finished]" in jcal.get_events(day(0))
+
+
+# ---------- changing events (update_event) ----------
+
+from tools import NeedsConfirmation  # noqa: E402
+
+
+def change(*args, **kwargs):
+    """Ask for a change; return the confirmation request (fails the test on an error)."""
+    req = jcal.update_event(*args, **kwargs)
+    assert isinstance(req, NeedsConfirmation), req
+    return req
+
+
+def times_on(n, title=None):
+    return [(e["time"], e["end_time"], e["title"]) for e in occurrences(n, n, title)]
+
+
+def test_moving_an_event_keeps_its_length_and_waits_for_confirm():
+    jcal.add_event("Dentist", day(1), "15:00", "16:30")
+    req = change("dentist appointment", day(1), new_start_time="16:00")
+    assert req.card == f"Change 'Dentist' on {day(1)} at 15:00-16:30: time to 16:00-17:30?"
+    assert times_on(1) == [("15:00", "16:30", "Dentist")]             # nothing changed yet
+    assert req.apply() == f"Done. 'Dentist' is now on {day(1)} from 16:00 to 17:30."
+    assert times_on(1) == [("16:00", "17:30", "Dentist")]
+
+
+def test_a_new_end_time_alone_changes_the_length():
+    jcal.add_event("Meeting", day(1), "10:00")
+    change("meeting", day(1), new_end_time="11:30").apply()
+    assert times_on(1) == [("10:00", "11:30", "Meeting")]
+
+
+def test_moving_a_one_off_event_to_another_day():
+    jcal.add_event("Dentist", day(1), "15:00")
+    change("dentist", day(1), new_date=day(3)).apply()
+    assert times_on(1) == [] and times_on(3) == [("15:00", "16:00", "Dentist")]
+
+
+def test_renaming_an_event():
+    jcal.add_event("Dentist", day(1), "15:00")
+    req = change("dentist", day(1), new_title="Orthodontist")
+    assert "title to 'Orthodontist'" in req.card
+    req.apply()
+    assert times_on(1) == [("15:00", "16:00", "Orthodontist")]
+
+
+def test_changing_one_occurrence_leaves_the_rest_of_the_series():
+    jcal.add_event("Piano lesson", day(1), "16:00", "17:00", repeat="weekly")
+    req = change("piano", day(8), new_start_time="17:30")
+    assert req.card.startswith(f"Change only the {day(8)} occurrence of 'Piano lesson'")
+    req.apply()
+    assert times_on(1) == [("16:00", "17:00", "Piano lesson")]
+    assert times_on(8) == [("17:30", "18:30", "Piano lesson")]           # exactly one, moved
+    assert times_on(15) == [("16:00", "17:00", "Piano lesson")]
+
+
+def test_changing_the_whole_series_without_a_date():
+    jcal.add_event("Piano lesson", day(1), "16:00", "17:00", repeat="weekly")
+    req = change("piano lessons", scope="all", new_start_time="17:00")
+    assert req.card.startswith("Change ALL occurrences of 'Piano lesson'")
+    assert req.apply() == "Done. Every 'Piano lesson' is now from 17:00 to 18:00."
+    assert {t for d in (1, 8, 15) for t in times_on(d)} == {("17:00", "18:00", "Piano lesson")}
+
+
+def test_a_whole_series_cannot_move_to_other_days():
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    result = jcal.update_event("piano", scope="all", new_date=day(2))
+    assert isinstance(result, str) and "cannot be moved to other dates or days" in result
+
+
+def test_a_move_into_another_event_is_refused():
+    jcal.add_event("Dentist", day(1), "15:00")
+    jcal.add_event("Team meeting", day(1), "16:00")
+    result = jcal.update_event("dentist", day(1), new_start_time="16:30")
+    assert result == f"Error: conflicts with 'Team meeting' at 16:00 on {day(1)}."
+
+
+def test_moving_half_an_hour_does_not_clash_with_itself():
+    jcal.add_event("Dentist", day(1), "15:00")
+    change("dentist", day(1), new_start_time="15:30").apply()
+    assert times_on(1) == [("15:30", "16:30", "Dentist")]
+
+
+def test_a_series_change_checks_every_upcoming_occurrence():
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    jcal.add_event("Recital", day(22), "17:00")                       # clashes in 3 weeks
+    result = jcal.update_event("piano", scope="all", new_start_time="17:00")
+    assert result == f"Error: conflicts with 'Recital' at 17:00 on {day(22)}."
+
+
+def test_confirm_checks_again_and_changes_nothing_if_the_slot_was_taken():
+    jcal.add_event("Dentist", day(1), "15:00")
+    req = change("dentist", day(1), new_start_time="18:00")
+    jcal.add_event("Dinner", day(1), "18:00")                          # added meanwhile
+    assert req.apply() == f"Nothing was changed. conflicts with 'Dinner' at 18:00 on {day(1)}."
+    assert ("15:00", "16:00", "Dentist") in times_on(1)
+
+
+def test_confirm_after_the_event_was_deleted_changes_nothing():
+    jcal.add_event("Dentist", day(1), "15:00")
+    req = change("dentist", day(1), new_start_time="17:00")
+    jcal.apply_delete(jcal.find_for_delete("dentist", day(1))["action"])
+    assert req.apply() == "Nothing was changed. that event no longer exists."
+    assert times_on(1) == []
+
+
+def test_past_times_and_finished_events_cannot_be_changed(clock):
+    jcal.add_event("Dentist", day(0), "09:00")
+    assert jcal.update_event("dentist", day(0), new_start_time="07:00") == \
+        "Error: the new time is in the past."
+    clock.set(11)                                                      # it ended at 10:00
+    assert jcal.update_event("dentist", day(0), new_start_time="15:00") == \
+        "Error: that occurrence has already happened, so it cannot be changed."
+
+
+@pytest.mark.parametrize("kwargs,error", [
+    ({}, "nothing would change"),
+    ({"new_start_time": "15:00"}, "nothing would change"),
+    ({"new_start_time": "3pm"}, "new_start_time must be HH:MM"),
+    ({"new_end_time": "14:00"}, "end time must be after the start"),
+    ({"new_date": "Friday"}, "new_date must be YYYY-MM-DD"),
+    ({"new_start_time": "23:30"}, "run past midnight"),
+    ({"scope": "sometimes"}, "scope must be"),
+])
+def test_bad_changes_come_back_as_errors(kwargs, error):
+    jcal.add_event("Dentist", day(1), "15:00")
+    result = jcal.update_event("dentist", day(1), **kwargs)
+    assert isinstance(result, str) and result.startswith("Error") and error in result
+
+
+def test_changing_one_occurrence_needs_its_date():
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    assert jcal.update_event("piano", new_start_time="17:00").startswith(
+        "Error: give the date of the occurrence to change")
+
+
+def test_a_new_length_in_minutes_sets_the_end():
+    jcal.add_event("Team meeting", day(3), "10:00", "11:00")
+    req = change("team meeting", day(3), new_length_minutes=90)
+    assert "time to 10:00-11:30" in req.card
+    req.apply()
+    assert times_on(3) == [("10:00", "11:30", "Team meeting")]
+
+
+def test_moving_with_a_new_length_uses_the_new_start():
+    jcal.add_event("Team meeting", day(3), "10:00", "11:00")
+    change("team meeting", day(3), new_start_time="14:00", new_length_minutes=30).apply()
+    assert times_on(3) == [("14:00", "14:30", "Team meeting")]
+
+
+@pytest.mark.parametrize("kwargs,error", [
+    ({"new_length_minutes": 90, "new_end_time": "12:00"}, "not both"),
+    ({"new_length_minutes": -5}, "1 to 1440"),
+    ({"new_length_minutes": 2000}, "1 to 1440"),
+    ({"new_length_minutes": "ninety"}, "1 to 1440"),
+])
+def test_bad_lengths_come_back_as_errors(kwargs, error):
+    jcal.add_event("Team meeting", day(3), "10:00", "11:00")
+    result = jcal.update_event("team meeting", day(3), **kwargs)
+    assert isinstance(result, str) and error in result
+
+
+def test_a_length_sent_as_text_is_accepted():
+    jcal.add_event("Team meeting", day(3), "10:00", "11:00")
+    change("team meeting", day(3), new_length_minutes="90").apply()
+    assert times_on(3) == [("10:00", "11:30", "Team meeting")]
+
+
+def test_the_model_is_told_what_the_card_says():
+    jcal.add_event("Dentist", day(1), "15:00")
+    req = change("dentist", day(1), new_start_time="16:00")
+    assert req.reply.startswith("Confirmation required.")
+    assert req.card in req.reply and "NOT been changed" in req.reply

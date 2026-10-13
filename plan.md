@@ -105,7 +105,7 @@ reported.
 
 ## Phase 5: Features, in order of value
 
-1. **Edit and move events** (`update_event`). This is the largest gap in the calendar today.
+1. **Edit and move events** (`update_event`). *Done: CHANGELOG section 28.* This is the largest gap in the calendar today.
    It needs the same confirmation card as delete, and must handle "this occurrence" versus
    "the whole series". A "this occurrence" change can reuse the exceptions table: add an
    exception for that date and insert a one-off event in its place.
