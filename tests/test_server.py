@@ -3,6 +3,7 @@
 The model, Whisper and Kokoro are all replaced by fakes, so these run anywhere.
 """
 import json
+import logging
 import os
 import sys
 import types
@@ -177,3 +178,19 @@ def test_transcribe_refuses_large_uploads(client, whisper, monkeypatch):
     r = client.post("/transcribe", files={"file": ("clip.webm", b"x" * 11, "audio/webm")})
     assert r.status_code == 413
     assert "path" not in whisper                         # never reached Whisper
+
+
+# ---------- logging ----------
+
+def test_starting_the_server_starts_the_log_file(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "LOG_DIR", tmp_path)
+    root = logging.getLogger("jarvis")
+    before = list(root.handlers)
+    try:
+        with TestClient(server.app, base_url="http://127.0.0.1"):   # runs the start-up code
+            pass
+        assert "JARVIS started" in (tmp_path / "jarvis.log").read_text()
+    finally:
+        for h in root.handlers[len(before):]:
+            h.close()
+            root.removeHandler(h)
