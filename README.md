@@ -22,7 +22,7 @@ code, not left to the model.
 ## Setup
 
 ```bash
-cd ~/Desktop/jarvis
+cd ~/Developer/jarvis
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt

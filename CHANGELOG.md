@@ -532,6 +532,16 @@ Done on `fix-spoken-dates`, merged into `main` on 2026-10-14 (a fast-forward) an
 - Checked against Kokoro's phonemes: "October the sixteenth from three pm to four pm", "nine oh five am", "ten am to eleven fifteen am", "twelve thirty pm".
 - 21 new tests (295 in total). Not yet heard in the real app.
 
+## 30. Project moved to ~/Developer/jarvis
+
+The project folder moved from `~/Desktop/jarvis` to `~/Developer/jarvis` (2026-10-14).
+
+- **The virtual environment broke, as the note under "Run it" warned.** A venv stores its full path inside its own files. After `source .venv/bin/activate`, `python` was "command not found", and 26 commands in `.venv/bin` (such as `uvicorn` and `pytest`) still pointed at the old folder. `.venv/bin/python` itself still worked, which is why the nightly backup and the pre-commit hook kept running.
+- Fix: the venv was rebuilt in place from a `pip freeze` of the old one, so it has exactly the same 72 packages. Not from `requirements.txt`, which is missing `pre_commit`, `ruff` and their dependencies and has an older `filelock` (see below).
+- Already right before this change: the launchd backup job (`com.jarvis.backup.plist`) and the pre-commit hook use the new path, and the code builds its paths from the project folder. Moving off the Desktop should also remove the risk that macOS blocks the 03:00 job from reading the folder (section 19).
+- README setup now says `cd ~/Developer/jarvis`.
+- Checked: with the venv activated, `python`, `uvicorn` and `pytest` resolve inside the new `.venv`; `ruff check .` passes; 295 tests pass; `mlx_whisper`, `kokoro_onnx`, `ollama`, `fastapi` and `pre_commit` import. Not checked: the server and voice in the real app, and the 03:00 backup from the new folder (its first run is tomorrow night; output in `/tmp/jarvis-backup.log`).
+
 ---
 
 ## Status
