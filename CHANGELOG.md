@@ -495,7 +495,21 @@ Work on the branch `phase5-edit-events`. Before this, the only way to change an 
 - 3 new tests (250 in total): a retry that works (the model sees exactly the same request twice), a retry after a tool call, and two empty attempts that still end in the apology. All three failed on the code from before the change.
 - **Not verified on the real model.** After the change, no empty round happened at all in 219 runs (a full eval of 129, then 90 runs of the multi-turn and editing cases), against about 4 in the 130 runs before it, so the retry never triggered. It costs nothing when it does not trigger. Watch `logs/jarvis.log` for "retrying once".
 - Full eval with the retry (prompt `d3af1e9e7cc8`, unchanged): **128/129**; the one miss was `ask_am_pm` assuming 8 AM once.
-- **New weak spot found by the 90 runs:** in 4 of 40 editing runs (one each in four cases) JARVIS put the event's current date into `new_date` instead of `date` (for example `update_event(title='dentist appointment', new_date='2030-01-08', new_start_time='16:00')` when the dentist is already on 2030-01-08), got the "give the date of the occurrence" error, and apologised instead of correcting the call. Not fixed yet.
+- **New weak spot found by the 90 runs:** in 4 of 40 editing runs (one each in four cases) JARVIS put the event's current date into `new_date` instead of `date` (for example `update_event(title='dentist appointment', new_date='2030-01-08', new_start_time='16:00')` when the dentist is already on 2030-01-08), got the "give the date of the occurrence" error, and apologised instead of correcting the call. Fixed below.
+
+
+**Fix: working out the event's current date.** When `update_event` is called without `date` for a one-occurrence change, the new `_date_for_change` in `jcal.py` works it out where that is safe:
+
+1. Exactly one upcoming event has the title and it does not repeat: use its date. So "Move my dentist appointment to Thursday at 4pm" works without the dentist's current date.
+2. Otherwise, if the event really is on the date the model put in `new_date`, the model swapped the fields: use it as the current date, and move nothing to another day.
+3. Otherwise the error now explains: "date is the event's CURRENT date; new_date is only for moving it to a different day."
+
+Whatever it works out appears on the confirmation card, which names the event, its date and the change, before anything happens. The tool's `date` description now says it is the event's current date and is optional when only one upcoming event has the title.
+
+- 6 new tests (256, then 257 with the eval-case check): no date needed for the only upcoming event, moving it to a new day without its date, the current date given as `new_date` (a series), two dentists with the date in `new_date` picking the right one, the explaining error, and a finished one-off not being guessed. Disabling each rule in turn made exactly its own tests fail.
+- New eval case `edit_move_to_another_day` (44 cases in total). The checks for `edit_move_one_off` and `edit_conflict_reported` now judge the outcome (the card shown, or the clash reported) instead of which field the date went in.
+- **Evals:** the 8 editing cases × 10 runs: 78/80 (prompt `ebbd75f13e93`, rescored with the outcome checks). The model still put the current date in `new_date` in 3 of those runs, and the code handled all 3. The new case went from 8/10 to 9/10 with the clearer `date` description (prompt `897819a24315`); the miss is JARVIS asking for the dentist's current date although it does not need it. Full suite: **130/132**; the misses were `ask_am_pm` (assumed 8 AM once) and `multi_tonight_after_morning` (answered from the morning's result once). No empty rounds.
+- Not yet tried in the real app.
 
 ---
 
