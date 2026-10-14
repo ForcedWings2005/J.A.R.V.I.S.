@@ -90,7 +90,7 @@ def test_system_prompt_stays_the_same_all_day(brain_clock):
 
 
 def test_no_text_at_all_gets_an_apology():
-    a = brain.Assistant(chat=FakeModel(say("")))
+    a = brain.Assistant(chat=FakeModel(say(""), say("")))          # empty, and empty again
     _, reply = run(a, "Hm")
     assert reply == "Sorry, I could not finish that."
 
@@ -258,10 +258,29 @@ def test_think_and_keep_alive_settings_reach_the_model():
 
 
 def test_an_empty_model_round_is_logged(caplog):
-    a = brain.Assistant(chat=FakeModel(say("")))
+    a = brain.Assistant(chat=FakeModel(say(""), say("")))
     _, reply = run(a, "Hm")
     assert reply == "Sorry, I could not finish that."
     assert "model round 1 returned nothing" in caplog.text
+    assert "retrying once" in caplog.text and "giving up" in caplog.text
+
+
+def test_an_empty_answer_is_retried_once(caplog):
+    caplog.set_level("INFO", logger="jarvis")
+    model = FakeModel(say(""), say("Good evening, sir."))
+    a = brain.Assistant(chat=model)
+    events, reply = run(a, "Good evening")
+    assert reply == "Good evening, sir."
+    assert len(model.seen) == 2
+    assert model.seen[0] == model.seen[1]                       # the same request again
+    assert "the retry worked" in caplog.text
+    assert [brain._role(m) for m in a.messages[-2:]] == ["user", "assistant"]   # no empty reply kept
+
+
+def test_an_empty_round_after_a_tool_is_retried_too():
+    model = FakeModel(use(call("list_tasks")), say(""), say("No tasks, sir."))
+    _, reply = run(brain.Assistant(chat=model), "Any tasks?")
+    assert reply == "No tasks, sir."
 
 
 # --- trimming a long conversation --------------------------------------------

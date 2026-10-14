@@ -490,6 +490,13 @@ Work on the branch `phase5-edit-events`. Before this, the only way to change an 
 - **The rare empty reply, now explained.** The warning added in section 27 caught it 4 times: `done_reason=stop`, the model wrote 24-220 tokens of hidden thinking and then stopped without any answer. It is model behaviour, not a JARVIS bug, and it is now the most common failure in the evals (3 of 129 runs in the final run). Not fixed here; proposed separately.
 - Not yet tried in the real app.
 
+**Retrying an empty reply.** When a model round brings back no text and no tool call, `chat_stream` now sends the same request once more before giving up with "Sorry, I could not finish that." Nothing is added to the conversation in between. The log says "retrying once", then "the retry worked" or "giving up".
+
+- 3 new tests (250 in total): a retry that works (the model sees exactly the same request twice), a retry after a tool call, and two empty attempts that still end in the apology. All three failed on the code from before the change.
+- **Not verified on the real model.** After the change, no empty round happened at all in 219 runs (a full eval of 129, then 90 runs of the multi-turn and editing cases), against about 4 in the 130 runs before it, so the retry never triggered. It costs nothing when it does not trigger. Watch `logs/jarvis.log` for "retrying once".
+- Full eval with the retry (prompt `d3af1e9e7cc8`, unchanged): **128/129**; the one miss was `ask_am_pm` assuming 8 AM once.
+- **New weak spot found by the 90 runs:** in 4 of 40 editing runs (one each in four cases) JARVIS put the event's current date into `new_date` instead of `date` (for example `update_event(title='dentist appointment', new_date='2030-01-08', new_start_time='16:00')` when the dentist is already on 2030-01-08), got the "give the date of the occurrence" error, and apologised instead of correcting the call. Not fixed yet.
+
 ---
 
 ## Status
