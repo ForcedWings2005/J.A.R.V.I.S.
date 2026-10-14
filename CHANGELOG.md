@@ -514,7 +514,7 @@ Whatever it works out appears on the confirmation card, which names the event, i
 
 ## 29. Dates and times spoken naturally
 
-On the branch `fix-spoken-dates`. Dates and times are now spoken the way people say them.
+Done on `fix-spoken-dates`, merged into `main` on 2026-10-14 (a fast-forward) and then deleted. Dates and times are now spoken the way people say them.
 
 **Real-app check of section 28 (by the owner, 2026-10-14): all passed.** Moving an event to 4pm (card, then Confirm moved it and kept its length), making a meeting last 90 minutes (the card showed the new end), moving just tomorrow's occurrence of a repeating event (only that one changed), moving an event to another day without its current date (it was found), and Cancel (nothing changed).
 
