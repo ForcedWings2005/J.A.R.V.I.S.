@@ -472,7 +472,7 @@ Findings (Ollama 0.33.1, gemma4 on this Mac):
 
 ## 28. Phase 5: editing and moving events
 
-Work on the branch `phase5-edit-events`. Before this, the only way to change an event was to delete it and add it again.
+Done on `phase5-edit-events`, merged into `main` on 2026-10-14 (a fast-forward) and then deleted. Before this, the only way to change an event was to delete it and add it again.
 
 - **New tool `update_event`** (in `jcal.py`): change an event's time, length, date or title. It finds the event the same way as `delete_event` (titles match both ways; with scope "all" no date is needed) and, like delete, **never changes anything itself**: it returns a confirmation card ("Change 'Dentist' on 2030-01-08 at 15:00-16:00: time to 16:00-17:00?"), and only the Confirm button applies it. Cards expire after 5 minutes like delete cards.
 - **What a change does:** a one-off event is updated in place. One occurrence of a repeating event: that date is skipped (the exceptions table, as for delete) and a one-off event with the change is added in its place; the series is untouched. A whole series: its title and times change (past dates show the new time too). Moving a whole series to other days is refused with a clear message (delete and add again), because it interacts with `repeat_days` and the series' start date in ways that are easy to get wrong.
@@ -529,6 +529,7 @@ Whatever it works out appears on the confirmation card, which names the event, i
 | Time-of-day awareness when listing today's events | Logic tested; passes in the evals (section 21), not yet confirmed in a real conversation (section 16) |
 | Phase 3 (config, one database with migrations, tool registry, Assistant, endpoint tests, logging) | Done, merged into `main`; 191 tests; evals 87/90 with unchanged prompt (section 23) |
 | Phase 4 (time stamps, thinking kept on, trimming, new conversation, expiring cards) | Done, merged into `main`; 211 tests; evals 108/108 (section 27); not yet tried in the real app |
+| Editing and moving events (Phase 5, item 1), empty-reply retry | Done, merged into `main`; 257 tests; evals 130/132 (section 28); not yet tried in the real app; the retry has not yet triggered on the real model |
 | Model eval suite (Phase 2) | Done, merged into `main`; baseline 80/90 runs, 90/90 after fixes (sections 21, 22) |
 | Decimals in speech | Fixed and tested against Kokoro's phonemes; not yet heard in a real conversation (section 22) |
 
