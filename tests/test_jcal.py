@@ -537,3 +537,48 @@ def test_the_model_is_told_what_the_card_says():
     req = change("dentist", day(1), new_start_time="16:00")
     assert req.reply.startswith("Confirmation required.")
     assert req.card in req.reply and "NOT been changed" in req.reply
+
+
+# ---------- update_event without the event's current date ----------
+
+def test_no_date_needed_when_only_one_upcoming_event_has_the_title():
+    jcal.add_event("Dentist", day(1), "15:00")
+    req = change("dentist appointment", new_start_time="16:00")
+    assert req.card.startswith(f"Change 'Dentist' on {day(1)} at 15:00-16:00: time to 16:00-17:00")
+
+
+def test_the_only_upcoming_event_can_move_to_a_new_day_without_its_date():
+    jcal.add_event("Dentist", day(1), "15:00")
+    change("dentist", new_date=day(3), new_start_time="16:00").apply()
+    assert times_on(1) == [] and times_on(3) == [("16:00", "17:00", "Dentist")]
+
+
+def test_the_current_date_put_in_new_date_is_understood():
+    """Seen in the evals: the model put the event's own date in new_date, not in date."""
+    jcal.add_event("Piano lesson", day(1), "16:00", "17:00", repeat="weekly")
+    req = change("piano", new_date=day(8), new_start_time="17:00")
+    assert req.card.startswith(f"Change only the {day(8)} occurrence of 'Piano lesson'")
+    assert "date to" not in req.card                     # nothing moves to another day
+    req.apply()
+    assert times_on(8) == [("17:00", "18:00", "Piano lesson")]
+
+
+def test_with_two_dentists_the_date_in_new_date_picks_the_right_one():
+    jcal.add_event("Dentist", day(1), "15:00")
+    jcal.add_event("Dentist", day(5), "11:00")
+    req = change("dentist", new_date=day(1), new_start_time="16:00")
+    assert req.card.startswith(f"Change 'Dentist' on {day(1)}")
+    assert "date to" not in req.card
+
+
+def test_without_a_safe_guess_the_error_explains_the_two_dates():
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    result = jcal.update_event("piano", new_date=day(3), new_start_time="17:00")   # no piano on day 3
+    assert result.startswith("Error: give the date of the occurrence to change")
+    assert "CURRENT date" in result
+
+
+def test_a_finished_one_off_is_not_guessed(clock):
+    jcal.add_event("Dentist", day(1), "15:00")
+    clock.set(9, day=9)                                  # day(1) is now in the past
+    assert jcal.update_event("dentist", new_start_time="16:00").startswith("Error")

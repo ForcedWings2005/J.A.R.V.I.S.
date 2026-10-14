@@ -283,8 +283,12 @@ def _locate(title: str, date: str, scope: str, verb: str):
         return "Error: scope must be 'this' or 'all'."
     if not date:
         if scope != "all":
-            return (f"Error: give the date of the occurrence to {verb}, "
-                    f"or use scope 'all' to {verb} a whole repeating series.")
+            msg = (f"Error: give the date of the occurrence to {verb}, "
+                   f"or use scope 'all' to {verb} a whole repeating series.")
+            if verb == "change":
+                msg += (" date is the event's CURRENT date; new_date is only for "
+                        "moving it to a different day.")
+            return msg
         found = _find_series(title)
         return found if isinstance(found, str) else (found, found["date"], "all")
     try:
@@ -524,9 +528,32 @@ def apply_update(plan: dict) -> str:
     return f"Done. '{plan['title']}' is now on {plan['target']} from {plan['start']} to {plan['end']}."
 
 
+def _date_for_change(title: str, new_date: str):
+    """update_event was called without the event's current date. Work it out if that is safe.
+
+    1. Exactly one upcoming event has this title and it does not repeat: use its date
+       (so "move the dentist to Thursday" works without one).
+    2. Otherwise, if the event really is on new_date, the model put the current date in
+       the wrong field: use it as the date, and move nothing to another day.
+    Returns (date, new_date); date stays "" if neither applies. Whatever is worked out
+    here is shown on the confirmation card before anything changes.
+    """
+    only = _find_series(title)
+    if isinstance(only, dict) and only["repeat"] == "none":
+        return only["date"], new_date
+    if new_date:
+        try:
+            d = _d(new_date)
+        except ValueError:
+            return "", new_date
+        if any(_title_matches(title, ev["title"]) for ev in events_between(d, d)):
+            return new_date, ""
+    return "", new_date
+
+
 @tool("Request a change to a calendar event: its time, length, date or title. This only asks the user to confirm on screen; nothing changes until they click Confirm. Find the event by its title and date, as for delete_event. For a repeating event, scope 'this' changes only that date's occurrence and scope 'all' changes the whole series. With scope 'all' only the title is needed: the tool finds the series itself, so never ask the user for its date, days or current time. For 'all my piano lessons' or 'from now on', call this straight away with scope 'all' and the title. Give only what changes: new_start_time alone moves the event and keeps its length; new_length_minutes sets its length (for 'make it last 90 minutes' pass 90, without needing the start time); new_end_time sets an exact end. A whole series cannot be moved to other days.",
       title={"type": "string"},
-      date={"type": "string", "description": "YYYY-MM-DD, the occurrence to change. Optional when scope is 'all'."},
+      date={"type": "string", "description": "The event's CURRENT date, YYYY-MM-DD (the occurrence to change). Optional when scope is 'all', and when only one upcoming event has this title, so never ask the user for it."},
       scope={"type": "string", "enum": ["this", "all"]},
       new_title={"type": "string", "description": "Optional new title"},
       new_date={"type": "string", "description": "Optional new date, YYYY-MM-DD"},
@@ -537,6 +564,8 @@ def update_event(title: str, date: str = "", scope: str = "this", new_title: str
                  new_date: str = "", new_start_time: str = "", new_end_time: str = "",
                  new_length_minutes: int = 0):
     """Never changes anything itself: returns a request the user must confirm."""
+    if not date and (scope or "this").lower().strip() != "all":
+        date, new_date = _date_for_change(title, new_date)
     found = _locate(title, date, scope, "change")
     if isinstance(found, str):
         return found

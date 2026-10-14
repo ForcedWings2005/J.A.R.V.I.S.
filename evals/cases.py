@@ -161,8 +161,10 @@ CASES = [
     # --- Changing events (only ever asks for confirmation) ----------------------
     Case("edit_move_one_off", "Move my dentist appointment tomorrow to 4pm.",
          events=[DENTIST],
-         expect=[("update_event", {"title": contains("dentist"), "date": TUE,
-                                   "new_start_time": "16:00"})],
+         # Judge the outcome (the card), not which field the date went in: the code
+         # works out the current date when the model leaves it out (section 28)
+         expect=[("update_event", {"title": contains("dentist"), "_result": contains(
+             f"Change 'Dentist' on {TUE} at 15:00-16:00: time to 16:00-17:00")})],
          forbid=["delete_event", "add_event"],
          includes_any=["confirm"], excludes=CLAIMS_CHANGED),
     Case("edit_one_occurrence", "Move tomorrow's piano lesson to 5pm, just this once.",
@@ -188,10 +190,16 @@ CASES = [
     Case("edit_conflict_reported", "Move my dentist appointment tomorrow to 4pm.",
          events=[DENTIST, {"title": "Team meeting", "date": TUE, "time": "16:00",
                            "end_time": "17:00"}],
-         expect=[("update_event", {"date": TUE, "new_start_time": "16:00"})],
+         expect=[("update_event", {"new_start_time": "16:00",
+                                   "_result": contains("conflicts with 'Team meeting'")})],
          forbid=["delete_event"],
          includes_any=["conflict", "clash", "team meeting", "already"],
          excludes=CLAIMS_CHANGED),
+    # No current date given: "move the dentist to Thursday" (it is on Tuesday)
+    Case("edit_move_to_another_day", "Move my dentist appointment to Thursday at 4pm.",
+         events=[DENTIST],
+         expect=[("update_event", {"_result": contains(f"date to {THU}, time to 16:00-17:00")})],
+         forbid=["delete_event", "add_event"], includes_any=["confirm"]),
     Case("edit_ask_when", "I need to move my dentist appointment tomorrow.",
          events=[DENTIST],
          forbid=["update_event", "delete_event", "add_event"], asks=True),
