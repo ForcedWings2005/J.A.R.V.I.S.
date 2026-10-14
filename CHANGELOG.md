@@ -511,6 +511,20 @@ Whatever it works out appears on the confirmation card, which names the event, i
 - **Evals:** the 8 editing cases × 10 runs: 78/80 (prompt `ebbd75f13e93`, rescored with the outcome checks). The model still put the current date in `new_date` in 3 of those runs, and the code handled all 3. The new case went from 8/10 to 9/10 with the clearer `date` description (prompt `897819a24315`); the miss is JARVIS asking for the dentist's current date although it does not need it. Full suite: **130/132**; the misses were `ask_am_pm` (assumed 8 AM once) and `multi_tonight_after_morning` (answered from the morning's result once). No empty rounds.
 - Not yet tried in the real app.
 
+
+## 29. Dates spoken naturally
+
+On the branch `fix-spoken-dates`.
+
+**Real-app check of section 28 (by the owner, 2026-10-14): all passed.** Moving an event to 4pm (card, then Confirm moved it and kept its length), making a meeting last 90 minutes (the card showed the new end), moving just tomorrow's occurrence of a repeating event (only that one changed), moving an event to another day without its current date (it was found), and Cancel (nothing changed).
+
+**Bug report from real use:** JARVIS read dates as written, so "2026-10-16" was spoken "two thousand and twenty-six dash ten dash sixteen".
+
+- Fix: `speak_dates()` in `speech_text.py` rewrites `YYYY-MM-DD` before speaking: "2026-10-16" becomes "October the 16th", and the year is added only when it is not the current year ("March the 3rd, 2027"). Kokoro reads ordinals correctly (checked: "October the sixteenth", "March the thirty-first, two thousand and twenty-seven"). Text that only looks like a date (2026-13-45, 2026-02-30) is left alone. Only the speech changes; the screen still shows the date as written.
+- It runs before the number clean-up, which would otherwise treat the digits as plain numbers.
+- 17 new tests (274 in total): every ordinal ending (1st, 2nd, 3rd, 11th-13th, 21st-23rd, 31st), another year, a range, invalid dates, and the order with the number clean-up.
+- **Noticed, not fixed:** 24-hour times are read digit by digit: "15:00" is "fifteen zero zero" and "09:05" is "zero nine zero five".
+
 ---
 
 ## Status

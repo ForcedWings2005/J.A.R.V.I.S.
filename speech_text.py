@@ -1,5 +1,6 @@
 """Text clean-up before speaking. Plain string work, so it is tested without Kokoro."""
 import re
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 MAX_DECIMALS = 4  # "38.4444444444" is spoken as "38 point 4 4 4 4"
@@ -40,7 +41,38 @@ def speak_numbers(text: str) -> str:
     return re.sub(r"(?<![\d.])(\d+)\.(\d+)(?!\d|\.\d)", _decimal, text)
 
 
-def prepare(text: str) -> str:
+MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August",
+          "September", "October", "November", "December"]
+
+
+def _ordinal(n: int) -> str:
+    """16 -> '16th', 1 -> '1st', 22 -> '22nd', 11/12/13 -> 'th'. Kokoro reads these well."""
+    if 11 <= n % 100 <= 13:
+        return f"{n}th"
+    return f"{n}" + {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+
+
+def speak_dates(text: str, today: date | None = None) -> str:
+    """'2026-10-16' -> 'October the 16th' (the year only if it is not this year).
+
+    Read as written, the speech model says "two thousand and twenty-six dash ten dash
+    sixteen". Text that only looks like a date (2026-13-45) is left alone.
+    """
+    this_year = (today or date.today()).year
+
+    def spoken(m: re.Match) -> str:
+        try:
+            d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            return m.group(0)
+        words = f"{MONTHS[d.month - 1]} the {_ordinal(d.day)}"
+        return words if d.year == this_year else f"{words}, {d.year}"
+
+    return re.sub(r"(?<![\d-])(\d{4})-(\d{2})-(\d{2})(?![\d-])", spoken, text)
+
+
+def prepare(text: str, today: date | None = None) -> str:
     text = re.sub(r"[*_`#]", "", text).strip()
+    text = speak_dates(text, today)      # before speak_numbers, which would read the digits
     text = speak_numbers(text)
     return fix_pronunciations(text)
