@@ -278,30 +278,36 @@ class Assistant:
                 log.info("user: %s", _short(user_text))
 
                 for round_no in range(self.max_rounds + 1):
-                    content = ""
-                    thought = 0             # characters of hidden thinking, for the log
-                    calls = []
-                    chunk = None
-                    for chunk in self.chat(model=self.model, messages=self.messages,
-                                           tools=tools.SCHEMAS, stream=True,
-                                           think=self.think, keep_alive=self.keep_alive):
-                        piece = chunk.message.content or ""
-                        if piece:
-                            content += piece
-                            wrote_text = True
-                            if first_text is None:
-                                first_text = time.perf_counter() - started
-                            yield {"type": "delta", "text": piece}
-                        if chunk.message.tool_calls:
-                            calls.extend(chunk.message.tool_calls)
-                        thought += len(getattr(chunk.message, "thinking", None) or "")
-                    self._log_usage(chunk, round_no)
-                    if not content and not calls:
-                        # Seen in the evals: an empty answer after 0.4 s, cause unknown
+                    # gemma4 sometimes thinks and then stops without any answer
+                    # (done_reason=stop, CHANGELOG section 28). Ask once more before giving up.
+                    for attempt in range(2):
+                        content = ""
+                        thought = 0         # characters of hidden thinking, for the log
+                        calls = []
+                        chunk = None
+                        for chunk in self.chat(model=self.model, messages=self.messages,
+                                               tools=tools.SCHEMAS, stream=True,
+                                               think=self.think, keep_alive=self.keep_alive):
+                            piece = chunk.message.content or ""
+                            if piece:
+                                content += piece
+                                wrote_text = True
+                                if first_text is None:
+                                    first_text = time.perf_counter() - started
+                                yield {"type": "delta", "text": piece}
+                            if chunk.message.tool_calls:
+                                calls.extend(chunk.message.tool_calls)
+                            thought += len(getattr(chunk.message, "thinking", None) or "")
+                        self._log_usage(chunk, round_no)
+                        if content or calls:
+                            if attempt:
+                                log.info("model round %d: the retry worked", round_no + 1)
+                            break
                         log.warning("model round %d returned nothing: done_reason=%s, "
-                                    "wrote %s tokens, thought %d characters", round_no + 1,
+                                    "wrote %s tokens, thought %d characters; %s", round_no + 1,
                                     getattr(chunk, "done_reason", None),
-                                    getattr(chunk, "eval_count", None), thought)
+                                    getattr(chunk, "eval_count", None), thought,
+                                    "retrying once" if attempt == 0 else "giving up")
 
                     self.messages.append(
                         ollama.Message(role="assistant", content=content, tool_calls=calls or None)
