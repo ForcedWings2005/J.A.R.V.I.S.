@@ -67,3 +67,42 @@ def test_speak_dates(text, spoken):
 def test_prepare_speaks_dates_before_numbers():
     assert prepare("On 2027-03-03 it costs 9.99.", today=THIS_YEAR) == \
         "On March the 3rd, 2027 it costs 9 point 9 9."
+
+
+# ---------- times ----------
+
+from speech_text import speak_times  # noqa: E402
+
+
+@pytest.mark.parametrize("text,spoken", [
+    # The bug: read as "fifteen zero zero" and "zero nine zero five"
+    ("at 15:00.", "at 3 pm."),
+    ("at 09:05", "at 9 oh 5 am"),
+    ("at 15:30", "at 3 30 pm"),
+    ("at 22:45", "at 10 45 pm"),
+    ("at 12:00", "at 12 noon"),
+    ("at 12:30", "at 12 30 pm"),
+    ("at 00:00", "at midnight"),
+    ("at 00:30", "at 12 30 am"),
+    ("at 9:00", "at 9 am"),
+    ("at 23:59", "at 11 59 pm"),
+    ("from 15:00-16:30", "from 3 pm to 4 30 pm"),
+    ("from 15:00 – 16:00", "from 3 pm to 4 pm"),
+    ("from 15:00 to 16:00", "from 3 pm to 4 pm"),
+    # The model sometimes already writes 12-hour times: keep them right
+    ("at 3:00 PM", "at 3 pm"),
+    ("at 3:30 p.m.", "at 3 30 pm"),
+    ("at 12:15 am", "at 12 15 am"),
+    ("at 9:05am", "at 9 oh 5 am"),
+    # Not times: left alone
+    ("a 2:1 win", "a 2:1 win"),
+    ("at 25:00", "at 25:00"),
+    ("at 10:00:30", "at 10:00:30"),
+])
+def test_speak_times(text, spoken):
+    assert speak_times(text) == spoken
+
+
+def test_prepare_speaks_a_date_and_time_together():
+    assert prepare("Your dentist is on 2026-10-16 from 15:00 to 16:00.", today=THIS_YEAR) == \
+        "Your dentist is on October the 16th from 3 pm to 4 pm."
