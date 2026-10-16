@@ -556,7 +556,7 @@ The project folder moved from `~/Desktop/jarvis` to `~/Developer/jarvis` (2026-1
 **Crypto lab.** `experiments/crypto_lab.py`, six small experiments to run one at a time (`python experiments/crypto_lab.py 1`). Not part of the app; it never touches `jarvis.db`.
 
 - Written: 1 (encrypt and decrypt with AES-GCM; a wrong key is refused) and 5 (two keys: X25519 key agreement, HKDF, then AES-GCM, the design planned for backups). The X25519 private key is 32 bytes, 64 hex characters, short enough for paper; an RSA key would not be.
-- Left for the owner to write, with steps in each function: 2 (change one byte), 3 (same sentence twice), 4 (nonce reuse), 6 (scrypt).
+- 2 (change one byte), 3 (same sentence twice), 4 (nonce reuse) and 6 (scrypt) were first left as exercises, then written with line-by-line comments at the owner's request. Results: one flipped bit, or a changed nonce, is refused; the same sentence encrypts differently each time; a reused nonce lets a guessed message reveal the other one without the key; scrypt took about 0.02 s, 0.19 s and 1.6 s at n = 2^14, 2^17 and 2^20 on this Mac.
 - New dependency, agreed by the owner: `cryptography` 50.0.2, which brought `cffi` 2.1.1 and `pycparser` 3.11. Added to `requirements.txt`, not to `requirements-dev.txt`: nothing in the tests uses it yet.
 - Checked: experiments 1 and 5 run and print the expected results. Not checked: no tests cover the lab (experiments are outside the test suite, as before).
 
