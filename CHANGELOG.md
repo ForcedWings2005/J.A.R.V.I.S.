@@ -52,7 +52,7 @@ jarvis/
 ├── ruff.toml           Lint settings
 ├── .pre-commit-config.yaml  Checks that run before every commit
 ├── .github/workflows/tests.yml  Runs lint and tests on GitHub for every push
-├── experiments/        Old scripts, not part of the app (agent.py, compare.py)
+├── experiments/        Not part of the app: old scripts (agent.py, compare.py) and crypto_lab.py
 ├── README.md           Setup, run, tests, backups, pinned model
 ├── CLAUDE.md           Instructions for Claude Code when it works on this project
 ├── plan.md             The plan from Phase 2 onward
@@ -543,6 +543,22 @@ The project folder moved from `~/Desktop/jarvis` to `~/Developer/jarvis` (2026-1
 - Already right before this change: the launchd backup job (`com.jarvis.backup.plist`) and the pre-commit hook use the new path, and the code builds its paths from the project folder. Moving off the Desktop should also remove the risk that macOS blocks the 03:00 job from reading the folder (section 19).
 - README setup now says `cd ~/Developer/jarvis`.
 - Checked: with the venv activated, `python`, `uvicorn` and `pytest` resolve inside the new `.venv`; `ruff check .` passes; 295 tests pass; `mlx_whisper`, `kokoro_onnx`, `ollama`, `fastapi` and `pre_commit` import. Not checked: the server and voice in the real app, and the 03:00 backup from the new folder (its first run is tomorrow night; output in `/tmp/jarvis-backup.log`).
+
+## 31. Threat model, and a crypto lab before encrypted backups
+
+**Threat model.** New `SECURITY.md`: what JARVIS holds, who could harm it, the ways in, the controls in place (each one checked), known gaps and accepted risks. Written from the owner's answers, as the first step of learning security on this project.
+
+- Main finding: the most likely harm is *losing* the data, and every backup sits on the same disk as the database. FileVault is on; Time Machine is not set up.
+- Decisions: daily backups will be encrypted with a public key and copied to iCloud Drive; the private key is kept on paper, never on the Mac. Notes and memory hold trivial preferences only, never passwords.
+- `plan.md`: encrypted offsite backups are now Phase 5 item 3, before notes (now item 4). `plan.md` and `CLAUDE.md` point to `SECURITY.md`.
+- Checked after the move (section 30): the 03:00 backup ran from the new folder on 2026-10-15 and 2026-10-16.
+
+**Crypto lab.** `experiments/crypto_lab.py`, six small experiments to run one at a time (`python experiments/crypto_lab.py 1`). Not part of the app; it never touches `jarvis.db`.
+
+- Written: 1 (encrypt and decrypt with AES-GCM; a wrong key is refused) and 5 (two keys: X25519 key agreement, HKDF, then AES-GCM, the design planned for backups). The X25519 private key is 32 bytes, 64 hex characters, short enough for paper; an RSA key would not be.
+- Left for the owner to write, with steps in each function: 2 (change one byte), 3 (same sentence twice), 4 (nonce reuse), 6 (scrypt).
+- New dependency, agreed by the owner: `cryptography` 50.0.2, which brought `cffi` 2.1.1 and `pycparser` 3.11. Added to `requirements.txt`, not to `requirements-dev.txt`: nothing in the tests uses it yet.
+- Checked: experiments 1 and 5 run and print the expected results. Not checked: no tests cover the lab (experiments are outside the test suite, as before).
 
 ---
 
