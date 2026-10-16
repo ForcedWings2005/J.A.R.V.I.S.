@@ -5,8 +5,9 @@ dashboard (calendar, to-do list, chat, voice), a local language model through Ol
 SQLite. Nothing should leave the machine. The owner is learning Python and software
 engineering, so explanations matter as much as the code.
 
-Read `README.md` (setup, running), `CHANGELOG.md` (history, incidents, status) and `plan.md`
-(the roadmap, by phase) when you need context. Do not duplicate them here.
+Read `README.md` (setup, running), `CHANGELOG.md` (history, incidents, status), `plan.md`
+(the roadmap, by phase) and `SECURITY.md` (the threat model and security decisions) when you
+need context. Do not duplicate them here.
 
 ## Architecture
 
