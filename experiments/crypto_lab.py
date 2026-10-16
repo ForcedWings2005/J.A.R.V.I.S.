@@ -5,12 +5,12 @@ Not part of the app. It never touches jarvis.db, config or the network.
 Run one experiment at a time, from the project folder with the venv active:
     python experiments/crypto_lab.py 1
 
-    1  Encrypt and decrypt a sentence (AES-GCM)            written
-    2  Change one byte, then decrypt                        your turn
-    3  Encrypt the same sentence twice                      your turn
-    4  Reuse a nonce, and see what leaks                    your turn
-    5  Two keys: lock with the public key (X25519)          written
-    6  Turn a passphrase into a key (scrypt)                your turn
+    1  Encrypt and decrypt a sentence (AES-GCM)
+    2  Change one byte, then decrypt
+    3  Encrypt the same sentence twice
+    4  Reuse a nonce, and see what leaks
+    5  Two keys: lock with the public key (X25519)
+    6  Turn a passphrase into a key (scrypt)
 
 Words used below:
     plaintext   the readable message
@@ -26,14 +26,14 @@ mistakes, such as reusing a nonce. That is what this lab is for.
 """
 import os
 import sys
-import time  # noqa: F401  (for experiment 6)
+import time
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives.kdf.scrypt import Scrypt  # noqa: F401  (for experiment 6)
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 
 def show(label: str, data: bytes) -> None:
@@ -46,7 +46,7 @@ def xor(a: bytes, b: bytes) -> bytes:
     return bytes(x ^ y for x, y in zip(a, b, strict=False))
 
 
-# --- 1. Encrypt and decrypt (written) -------------------------------------------------
+# --- 1. Encrypt and decrypt -------------------------------------------------------------
 
 def experiment_1() -> None:
     """The basic round trip: plaintext + key + nonce -> ciphertext, and back."""
@@ -75,7 +75,7 @@ def experiment_1() -> None:
     # because the key and the nonce are random each time.
 
 
-# --- 2. Change one byte (your turn) -------------------------------------------------
+# --- 2. Change one byte -------------------------------------------------------------
 
 def experiment_2() -> None:
     """Show that AES-GCM notices when the ciphertext has been changed.
@@ -89,10 +89,41 @@ def experiment_2() -> None:
     Then try changing the nonce instead of the ciphertext. What happens, and why?
     The question to answer: why is refusing better than returning slightly wrong text?
     """
-    print("Not written yet: open experiments/crypto_lab.py and read the steps in experiment_2.")
+    key = AESGCM.generate_key(bit_length=256)
+    nonce = os.urandom(12)
+    ciphertext = AESGCM(key).encrypt(nonce, b"Dentist on Friday at 15:00", None)
+
+    # bytes cannot be changed once made; a bytearray is the changeable version
+    changed = bytearray(ciphertext)
+    # ^= 1 flips the lowest bit: the first byte goes from, say, 0xd8 to 0xd9
+    changed[0] ^= 1
+    changed = bytes(changed)
+
+    show("original", ciphertext)
+    show("changed", changed)
+    differing = sum(a != b for a, b in zip(ciphertext, changed, strict=True))
+    print(f"Bytes that differ: {differing} of {len(ciphertext)}\n")
+
+    # The original still decrypts, so the key and nonce are fine
+    print(f"Original:    {AESGCM(key).decrypt(nonce, ciphertext, None).decode()}")
+
+    try:
+        AESGCM(key).decrypt(nonce, changed, None)
+        print("Changed:     decrypted (this should never happen)")
+    except InvalidTag:
+        print("Changed:     refused (InvalidTag). One flipped bit, and the seal no longer matches.")
+
+    # Bonus: leave the ciphertext alone and change the nonce instead
+    other_nonce = bytearray(nonce)
+    other_nonce[0] ^= 1
+    try:
+        AESGCM(key).decrypt(bytes(other_nonce), ciphertext, None)
+        print("Nonce:       decrypted (this should never happen)")
+    except InvalidTag:
+        print("Nonce:       refused too. The tag covers the nonce, so it can't be swapped.")
 
 
-# --- 3. Same sentence twice (your turn) ---------------------------------------------
+# --- 3. Same sentence twice ---------------------------------------------------------
 
 def experiment_3() -> None:
     """Encrypt the same sentence twice with the same key, each time with a fresh nonce.
@@ -105,10 +136,26 @@ def experiment_3() -> None:
     The question to answer: if the same sentence always gave the same ciphertext, what
     could someone learn from a pile of encrypted backups without ever decrypting one?
     """
-    print("Not written yet: open experiments/crypto_lab.py and read the steps in experiment_3.")
+    key = AESGCM.generate_key(bit_length=256)
+    plaintext = b"Dentist on Friday at 15:00"
+
+    # Same key, same sentence, but each message gets its own fresh nonce
+    nonce_a, nonce_b = os.urandom(12), os.urandom(12)
+    first = AESGCM(key).encrypt(nonce_a, plaintext, None)
+    second = AESGCM(key).encrypt(nonce_b, plaintext, None)
+
+    show("first", first)
+    show("second", second)
+    print(f"Same ciphertext? {first == second}")
+
+    # Both still decrypt to the same sentence, each with its own nonce
+    same = AESGCM(key).decrypt(nonce_a, first, None) == AESGCM(key).decrypt(nonce_b, second, None)
+    print(f"Same sentence after decrypting? {same}")
+    print("\nWithout the key, nobody can tell these are the same message. If they were")
+    print("identical, an attacker could spot repeats: 'this backup is the same as yesterday's'.")
 
 
-# --- 4. Reuse a nonce (your turn) ---------------------------------------------------
+# --- 4. Reuse a nonce ---------------------------------------------------------------
 
 def experiment_4() -> None:
     """Break the one rule on purpose: the same key AND the same nonce for two messages.
@@ -129,10 +176,34 @@ def experiment_4() -> None:
 
     The question to answer: you never had the key. How did you read message 2?
     """
-    print("Not written yet: open experiments/crypto_lab.py and read the steps in experiment_4.")
+    key = AESGCM.generate_key(bit_length=256)
+    nonce = os.urandom(12)                       # the mistake: one nonce for two messages
+    plain1 = b"Lock code for the garage: 4417"
+    plain2 = b"Bank PIN reminder: card ends 4"
+
+    # [:-16] drops the tag, leaving only the encrypted bytes, one per letter
+    cipher1 = AESGCM(key).encrypt(nonce, plain1, None)[:-16]
+    cipher2 = AESGCM(key).encrypt(nonce, plain2, None)[:-16]
+    show("cipher 1", cipher1)
+    show("cipher 2", cipher2)
+
+    # Each ciphertext is plaintext XOR stream. With the same stream twice, XORing the two
+    # ciphertexts cancels the stream: (p1 ^ s) ^ (p2 ^ s) = p1 ^ p2. The key is gone.
+    leak = xor(cipher1, cipher2)
+    show("c1 XOR c2", leak)
+    show("p1 XOR p2", xor(plain1, plain2))
+    print(f"Equal? {leak == xor(plain1, plain2)}: the attacker now holds p1 XOR p2, no key needed.\n")
+
+    # The attacker guesses message 1 (garage codes and greetings are easy to guess)
+    recovered = xor(leak, plain1)
+    print(f"Guess message 1, and out comes message 2: {recovered.decode()}")
+
+    # Even a partial guess works: knowing only how message 1 starts reveals how 2 starts
+    partial = xor(leak[:9], b"Lock code")
+    print(f"Guess only 'Lock code', and out comes:     {partial.decode()}")
 
 
-# --- 5. Two keys (written) ----------------------------------------------------------
+# --- 5. Two keys ----------------------------------------------------------------------
 
 def _derive_key(shared_secret: bytes) -> bytes:
     """Turn the X25519 shared secret into an AES key. HKDF mixes it into a clean 32-byte key."""
@@ -196,7 +267,7 @@ def experiment_5() -> None:
     # Try this: lock() the same message twice. Are the boxes the same? Why not?
 
 
-# --- 6. Passphrase to key (your turn) -----------------------------------------------
+# --- 6. Passphrase to key -----------------------------------------------------------
 
 def experiment_6() -> None:
     """A passphrase is not a key: it is too short and too guessable. scrypt stretches it
@@ -214,7 +285,37 @@ def experiment_6() -> None:
     The question to answer: an attacker trying 1 billion passphrases pays that time
     1 billion times. How long would that take at each setting?
     """
-    print("Not written yet: open experiments/crypto_lab.py and read the steps in experiment_6.")
+    passphrase = b"correct horse battery"
+    # The salt is random and stored with the result. It means the attacker can't compute
+    # one big table of "passphrase -> key" in advance and reuse it for every file.
+    salt = os.urandom(16)
+    show("salt", salt)
+    print()
+
+    guesses = 1_000_000_000
+    # n is the cost: each step up of x8 makes scrypt use 8x the time and 8x the memory
+    for exponent in (14, 17, 20):
+        # A Scrypt object can derive only once, so make a new one each time
+        kdf = Scrypt(salt=salt, length=32, n=2**exponent, r=8, p=1)
+        start = time.perf_counter()
+        key = kdf.derive(passphrase)
+        seconds = time.perf_counter() - start
+        years = seconds * guesses / (60 * 60 * 24 * 365)
+        print(f"n = 2**{exponent}: {seconds:6.3f} s per guess, "
+              f"{128 * 8 * 2**exponent // 2**20:>4} MB memory, "
+              f"1 billion guesses = {years:,.1f} years on one core")
+        print(f"            key {key.hex()}")
+
+    # Same passphrase, same salt, same settings: always the same key. That is what lets
+    # you unlock things again later with only the passphrase.
+    first = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1).derive(passphrase)
+    again = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1).derive(passphrase)
+    print(f"\nSame passphrase and salt give the same key again? {again == first}")
+
+    other_salt = Scrypt(salt=os.urandom(16), length=32, n=2**14, r=8, p=1).derive(passphrase)
+    print(f"Same passphrase, different salt, same key?        {other_salt == first}")
+    print("\nThe years assume one computer. Attackers use thousands in parallel, which is why a")
+    print("long passphrase matters as much as a slow setting.")
 
 
 EXPERIMENTS = {"1": experiment_1, "2": experiment_2, "3": experiment_3,
