@@ -2,6 +2,9 @@
 
 Written 2026-10-12, after Phase 1 (backups, CI, ruff, pre-commit, cleanup) was merged and CI went green.
 
+Security decisions (what JARVIS holds, who could harm it, what stops them) are in
+`SECURITY.md`. Read it before any work on backups, notes, logging or Phase 6.
+
 ## Where the project stands
 
 The calendar logic is in good shape: it is checked in code, covered by 51 tests, and has
@@ -112,11 +115,16 @@ reported.
 2. **Reminders.** A small scheduler inside the server checks every minute, and the page
    receives reminders through server-sent events, shows them, and speaks them when voice
    mode is on. Store reminders in the database so a restart does not lose them.
-3. **Notes and memory.** `remember` and `recall` tools backed by a table with SQLite's FTS5
-   full-text search. Start with that before reaching for embeddings.
-4. **Morning briefing.** Today's events, overdue tasks and open reminders in one reply. Most
+3. **Encrypted backups off this Mac.** Before notes. Each daily backup is encrypted with a
+   public key (the private key is on paper, never on the Mac), then copied to iCloud Drive.
+   A restore script and a test that a restore works. Details in `SECURITY.md` section 5.
+4. **Notes and memory.** `remember` and `recall` tools backed by a table with SQLite's FTS5
+   full-text search. Start with that before reaching for embeddings. Trivial preferences
+   only, and the rules in `SECURITY.md` section 5: no secrets, saved only when I ask, `forget`
+   through the confirmation card, note text kept out of the log.
+5. **Morning briefing.** Today's events, overdue tasks and open reminders in one reply. Most
    of it can be put together in code, with the model only writing the sentences.
-5. **Weather, then news and sports**, as plain read-only tools with a timeout and a cached
+6. **Weather, then news and sports**, as plain read-only tools with a timeout and a cached
    result, so a slow API never blocks a reply.
 
 Each new tool gets its own eval cases before it ships.
@@ -144,8 +152,8 @@ Not before Phases 3 and 4. In this order:
   Keep a short `requirements.in` listing what the project uses directly, a
   `requirements-dev.txt` (pytest, ruff, pre-commit), and a generated lock file.
 - **Keep backups off this disk.** `backups/` sits next to `jarvis.db`, so a disk failure or
-  a lost laptop takes both. Copy them to iCloud Drive or Time Machine, and test a restore
-  once.
+  a lost laptop takes both. Now planned as Phase 5, item 3 (encrypted, to iCloud Drive).
+  Time Machine on an external drive is still worth adding for the rest of the Mac.
 - **Split up `index.html`.** At over 1000 lines, move the scripts into `static/js/` modules
   (orb, chat, speech, calendar). No build step is needed.
 - **Check model latency.** Measure the time to the first spoken word. Try Ollama's

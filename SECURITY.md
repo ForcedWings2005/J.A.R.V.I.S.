@@ -1,0 +1,151 @@
+# JARVIS security: threat model
+
+Written 2026-10-14. Review it when anything in "When to revisit" happens.
+
+This file answers four questions: what JARVIS holds, who could harm it, how they could get
+in, and what stops them. Decisions about security should start here, not with a tool. The
+point is to protect the right thing: encrypting the database does nothing if the same text
+sits readable in the log.
+
+## 1. What we protect (assets)
+
+Each asset is rated on the three security properties:
+
+- **Confidentiality**: only I can read it.
+- **Integrity**: nobody can change it without me knowing.
+- **Availability**: it is there when I need it.
+
+| Asset | Where it lives | Most important | Why |
+|---|---|---|---|
+| Calendar events | `jarvis.db` | Availability, then confidentiality | Losing it is the most likely harm. It also shows where I will be and when. |
+| Tasks | `jarvis.db` | Availability | Annoying to lose, not secret. |
+| Notes and memory (Phase 5, planned) | `jarvis.db` | Integrity | Only trivial preferences (favourite food, places). A false "preference" would change how JARVIS behaves in every later conversation. |
+| Daily backups | `backups/`, 7 kept | Same as the database | Each one is a full copy of everything above. |
+| The log | `logs/jarvis.log` plus up to 5 older files of 1 MB each; also printed in the terminal | Confidentiality | Holds the first 300 characters of every message I send, and every tool call with its inputs and results. |
+| The current conversation | Server memory only | Low | Lost on restart, by design (plan.md, Phase 4). |
+| Voice recordings | A temporary file during transcription | Confidentiality | Deleted straight after, every time. |
+
+**Data copies itself.** One sentence typed to JARVIS can end up in the database, 7 backups,
+the log and the terminal. The weakest copy decides how safe it really is.
+
+## 2. Who could cause harm (threat actors)
+
+A threat actor is anyone or anything that could cause harm, including accidents.
+
+| Actor | How likely | Notes |
+|---|---|---|
+| **Hardware failure, loss or theft of the Mac** | Most likely | Takes the database and every backup at once, because they are on the same disk. |
+| **My own mistakes** (deleting the wrong thing, a bad migration) | Likely | Has happened once already (CHANGELOG section 23). |
+| **Software I install** (pip packages, Steam games, apps) | Possible | Runs with my permissions and can read every file JARVIS can. A compromised package update is called a *supply chain attack*. |
+| **A website in another browser tab** | Possible | Can send requests to `127.0.0.1:8000` while the server runs. |
+| **Text that tricks the model** (*prompt injection*) | Possible later | Today the model only sees what I type. Once news or web tools exist, outside text reaches it. |
+| **AI coding tools in this folder** (Claude Code) | Trusted, with limits | Can read `jarvis.db` and the log like any program I run. Controlled by CLAUDE.md and by my approval of what it runs, not by encryption. |
+| **Another person with the laptop** | Unlikely | I am the only user, and it locks when it sleeps. |
+| **Someone on the network** | Very unlikely today | The server listens only on this Mac. Becomes real in Phase 6. |
+
+## 3. Ways in (attack surface)
+
+- **The HTTP endpoints**: `/chat`, `/confirm`, `/calendar`, `/tasks`, `/transcribe`, `/speak`.
+  Reachable only from this Mac, but including from other browser tabs.
+- **Files on disk**: `jarvis.db`, `backups/`, `logs/`. Readable by anything running as me.
+- **The model**: anything it reads can try to steer it.
+- **Dependencies**: 72 packages in `requirements.txt`, about 10 chosen directly.
+- **Off-disk backups** (planned, see section 5): a new copy of the data outside this Mac.
+
+## 4. Controls in place today
+
+Each of these is in the code or the system and has been checked.
+
+| Control | Protects against |
+|---|---|
+| FileVault (whole-disk encryption) is on | A stolen or lost Mac while it is off or locked. Does **not** protect anything while I am logged in. |
+| Screen locks on sleep, password to wake | Someone using the Mac while I am away. Gap: the minutes before it sleeps. Habit: lock it when stepping away. |
+| Server listens on `127.0.0.1` only | Everything on the network. |
+| `TrustedHostMiddleware` allows only `127.0.0.1` and `localhost` | DNS rebinding (a website pretending to be this Mac). |
+| JSON endpoints refuse `text/plain` bodies (pinned by a test) | Other websites driving `/chat`, `/confirm` or `/tasks`. |
+| Deletes and edits only through a confirmation card and `POST /confirm` | The model deleting or changing events by itself. |
+| Input limits (upload size, text length, date ranges, calculator) | Requests that use up memory or time. |
+| Every SQL value goes through `?` parameters | SQL injection. |
+| Calculator parses with `ast`, never `eval` | Running arbitrary code through arithmetic. |
+| Pinned dependency versions | A bad new release being installed without my knowing. |
+| Daily backups, integrity-checked, 7 kept | Software mistakes and corruption. Not hardware loss (same disk). |
+| `jarvis.db`, `backups/`, `logs/`, `evals/results/`, `.env` are in `.gitignore` | Personal data being pushed to GitHub. |
+
+## 5. Decisions
+
+### Backups: encrypted, and a copy off this Mac (Phase 5, item 3)
+
+The biggest real risk is losing the Mac, which takes every backup with it. The plan:
+
+- Each daily backup is encrypted **before** it leaves the Mac, then a copy goes to iCloud
+  Drive. iCloud gives the offsite copy; the encryption means only I can read it. (Advanced
+  Data Protection is off, so without our own encryption Apple would hold the key.)
+- **Two keys** (public-key encryption). The **public key** stays on the Mac and can only lock
+  backups, so the 03:00 job can run unattended and a stolen public key opens nothing. The
+  **private key** can only unlock, and never lives on the Mac.
+- For each backup, a fresh random key encrypts the file (fast), and the public key locks
+  that small key (*hybrid* or *envelope* encryption).
+- The private key is kept **on paper**, for now. If it is lost, every encrypted backup is
+  lost with it: encryption trades some availability for confidentiality.
+- A restore script and a test prove a backup can be restored, and that a changed backup is
+  refused. A backup that has never been restored is not known to work.
+- Library: `cryptography` (a new dependency, still to be agreed before step 3).
+
+Later: Time Machine on an external drive, for the rest of the Mac as well.
+
+### Notes and memory (Phase 5, item 4)
+
+Notes are for **trivial preferences only**: favourite food, places, how I like replies.
+
+- **No passwords, codes or secrets.** `remember` refuses text that looks like one and
+  points to a password manager. A password in JARVIS would be in the database, the log, the
+  model's context, the screen, the speakers and 7 backups. Encrypting one of those copies
+  would not protect the others.
+- **Only I can make JARVIS remember something.** The model saves a note only when I ask
+  in my own message, never on its own, and never from text a tool returned. This protects
+  integrity.
+- **Recalled notes are data, not instructions.** The tool result says they are my saved
+  notes. Deletes and edits still need the confirmation card, so a planted note cannot act
+  on its own.
+- **`forget` uses the confirmation card**, like `delete_event`. A forgotten note can stay in
+  the backups for up to 7 days.
+- **The log never holds note text.** It records "note 12 saved, 84 characters" instead.
+- **`PRAGMA secure_delete`** is on, so a deleted note is wiped from the file instead of
+  only marked as free space.
+- **Limits** on note length and on how many notes one `recall` returns.
+- Notes stay searchable with SQLite FTS5. They are not encrypted on their own: at this
+  sensitivity, FileVault is enough on this Mac, and the backups are encrypted (above).
+
+## 6. Known gaps
+
+In rough order of importance.
+
+1. **Backups are on the same disk as the database.** Fixed by the backup plan in section 5.
+2. **The log holds message text** (first 300 characters of each message, and tool inputs
+   and results), in up to 6 MB of files and the terminal. Notes will be kept out of it
+   (section 5); other messages are a known trade-off for being able to debug.
+3. **`/transcribe` has no `Origin` check.** Another website can upload audio to it. It
+   cannot read the reply, but the check should exist (plan.md, Phase 6 item 1).
+4. **Files are readable by group and others** (`-rw-r--r--`). Low risk while I am the only
+   user, but `chmod 600` on the files and `700` on the folders is free.
+5. **Dependencies are pinned by version, not by hash.** A version on PyPI could in theory
+   be replaced; hash checking (`pip install --require-hashes`) would catch that.
+6. **No login and no HTTPS.** Acceptable only while the server stays on `127.0.0.1`.
+
+## 7. Accepted risks
+
+- **Software running as me can read `jarvis.db`.** JARVIS has to read it, so anything
+  running as me can too. Encrypting the database would not change this, because the key
+  would also be on the Mac. The controls are FileVault, installing little, and pinned
+  versions.
+- **AI coding tools can read personal data in this folder.** Accepted because I approve
+  what they run and CLAUDE.md sets the rules.
+
+## 8. When to revisit
+
+- Before Phase 6 (anything leaving `127.0.0.1`): the network becomes an attack surface, and
+  a login, HTTPS and the `Origin` check are needed first.
+- Before adding a tool that reads outside content (news, weather, web): prompt injection
+  becomes real.
+- If JARVIS is ever asked to hold something more sensitive than it does today.
+- If someone else starts using this Mac.

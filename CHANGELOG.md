@@ -56,6 +56,7 @@ jarvis/
 ├── README.md           Setup, run, tests, backups, pinned model
 ├── CLAUDE.md           Instructions for Claude Code when it works on this project
 ├── plan.md             The plan from Phase 2 onward
+├── SECURITY.md         Threat model: what JARVIS holds, who could harm it, what stops them
 └── CHANGELOG.md        This file
 ```
 
