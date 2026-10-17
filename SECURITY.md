@@ -75,21 +75,35 @@ Each of these is in the code or the system and has been checked.
 
 ### Backups: encrypted, and a copy off this Mac (Phase 5, item 3)
 
-The biggest real risk is losing the Mac, which takes every backup with it. The plan:
+The biggest real risk is losing the Mac, which takes every backup with it. Built
+(CHANGELOG section 32):
 
-- Each daily backup is encrypted **before** it leaves the Mac, then a copy goes to iCloud
-  Drive. iCloud gives the offsite copy; the encryption means only I can read it. (Advanced
-  Data Protection is off, so without our own encryption Apple would hold the key.)
-- **Two keys** (public-key encryption). The **public key** stays on the Mac and can only lock
-  backups, so the 03:00 job can run unattended and a stolen public key opens nothing. The
-  **private key** can only unlock, and never lives on the Mac.
-- For each backup, a fresh random key encrypts the file (fast), and the public key locks
-  that small key (*hybrid* or *envelope* encryption).
-- The private key is kept **on paper**, for now. If it is lost, every encrypted backup is
-  lost with it: encryption trades some availability for confidentiality.
-- A restore script and a test prove a backup can be restored, and that a changed backup is
-  refused. A backup that has never been restored is not known to work.
-- Library: `cryptography` (a new dependency, still to be agreed before step 3).
+- The project's rule changed with my agreement: nothing leaves the Mac **unencrypted**,
+  and only I hold the key. The encrypted backups are the only thing that leaves.
+- Each night, after the plain backup, `backup_db.py` writes an encrypted copy to
+  `backups/encrypted/` (30 kept). I copy that folder to iCloud Drive by hand (route B).
+  iCloud gives the offsite copy; the encryption means only I can read it. (Advanced Data
+  Protection is off, so without our own encryption Apple would hold the key.)
+- Why by hand: macOS privacy protection (TCC) blocks programs from iCloud Drive unless
+  allowed. The 03:00 job has no window to ask, and giving Python Full Disk Access would let
+  every Python script read everything. Still to test (route A): a copy made when I start the
+  server from Terminal, which may already have the permission.
+- **Two keys** (X25519 public-key encryption, `backup_crypto.py`). The **public key** is in
+  `backup_public_key.txt`, in git: it can only lock, so the 03:00 job runs unattended and a
+  stolen public key opens nothing. The **private key** can only unlock, and never lives on
+  the Mac.
+- Each file gets its own throwaway key pair and nonce. The header and throwaway public key
+  are covered by the tag, so nothing in the file can be changed without it being refused.
+- The private key is kept **on paper**, with a short check value to catch copying mistakes.
+  `backup_keys.py` makes me type it back before saving the public key. If the paper is lost,
+  every encrypted backup is lost with it (encryption trades some availability for
+  confidentiality); the plain local backups are unaffected.
+- `restore_backup.py` writes `jarvis-restored.db`, checks it, and never replaces
+  `jarvis.db`. AI tools must never run either script or see the private key (CLAUDE.md).
+- A failed encryption never costs the plain backup: it runs second, separately, and the
+  server's start-up does not encrypt at all.
+- Tested (`tests/test_backup.py`): round trip, wrong key, changed bytes, wrong version, cut-off
+  files, restore checks. Still to do by hand: a restore drill with the real paper key.
 
 Later: Time Machine on an external drive, for the rest of the Mac as well.
 
@@ -120,7 +134,8 @@ Notes are for **trivial preferences only**: favourite food, places, how I like r
 
 In rough order of importance.
 
-1. **Backups are on the same disk as the database.** Fixed by the backup plan in section 5.
+1. **Backups are on the same disk as the database.** Encrypted copies now exist (section 5),
+   but they only leave the Mac when I copy them to iCloud Drive by hand.
 2. **The log holds message text** (first 300 characters of each message, and tool inputs
    and results), in up to 6 MB of files and the terminal. Notes will be kept out of it
    (section 5); other messages are a known trade-off for being able to debug.

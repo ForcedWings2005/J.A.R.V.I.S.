@@ -6,3 +6,4 @@ ollama==0.6.3
 fastapi==0.143.0
 httpx2==2.13.1
 python-multipart==0.0.32
+cryptography==50.0.2

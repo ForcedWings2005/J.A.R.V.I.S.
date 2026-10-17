@@ -85,7 +85,8 @@ message. Cases live in `evals/cases.py`; results are saved to `evals/results/` (
 
 - The first time the server starts each day, it saves a snapshot to `backups/`
   before anything touches the database. The newest 7 days are kept.
-- `python backup_db.py` takes a fresh backup of today right now.
+- `python backup_db.py` takes a fresh backup of today right now, then an encrypted copy
+  of it. A launchd job runs it every night at 03:00.
 
 To restore (stop the server first):
 
@@ -93,6 +94,25 @@ To restore (stop the server first):
 cp jarvis.db jarvis.db.broken
 cp backups/jarvis-YYYY-MM-DD.db jarvis.db
 ```
+
+### Encrypted copies (for keeping off this Mac)
+
+The nightly run also saves an encrypted copy to `backups/encrypted/` (newest 30 kept).
+They are locked with the public key in `backup_public_key.txt`; only the private key, kept
+on paper, can open them. See `SECURITY.md` section 5 for why.
+
+Run these yourself, in your own Terminal (never through an AI tool: the private key must
+not leave this Mac).
+
+- **Once, to set up:** `python backup_keys.py`. It shows the private key once, asks you to
+  type it back from the paper, then saves only the public key.
+- **To keep them off this Mac:** copy `backups/encrypted/` into iCloud Drive in Finder,
+  for example once a week.
+- **To restore one:** `python restore_backup.py backups/encrypted/jarvis-YYYY-MM-DD.db.enc`.
+  It asks for the key without showing it, checks the result, and writes
+  `jarvis-restored.db`; it never replaces `jarvis.db` itself.
+- **Once after setting up, practise:** restore last night's copy with the paper key. A
+  backup that has never been restored is not known to work.
 
 ## Pinned model
 

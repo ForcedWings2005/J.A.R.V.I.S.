@@ -21,7 +21,11 @@ jarvis/
 ├── server.py           Web server (FastAPI): endpoints for the page
 ├── speech.py           Text-to-speech (Kokoro)
 ├── speech_text.py      Text clean-up before speaking: numbers, pronunciations
-├── backup_db.py        Backs up jarvis.db (SQLite backup API, 7 days kept)
+├── backup_db.py        Backs up jarvis.db (SQLite backup API, 7 days kept), then an encrypted copy
+├── backup_crypto.py   Encryption for backups: two keys (X25519), the file format
+├── backup_keys.py     Makes the backup key pair; run once by the owner only
+├── restore_backup.py  Opens an encrypted backup with the paper key; owner only
+├── backup_public_key.txt  The public key (only locks; meant to be in git)
 ├── static/
 │   └── index.html      The dashboard page
 ├── models/
@@ -42,7 +46,8 @@ jarvis/
 │   ├── test_server.py  Tests for the web endpoints
 │   ├── fakes.py        A fake model that plays back scripted replies
 │   ├── test_speech_text.py  Tests for the text clean-up before speaking
-│   └── test_evals.py   Tests for the eval suite's matching rules
+│   ├── test_evals.py   Tests for the eval suite's matching rules
+│   └── test_backup.py  Tests for backups: plain, encrypted, restore, keys
 ├── evals/              Model evaluation suite (python -m evals)
 │   ├── cases.py        The 30 cases
 │   ├── check.py        How a run is scored
@@ -560,6 +565,20 @@ The project folder moved from `~/Desktop/jarvis` to `~/Developer/jarvis` (2026-1
 - New dependency, agreed by the owner: `cryptography` 50.0.2, which brought `cffi` 2.1.1 and `pycparser` 3.11. Added to `requirements.txt`, not to `requirements-dev.txt`: nothing in the tests uses it yet.
 - Checked: experiments 1 and 5 run and print the expected results. Not checked: no tests cover the lab (experiments are outside the test suite, as before).
 
+## 32. Encrypted backups (Phase 5, item 3)
+
+Built test-first, as agreed with the owner, from the plan in `SECURITY.md` section 5.
+
+- **Every night, after the plain backup**, `backup_db.main()` writes an encrypted copy to `backups/encrypted/jarvis-YYYY-MM-DD.db.enc` and keeps the newest 30. The plain backup and its 7-day rule are unchanged, and the server's start-up still makes only the plain backup. If encryption fails, the plain backup is already saved and the job exits with code 1, so `/tmp/jarvis-backup.log` shows it.
+- **`backup_crypto.py`** does the locking: a throwaway X25519 key pair per file, HKDF, AES-GCM, a fresh nonce. File layout: `JARVISBK` + version 1, the throwaway public key, the nonce, then ciphertext and tag. The header and throwaway key are "associated data": not secret, but covered by the tag. `cryptography` is imported inside `encrypt_copy()`, not at the top of `backup_db.py`, so a broken library can never stop the server or the plain backup.
+- **`backup_keys.py`** (owner only, once): makes the key pair, shows the private key as 16 groups of 4 with an 8-character check value, clears the screen and scrollback, asks for the key to be typed back from paper, and only then saves the public key to `backup_public_key.txt`. It refuses to replace an existing public key.
+- **`restore_backup.py`** (owner only): asks for the key without echoing it, decrypts, runs `PRAGMA integrity_check`, writes `jarvis-restored.db`, never replaces `jarvis.db`, and never leaves a half-written file. If the key is wrong, it prints the typed key's check value, so a typo (checks differ) can be told apart from the wrong key (checks match).
+- **The project rule changed**, with the owner's agreement: "nothing leaves the machine unencrypted, and only the owner holds the key" (CLAUDE.md). CLAUDE.md also says AI tools must never run the two key scripts or see the private key, because anything a tool prints is sent off the Mac.
+- **Getting the files to iCloud is by hand for now** (route B). macOS privacy protection (TCC) refused even listing iCloud Drive from here; the 03:00 job has no window to ask for permission, and Full Disk Access for Python would open everything to every Python script.
+- Settings in `config.py`: `BACKUP_ENCRYPTED_DIR`, `BACKUP_ENCRYPTED_KEEP_DAYS = 30`, `BACKUP_PUBLIC_KEY`. `cryptography` added to `requirements-dev.txt` for CI. `jarvis-restored.db` is in `.gitignore`.
+- **`tests/test_backup.py`, 37 tests**, including the first tests of the existing plain backup (it had none). Each new behaviour was seen failing first; the "plain backup survives a failed encryption" test was also checked by breaking the code on purpose.
+- Not checked: no key pair exists yet (the owner makes it with `backup_keys.py`), so no real encrypted backup has been made or restored. Until then the nightly job prints "no public key yet" and carries on. Still to do: the restore drill with the paper key, and testing a copy to iCloud when the server starts from Terminal (route A).
+
 ---
 
 ## Status
@@ -581,6 +600,7 @@ The project folder moved from `~/Desktop/jarvis` to `~/Developer/jarvis` (2026-1
 | Editing and moving events (Phase 5, item 1), empty-reply retry | Done, merged into `main`; 257 tests; evals 130/132 (section 28); not yet tried in the real app; the retry has not yet triggered on the real model |
 | Model eval suite (Phase 2) | Done, merged into `main`; baseline 80/90 runs, 90/90 after fixes (sections 21, 22) |
 | Decimals in speech | Fixed and tested against Kokoro's phonemes; not yet heard in a real conversation (section 22) |
+| Encrypted backups (Phase 5, item 3) | Built and tested (37 tests, section 32); waiting for the owner to make the key pair; restore drill and iCloud copy not done yet |
 
 ## Known limits
 
