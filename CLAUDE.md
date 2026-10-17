@@ -2,7 +2,8 @@
 
 JARVIS is a private assistant that runs entirely on one Mac: a FastAPI server, a single-page
 dashboard (calendar, to-do list, chat, voice), a local language model through Ollama, and
-SQLite. Nothing should leave the machine. The owner is learning Python and software
+SQLite. Nothing leaves the machine unencrypted, and only the owner holds the key (today the
+only thing that leaves is the encrypted backup copy). The owner is learning Python and software
 engineering, so explanations matter as much as the code.
 
 Read `README.md` (setup, running), `CHANGELOG.md` (history, incidents, status), `plan.md`
@@ -37,7 +38,8 @@ is checked in code, never left to the model.** The model chooses tools; code val
 | `tasks.py`, `calc.py` | To-do list; safe arithmetic (parses the expression with `ast`, never `eval`). |
 | `server.py` | Endpoints `/`, `/chat` (NDJSON stream), `/confirm`, `/calendar`, `/tasks`, `/tasks/{id}`, `/transcribe`, `/speak`; logging setup at start-up. |
 | `speech.py`, `speech_text.py` | Kokoro synthesis; text clean-up before speaking (numbers, pronunciations). |
-| `backup_db.py` | Daily SQLite backup via the backup API, integrity-checked, 7 kept. |
+| `backup_db.py` | Daily SQLite backup via the backup API, integrity-checked, 7 kept; the nightly run (`main()`) then makes an encrypted copy, 30 kept. |
+| `backup_crypto.py`, `backup_keys.py`, `restore_backup.py` | Encrypted backups: lock/unlock and the file format; making the key pair (owner only); restoring (owner only). |
 | `evals/` | Model evaluation suite (`python -m evals`). Cases in `cases.py`, scoring in `check.py`. |
 | `tests/` | pytest. `conftest.py` sets up the in-memory database and frozen clock; `fakes.py` has `FakeModel`. |
 | `experiments/` | Old scripts, not part of the app, excluded from ruff. Do not run `agent.py` from the project root (it opens `jarvis.db`). |
@@ -98,6 +100,10 @@ of the risk and the owner's agreement first.
   `evals/results/` are in `.gitignore`. Never commit them, paste their contents into docs or
   commit messages, or log secrets. There are no API keys today; if one is ever needed it goes
   in `.env` (already ignored), never in code.
+- Encrypted backups: the private key exists only on paper. **Never run `backup_keys.py` or
+  `restore_backup.py`, and never ask for, read or handle the private key:** anything a tool
+  run prints is sent off this Mac. The owner runs both in their own Terminal.
+  `backup_public_key.txt` is meant to be in git (it can only lock); never replace it.
 
 ## Database changes
 

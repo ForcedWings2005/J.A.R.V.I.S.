@@ -27,3 +27,7 @@ backups/
 # Eval run results (local, one JSON file per run)
 evals/results/
 logs/
+
+# A restored backup is personal data too
+jarvis-restored.db
+jarvis-restored.tmp

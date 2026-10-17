@@ -118,6 +118,8 @@ reported.
 3. **Encrypted backups off this Mac.** Before notes. Each daily backup is encrypted with a
    public key (the private key is on paper, never on the Mac), then copied to iCloud Drive.
    A restore script and a test that a restore works. Details in `SECURITY.md` section 5.
+   *Built: CHANGELOG section 32. Copied to iCloud by hand for now; still to test copying
+   it when the server starts from Terminal, and to do a restore drill with the paper key.*
 4. **Notes and memory.** `remember` and `recall` tools backed by a table with SQLite's FTS5
    full-text search. Start with that before reaching for embeddings. Trivial preferences
    only, and the rules in `SECURITY.md` section 5: no secrets, saved only when I ask, `forget`

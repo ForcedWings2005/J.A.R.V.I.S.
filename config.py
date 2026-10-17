@@ -13,6 +13,11 @@ ROOT = Path(__file__).resolve().parent
 DB_PATH = os.environ.get("JARVIS_DB", str(ROOT / "jarvis.db"))
 BACKUP_DIR = ROOT / "backups"
 BACKUP_KEEP_DAYS = 7
+# Encrypted copies, made for leaving this Mac (SECURITY.md section 5). Locked with the
+# public key below; the private key that unlocks them is on paper, never on this Mac.
+BACKUP_ENCRYPTED_DIR = BACKUP_DIR / "encrypted"
+BACKUP_ENCRYPTED_KEEP_DAYS = 30
+BACKUP_PUBLIC_KEY = ROOT / "backup_public_key.txt"
 LOG_DIR = ROOT / "logs"
 STATIC_DIR = ROOT / "static"
 MODELS_DIR = ROOT / "models"
