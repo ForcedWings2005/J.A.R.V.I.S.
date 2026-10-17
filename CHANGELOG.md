@@ -600,7 +600,7 @@ Built test-first, as agreed with the owner, from the plan in `SECURITY.md` secti
 | Editing and moving events (Phase 5, item 1), empty-reply retry | Done, merged into `main`; 257 tests; evals 130/132 (section 28); not yet tried in the real app; the retry has not yet triggered on the real model |
 | Model eval suite (Phase 2) | Done, merged into `main`; baseline 80/90 runs, 90/90 after fixes (sections 21, 22) |
 | Decimals in speech | Fixed and tested against Kokoro's phonemes; not yet heard in a real conversation (section 22) |
-| Encrypted backups (Phase 5, item 3) | Built and tested (37 tests, section 32); waiting for the owner to make the key pair; restore drill and iCloud copy not done yet |
+| Encrypted backups (Phase 5, item 3) | Built and tested (37 tests, section 32); key pair made 2026-10-17 (public key in git, private key on paper); first encrypted copy due at 03:00; restore drill and iCloud copy not done yet |
 
 ## Known limits
 
