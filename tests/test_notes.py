@@ -181,3 +181,15 @@ def test_forget_checks_again_when_the_button_is_clicked():
     notes.forget("sushi").apply()
     assert "already gone" in card.apply()
     assert saved() == []
+
+
+# --- the model sends null instead of text (seen in the evals, CHANGELOG section 34) ----
+
+def test_recall_with_null_lists_the_latest_notes():
+    save("Favourite food is sushi")
+    assert "Favourite food is sushi" in notes.recall(None)
+
+
+def test_remember_and_forget_with_null_return_an_error_instead_of_crashing():
+    assert notes.remember(None).startswith("Error:")
+    assert notes.forget(None).startswith("Error:")

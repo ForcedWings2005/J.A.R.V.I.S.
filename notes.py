@@ -46,7 +46,8 @@ def _terms(words: str) -> list[str]:
     where FTS5 treats it as a plain word. The * after the quotes finds the start of a
     word: "restaurant" also finds "restaurants".
     """
-    unique = dict.fromkeys(re.findall(r"\w+", words.lower()))
+    # The model sometimes sends null instead of an empty string
+    unique = dict.fromkeys(re.findall(r"\w+", (words or "").lower()))
     return [f'"{w}"*' for w in unique]
 
 
@@ -77,7 +78,7 @@ def _label(found: list[str]) -> str:
       "The user must confirm on screen before it is saved.",
       text={"type": "string", "description": "The note, in a few plain words"})
 def remember(text: str):
-    text = " ".join(text.split())
+    text = " ".join((text or "").split())     # the model may send null
     if not text:
         return "Error: the note is empty."
     if len(text) > config.NOTE_MAX_CHARS:
