@@ -45,9 +45,19 @@ def _durations_and_repeats(c):
             c.execute(f"ALTER TABLE events ADD COLUMN {name} {ddl}")
 
 
+def _notes(c):
+    # FTS5 is SQLite's full-text search: it keeps an index of every word, so a note can be
+    # found by any word in it. created is stored but not indexed.
+    c.execute("CREATE VIRTUAL TABLE IF NOT EXISTS notes USING fts5(text, created UNINDEXED)")
+    # Make FTS5 wipe a deleted note's words from its index at once, instead of leaving
+    # them until the index is next tidied up (SECURITY.md section 5)
+    c.execute("INSERT INTO notes (notes, rank) VALUES ('secure-delete', 1)")
+
+
 MIGRATIONS = [
     _initial_tables,            # 1
     _durations_and_repeats,     # 2
+    _notes,                     # 3
 ]
 
 
@@ -73,6 +83,9 @@ def migrate(c) -> int:
 
 def connect(path: str) -> sqlite3.Connection:
     c = sqlite3.connect(path, check_same_thread=False)
+    # Deleted rows are overwritten with zeros, not just marked as free space, so a
+    # forgotten note cannot be read back from the file. A connection setting: not saved.
+    c.execute("PRAGMA secure_delete = ON")
     migrate(c)
     return c
 
