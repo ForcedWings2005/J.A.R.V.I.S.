@@ -41,6 +41,10 @@ HISTORY_KEEP_TOKENS = 30_000
 # A delete card left unanswered this long can no longer be confirmed (ask again instead).
 CONFIRM_TIMEOUT_SECONDS = 300
 
+# Notes and memory (SECURITY.md section 5): trivial preferences, never secrets
+NOTE_MAX_CHARS = 300
+NOTES_RECALL_LIMIT = 5     # notes given to the model per recall
+
 # Speech
 STT_MODEL = "mlx-community/whisper-large-v3-turbo"
 MAX_AUDIO_BYTES = 10_000_000

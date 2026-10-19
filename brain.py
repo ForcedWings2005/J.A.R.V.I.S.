@@ -17,6 +17,7 @@ import tools
 import jcal  # noqa: F401, E402
 import tasks  # noqa: F401, E402
 import calc  # noqa: F401, E402
+import notes  # noqa: F401, E402
 
 log = logging.getLogger("jarvis.brain")
 

@@ -15,6 +15,8 @@ import pytest  # noqa: E402
 
 import database  # noqa: E402
 import jcal  # noqa: E402
+# Registers every tool in the order the app uses, whichever test file runs first
+import brain  # noqa: E402, F401
 
 
 class Clock:
