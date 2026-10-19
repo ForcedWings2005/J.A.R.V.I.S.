@@ -34,6 +34,7 @@ def clock(monkeypatch):
         database.conn.execute("DELETE FROM events")
         database.conn.execute("DELETE FROM event_exceptions")
         database.conn.execute("DELETE FROM tasks")
+        database.conn.execute("DELETE FROM notes")
         database.conn.commit()
 
     fake = Clock()

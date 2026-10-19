@@ -84,3 +84,54 @@ def test_newer_database_than_the_code_is_refused():
     c.execute(f"PRAGMA user_version = {LATEST + 1}")
     with pytest.raises(RuntimeError, match="newer than this code"):
         database.migrate(c)
+
+
+# --- Step 3: notes (full-text search) --------------------------------------------------
+
+def test_new_database_has_a_searchable_notes_table():
+    c = sqlite3.connect(":memory:")
+    database.migrate(c)
+    c.execute("INSERT INTO notes (text, created) VALUES ('Favourite food is sushi', '2030-01-07')")
+    found = c.execute("SELECT text FROM notes WHERE notes MATCH 'sushi'").fetchall()
+    assert found == [("Favourite food is sushi",)]
+
+
+def test_version_2_database_keeps_its_data_and_gains_notes(monkeypatch):
+    """The real jarvis.db today: version 2, with events and tasks in it."""
+    c = sqlite3.connect(":memory:")
+    monkeypatch.setattr(database, "MIGRATIONS", database.MIGRATIONS[:2])
+    database.migrate(c)
+    c.execute("INSERT INTO events (title, date, time) VALUES ('Dentist', '2030-01-08', '15:00')")
+    c.execute("INSERT INTO tasks (title) VALUES ('Buy milk')")
+    c.commit()
+    monkeypatch.undo()
+
+    assert database.version(c) == 2
+    assert database.migrate(c) == LATEST
+    assert c.execute("SELECT title FROM events").fetchall() == [("Dentist",)]
+    assert c.execute("SELECT title FROM tasks").fetchall() == [("Buy milk",)]
+    assert c.execute("SELECT count(*) FROM notes").fetchone() == (0,)
+
+
+def test_notes_index_wipes_deleted_words():
+    """FTS5's own secure-delete option, stored in the table's settings."""
+    c = sqlite3.connect(":memory:")
+    database.migrate(c)
+    assert c.execute("SELECT v FROM notes_config WHERE k = 'secure-delete'").fetchone() == (1,)
+
+
+def test_connections_overwrite_deleted_data():
+    assert database.conn.execute("PRAGMA secure_delete").fetchone() == (1,)
+
+
+def test_a_forgotten_note_is_gone_from_the_file_itself(tmp_path):
+    """Read the raw bytes of the database file: the words must not be anywhere in it."""
+    path = tmp_path / "jarvis.db"
+    c = database.connect(str(path))
+    c.execute("INSERT INTO notes (text, created) VALUES ('Prefers window seats xyzzy', '2030-01-07')")
+    c.commit()
+    assert b"xyzzy" in path.read_bytes()
+    c.execute("DELETE FROM notes WHERE notes MATCH 'xyzzy'")
+    c.commit()
+    c.close()
+    assert b"xyzzy" not in path.read_bytes()
