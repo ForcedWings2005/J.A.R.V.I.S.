@@ -15,6 +15,7 @@ from typing import Callable
 
 FUNCTIONS: dict = {}    # name -> function
 SCHEMAS: list = []      # what the model is shown, in registration order
+PRIVATE: set = set()    # tools whose arguments and results the log records only as lengths
 
 
 @dataclass
@@ -23,6 +24,7 @@ class NeedsConfirmation:
     card: str                   # the question on the confirmation card
     apply: Callable[[], str]    # runs on Confirm; returns what to tell the user
     reply: str                  # the tool result the model sees meanwhile
+    private: bool = False       # if True, the log never records the card's text
 
 
 def tool(description: str, **properties):

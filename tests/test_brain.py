@@ -11,6 +11,7 @@ import pytest
 import brain
 import config
 import jcal
+import notes
 import tasks
 import tools
 from fakes import FakeModel, call, say, use
@@ -229,6 +230,34 @@ def test_turns_and_tool_calls_are_logged(caplog):
     assert "reply: Added, sir. [2 rounds, 1 tools, first text" in caplog.text
 
 
+def test_note_text_never_reaches_the_log_when_saving(caplog):
+    """SECURITY.md: the log records a note's length, never its words, for tool calls and cards."""
+    caplog.set_level("INFO", logger="jarvis")
+    model = FakeModel(use(call("remember", text="Favourite food is xyzzy")),
+                      say("Please confirm on screen, sir."))
+    a = brain.Assistant(chat=model)
+    events, _ = run(a, "Note that down")
+    a.resolve_pending(events[-1]["confirm"]["id"], True)
+    assert notes.recall("xyzzy").endswith("Favourite food is xyzzy")     # it was saved
+    assert "tool remember(23 characters)" in caplog.text
+    assert "confirmation approved" in caplog.text
+    assert "xyzzy" not in caplog.text
+
+
+def test_note_text_never_reaches_the_log_when_recalling_or_forgetting(caplog):
+    notes.remember("Prefers window seats").apply()
+    caplog.set_level("INFO", logger="jarvis")
+    model = FakeModel(use(call("recall", about="seats")), say("Noted, sir."),
+                      use(call("forget", about="seats")), say("Please confirm, sir."))
+    a = brain.Assistant(chat=model)
+    run(a, "What do I like?")
+    events, _ = run(a, "Drop that one")
+    a.resolve_pending(events[-1]["confirm"]["id"], True)
+    assert notes.recall() == "No saved notes yet."                       # it was forgotten
+    assert "tool recall(5 characters)" in caplog.text
+    assert "window" not in caplog.text and "seats" not in caplog.text
+
+
 def test_a_crashing_tool_is_logged_with_its_traceback(caplog, monkeypatch):
     def boom():
         raise RuntimeError("disk on fire")
@@ -357,6 +386,18 @@ def test_an_old_confirmation_can_no_longer_be_used():
     assert a.resolve_pending(pid, True).startswith("That request has expired, so nothing was changed")
     assert "Dentist" in jcal.get_events("2030-01-08")
     assert a.resolve_pending(pid, True) == "That request has expired or was already handled."
+
+
+def test_an_expired_note_card_is_logged_without_its_text(caplog):
+    caplog.set_level("INFO", logger="jarvis")
+    model = FakeModel(use(call("remember", text="Likes xyzzy jazz")), say("Please confirm, sir."))
+    a = brain.Assistant(chat=model)
+    run(a, "Note that down")
+    pid, request, made = a.pending
+    a.pending = (pid, request, made - config.CONFIRM_TIMEOUT_SECONDS - 1)
+    assert a.resolve_pending(pid, True).startswith("That request has expired")
+    assert "confirmation expired unanswered" in caplog.text
+    assert "xyzzy" not in caplog.text
 
 
 def test_a_confirmation_just_inside_the_time_limit_still_works():

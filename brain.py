@@ -254,11 +254,17 @@ class Assistant:
             self.pending = None
             # monotonic() only counts forward, so changing the Mac's clock cannot affect this
             if time.monotonic() - made > config.CONFIRM_TIMEOUT_SECONDS:
-                log.info("confirmation expired unanswered: %s", request.card)
+                log.info("confirmation expired unanswered: %s",
+                         f"a private card ({len(request.card)} characters)"
+                         if request.private else request.card)
                 return "That request has expired, so nothing was changed. Ask me again if you still want it."
             text = request.apply() if approve else "Okay, I left it alone."
-            log.info("confirmation %s: %s -> %s", "approved" if approve else "cancelled",
-                     request.card, text)
+            if request.private:
+                log.info("confirmation %s: a private card (%d characters)",
+                         "approved" if approve else "cancelled", len(request.card))
+            else:
+                log.info("confirmation %s: %s -> %s", "approved" if approve else "cancelled",
+                         request.card, text)
             self.messages.append({"role": "assistant", "content": text})
             return text
 
@@ -319,9 +325,14 @@ class Assistant:
                     for call in calls:
                         t0 = time.perf_counter()
                         result = self.run_tool(call)
-                        log.info("tool %s(%s) -> %s [%.0f ms]", call.function.name,
-                                 _short(call.function.arguments), _short(result),
-                                 (time.perf_counter() - t0) * 1000)
+                        ms = (time.perf_counter() - t0) * 1000
+                        if call.function.name in tools.PRIVATE:
+                            words = " ".join(str(v) for v in call.function.arguments.values())
+                            log.info("tool %s(%d characters) -> %d characters [%.0f ms]",
+                                     call.function.name, len(words), len(result), ms)
+                        else:
+                            log.info("tool %s(%s) -> %s [%.0f ms]", call.function.name,
+                                     _short(call.function.arguments), _short(result), ms)
                         step = describe_step(call, result)
                         steps.append(step)
                         self.messages.append({
