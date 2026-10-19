@@ -1,7 +1,8 @@
 # JARVIS
 
 A private personal assistant that runs entirely on this Mac: a web dashboard with a
-calendar, to-do list, voice input and spoken replies. Nothing leaves the machine.
+calendar, to-do list, notes, voice input and spoken replies. Nothing leaves the machine
+unencrypted (only the encrypted backups, see below).
 
 ## How the pieces fit
 
@@ -52,6 +53,19 @@ Open http://127.0.0.1:8000 and hard refresh with Cmd+Shift+R.
   you said to JARVIS, so it stays on this Mac; `logs/` is not in git.
 - When JARVIS does something odd, check the log for what it actually did. Its own
   explanation afterwards is a guess, not a record.
+- The note tools are logged as lengths only, never their words (see Notes below).
+
+## Notes
+
+Tell JARVIS small facts and preferences to keep: "remember that my favourite food is
+sushi". It uses them when they matter ("what should I have for dinner?"), or ask "what do
+you remember about me?".
+
+- Saving and forgetting show a card; nothing changes until you click it.
+- "Remember **to** call the bank" is a to-do task, not a note.
+- Passwords, PINs and other secrets are refused: keep them in a password manager.
+- A forgotten note is wiped from `jarvis.db`, but old backups keep it for up to 7 days
+  (plain) or 30 days (encrypted), and copies in iCloud Drive until you delete them.
 
 ## Tests and checks
 

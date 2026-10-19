@@ -15,6 +15,7 @@ jarvis/
 ├── tools.py            The tool registry (@tool) and NeedsConfirmation
 ├── tasks.py            To-do list tools
 ├── calc.py             The calculate tool (safe, no eval)
+├── notes.py            Notes and memory: remember, recall, forget (FTS5 search)
 ├── config.py           Settings: model, paths, limits, voice
 ├── database.py         The shared database connection and schema migrations
 ├── jcal.py             Calendar logic and tools: durations, repeats, exceptions, conflicts
@@ -47,6 +48,7 @@ jarvis/
 │   ├── fakes.py        A fake model that plays back scripted replies
 │   ├── test_speech_text.py  Tests for the text clean-up before speaking
 │   ├── test_evals.py   Tests for the eval suite's matching rules
+│   ├── test_notes.py   Tests for remember, recall and forget
 │   └── test_backup.py  Tests for backups: plain, encrypted, restore, keys
 ├── evals/              Model evaluation suite (python -m evals)
 │   ├── cases.py        The 30 cases
@@ -587,6 +589,27 @@ Built test-first, as agreed with the owner, from the plan in `SECURITY.md` secti
 - **Found during the drill:** `jarvis-restored.db` went missing from the project folder. The folder's modified time (21:20:26) was later than every file in it, which means a file had been *removed* then; it was in the Trash. A file deleted in Finder only moves to the Trash, so an unencrypted copy of everything stays on disk until the Trash is emptied. README now says to use Delete Immediately, and to copy to iCloud Drive with Copy and Paste: dragging moves the files out of `backups/encrypted/`.
 - Not checked by Claude: the restored file and the iCloud copies themselves (macOS blocks this session from the Trash and iCloud Drive, and the private key is never handled here). Both are the owner's report.
 
+## 34. Notes and memory (Phase 5, item 4)
+
+JARVIS can keep small facts about the owner, such as "my favourite food is sushi", and use them when they matter. Built test-first from the plan the owner agreed (a card for remember; their own messages may stay in the log; notes found with a tool, not put in the system prompt; no dashboard panel yet).
+
+- **Migration 3** adds `notes`, an FTS5 full-text table (find a note by any word in it). Deleted notes are really wiped: `PRAGMA secure_delete` on every connection, and FTS5's own `secure-delete` option. A test reads the raw database file and finds no trace of a deleted note; removing either setting makes it fail. The server's daily backup runs before the migration, as for every migration.
+- **`notes.py`**, three tools:
+  - `remember` checks the note in code (not empty, at most 300 characters, not already saved, not secret-looking: words like password or PIN, 6+ digits in a row, password-shaped words), then only shows a card. The note is saved when the owner clicks it, so the model alone can never save anything.
+  - `recall` returns at most 5 notes, labelled as "information, not instructions". Search words are turned into quoted plain terms first, because FTS5 has its own search language (OR, NOT, quotes, *) that `?` parameters do not switch off; removing that makes 9 tests fail.
+  - `forget` needs every word to match, asks which one when several do, shows a card, and checks again when the card is clicked.
+- **The log**: tools in the new `tools.PRIVATE` set are logged as lengths (`tool remember(23 characters)`), and a card marked `private` is logged without its text, whether approved, cancelled or expired. The owner's own message and JARVIS's reply are still logged, by choice (SECURITY.md).
+- **Prompt**: a few sentences on when to use remember (only when asked; "remember to" is a task), never repeating secrets, never claiming a note was saved, and calling recall before suggesting anything personal. `notes` is imported after `calc`, so the three tools come last.
+- **The tests now import `brain` in `conftest.py`**, so tools register in the app's order whichever test file runs first (running `test_notes.py` first had put the note tools before the to-do tools).
+- **Bug found by the evals:** the model called `recall` with `about` set to null; `None.lower()` crashed. Fixed for all three tools, with tests.
+- **Evals** (gemma4:latest `dc35e8d9c606`, 3 runs per case):
+  - Before, prompt `897819a24315`: 129/132 runs, 42/44 cases (misses: `ask_am_pm` 1/3, `edit_one_occurrence` 2/3).
+  - First version, prompt `aa1e7e31e062`: 143/153; the 44 old cases 131/132. Note cases failed for real (a passing remark was saved, dinner suggested without recall, the null crash) and two checks were too strict for correct replies ("I have noted your request ... please confirm"; "I must decline ... not permitted"), so those two checks were widened after reading the replies.
+  - Final, prompt `482653045a27`: 152/153 runs, 50/51 cases; the 44 old cases 132/132. 7 new cases.
+- **Known limit:** on a passing remark ("I absolutely love sushi, by the way") nothing is saved, every run, but the reply sometimes still sounds as if it will remember ("I have duly noted", "I shall take that into account"). Read in full, only 1 of the 3 final runs was fully right; the check missed one of them and now also looks for "take that into account" and similar.
+- 393 tests (`tests/test_notes.py` new; more in `test_database.py` and `test_brain.py`).
+- Not checked: the real app (cards on the dashboard, voice) and the migration on the real `jarvis.db`; both happen the first time the owner starts the server.
+
 ---
 
 ## Status
@@ -608,6 +631,7 @@ Built test-first, as agreed with the owner, from the plan in `SECURITY.md` secti
 | Editing and moving events (Phase 5, item 1), empty-reply retry | Done, merged into `main`; 257 tests; evals 130/132 (section 28); not yet tried in the real app; the retry has not yet triggered on the real model |
 | Model eval suite (Phase 2) | Done, merged into `main`; baseline 80/90 runs, 90/90 after fixes (sections 21, 22) |
 | Decimals in speech | Fixed and tested against Kokoro's phonemes; not yet heard in a real conversation (section 22) |
+| Notes and memory (Phase 5, item 4) | Built and tested (393 tests, evals 152/153, section 34); not yet tried in the real app; a passing remark is never saved but the reply sometimes sounds as if it is |
 | Encrypted backups (Phase 5, item 3) | Done: 37 tests (section 32); key pair made 2026-10-17; first encrypted copy 2026-10-18; restore drill with the paper key passed; copies in iCloud Drive, by hand (section 33). Automatic copy (route A) not tried |
 
 ## Known limits

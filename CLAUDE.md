@@ -18,11 +18,12 @@ static/index.html ──HTTP, 127.0.0.1 only──> server.py (FastAPI)
                                               │     └─ runs tools from tools.FUNCTIONS
                                               │          ├─ jcal.py   get_events, add_event, delete_event, update_event
                                               │          ├─ tasks.py  add_task, list_tasks, complete_task
-                                              │          └─ calc.py   calculate
+                                              │          ├─ calc.py   calculate
+                                              │          └─ notes.py  remember, recall, forget
                                               ├─ speech.py (Kokoro, loaded on first use) + speech_text.py
                                               ├─ mlx_whisper (imported on first /transcribe)
                                               └─ backup_db.py (runs at import, before the database opens)
-            jcal.py, tasks.py ──> database.py (one connection + one lock) ──> jarvis.db
+            jcal.py, tasks.py, notes.py ──> database.py (one connection + one lock) ──> jarvis.db
 ```
 
 The core rule: **anything that must be right (dates, times, conflicts, deletes, arithmetic)
@@ -36,6 +37,7 @@ is checked in code, never left to the model.** The model chooses tools; code val
 | `brain.py` | `build_system_prompt()` and `Assistant`: the conversation, the tool loop (capped at `MAX_ROUNDS`), the pending confirmation. |
 | `jcal.py` | Calendar logic: durations, repeats (stored as one row, expanded on read), exceptions, conflicts, finished/upcoming labels. |
 | `tasks.py`, `calc.py` | To-do list; safe arithmetic (parses the expression with `ast`, never `eval`). |
+| `notes.py` | Notes and memory (FTS5 search). Trivial preferences only; secrets refused; saving and forgetting go through the confirmation card. |
 | `server.py` | Endpoints `/`, `/chat` (NDJSON stream), `/confirm`, `/calendar`, `/tasks`, `/tasks/{id}`, `/transcribe`, `/speak`; logging setup at start-up. |
 | `speech.py`, `speech_text.py` | Kokoro synthesis; text clean-up before speaking (numbers, pronunciations). |
 | `backup_db.py` | Daily SQLite backup via the backup API, integrity-checked, 7 kept; the nightly run (`main()`) then makes an encrypted copy, 30 kept. |
@@ -52,7 +54,8 @@ each one, appends the result as a `tool` message, and the model is called again,
 `MAX_ROUNDS` tool rounds. Events streamed to the page: `delta`, `step`, `break`, `done`, `error`.
 
 ### Destructive actions: the confirmation path
-`delete_event` never deletes and `update_event` never changes anything. Each returns
+`delete_event` never deletes, `update_event` never changes anything, and `remember` and
+`forget` never save or delete a note. Each returns
 `NeedsConfirmation(card, apply, reply)`. `Assistant`
 stores it under a random id and shows a card; only `POST /confirm` (the on-screen buttons)
 calls `apply()`. **The model must never be able to confirm, skip or trigger `apply()` itself.**
@@ -73,7 +76,9 @@ Any new tool that deletes, overwrites or sends something must use this same path
 - Every database access holds `database.lock` (imported as `lock`).
 - A new tool: write the function with `@tool(description, arg=schema, ...)` in the module that
   owns it. Arguments without a default become required. The import order in `brain.py`
-  (`jcal`, `tasks`, `calc`) is the order the model sees the tools; changing it changes the prompt.
+  (`jcal`, `tasks`, `calc`, `notes`) is the order the model sees the tools; changing it changes
+  the prompt. A tool that handles private text adds its name to `tools.PRIVATE` (the log then
+  records only lengths) and sets `private=True` on its `NeedsConfirmation`.
 - Replies are spoken aloud: the system prompt asks for plain speech, no markdown.
 - Match the style of the file you are in. Comments and docs are plain English, short sentences.
 
@@ -126,7 +131,7 @@ Run from the project folder with the venv active (`source .venv/bin/activate`):
 ruff check .            # lint
 python -m pytest -q     # all tests, under a second; never touches jarvis.db or a model
 python -m evals --runs 1 -k <name>   # quick live check of some model cases (needs Ollama)
-python -m evals         # full suite, 43 cases x 3 runs, about 15 minutes
+python -m evals         # full suite, 51 cases x 3 runs, about 18 minutes
 ```
 
 - The pre-commit hook (installed) runs ruff and pytest on every commit with Python files.

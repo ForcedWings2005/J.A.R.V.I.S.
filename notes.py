@@ -74,7 +74,8 @@ def _label(found: list[str]) -> str:
 
 
 @tool("Ask to save a short note about the user, such as a preference. Only when the user "
-      "asks you to remember something. Never for passwords, PINs or other secrets. "
+      "asks you to remember something, never for a passing remark. Never for passwords, "
+      "PINs or other secrets. "
       "The user must confirm on screen before it is saved.",
       text={"type": "string", "description": "The note, in a few plain words"})
 def remember(text: str):
@@ -106,8 +107,8 @@ def remember(text: str):
     )
 
 
-@tool("Look up the user's saved notes, such as preferences. Use it when a preference "
-      "could change your answer, for example food, places or how they like replies.",
+@tool("Look up the user's saved notes, such as preferences. Call it before suggesting "
+      "food, meals, restaurants, places, gifts or plans, and when asked what you remember.",
       about={"type": "string", "description": "Words to search for; empty for the latest notes"})
 def recall(about: str = "") -> str:
     limit = config.NOTES_RECALL_LIMIT

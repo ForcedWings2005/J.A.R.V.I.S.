@@ -30,6 +30,7 @@ class Case:
     before: list = field(default_factory=list)
     events: list = field(default_factory=list)      # events in the calendar beforehand
     tasks: list = field(default_factory=list)       # open tasks beforehand
+    notes: list = field(default_factory=list)       # saved notes beforehand
 
 
 # JARVIS often asks politely without a question mark: "I will require a specific time."
