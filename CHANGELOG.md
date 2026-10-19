@@ -579,6 +579,14 @@ Built test-first, as agreed with the owner, from the plan in `SECURITY.md` secti
 - **`tests/test_backup.py`, 37 tests**, including the first tests of the existing plain backup (it had none). Each new behaviour was seen failing first; the "plain backup survives a failed encryption" test was also checked by breaking the code on purpose.
 - Not checked: no key pair exists yet (the owner makes it with `backup_keys.py`), so no real encrypted backup has been made or restored. Until then the nightly job prints "no public key yet" and carries on. Still to do: the restore drill with the paper key, and testing a copy to iCloud when the server starts from Terminal (route A).
 
+## 33. Restore drill passed, first copies off the Mac
+
+- **The nightly job made the first encrypted backup** on 2026-10-18 at 03:00 (`backup: encrypted jarvis-2026-10-18.db.enc` in `/tmp/jarvis-backup.log`), with the public key the owner made the day before.
+- **Restore drill: passed.** The owner ran `restore_backup.py` on that file with the paper key, in their own Terminal. It printed "Restored and checked", so the key on paper is right and the whole chain works: locked on the Mac without the private key, opened only with it.
+- **The first copies are in iCloud Drive**, copied by the owner by hand.
+- **Found during the drill:** `jarvis-restored.db` went missing from the project folder. The folder's modified time (21:20:26) was later than every file in it, which means a file had been *removed* then; it was in the Trash. A file deleted in Finder only moves to the Trash, so an unencrypted copy of everything stays on disk until the Trash is emptied. README now says to use Delete Immediately, and to copy to iCloud Drive with Copy and Paste: dragging moves the files out of `backups/encrypted/`.
+- Not checked by Claude: the restored file and the iCloud copies themselves (macOS blocks this session from the Trash and iCloud Drive, and the private key is never handled here). Both are the owner's report.
+
 ---
 
 ## Status
@@ -600,7 +608,7 @@ Built test-first, as agreed with the owner, from the plan in `SECURITY.md` secti
 | Editing and moving events (Phase 5, item 1), empty-reply retry | Done, merged into `main`; 257 tests; evals 130/132 (section 28); not yet tried in the real app; the retry has not yet triggered on the real model |
 | Model eval suite (Phase 2) | Done, merged into `main`; baseline 80/90 runs, 90/90 after fixes (sections 21, 22) |
 | Decimals in speech | Fixed and tested against Kokoro's phonemes; not yet heard in a real conversation (section 22) |
-| Encrypted backups (Phase 5, item 3) | Built and tested (37 tests, section 32); key pair made 2026-10-17 (public key in git, private key on paper); first encrypted copy due at 03:00; restore drill and iCloud copy not done yet |
+| Encrypted backups (Phase 5, item 3) | Done: 37 tests (section 32); key pair made 2026-10-17; first encrypted copy 2026-10-18; restore drill with the paper key passed; copies in iCloud Drive, by hand (section 33). Automatic copy (route A) not tried |
 
 ## Known limits
 

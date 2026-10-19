@@ -103,7 +103,8 @@ The biggest real risk is losing the Mac, which takes every backup with it. Built
 - A failed encryption never costs the plain backup: it runs second, separately, and the
   server's start-up does not encrypt at all.
 - Tested (`tests/test_backup.py`): round trip, wrong key, changed bytes, wrong version, cut-off
-  files, restore checks. Still to do by hand: a restore drill with the real paper key.
+  files, restore checks. Restore drill with the real paper key: passed on 2026-10-18
+  (CHANGELOG section 33). The first copies are in iCloud Drive.
 
 Later: Time Machine on an external drive, for the rest of the Mac as well.
 
@@ -134,8 +135,9 @@ Notes are for **trivial preferences only**: favourite food, places, how I like r
 
 In rough order of importance.
 
-1. **Backups are on the same disk as the database.** Encrypted copies now exist (section 5),
-   but they only leave the Mac when I copy them to iCloud Drive by hand.
+1. **Offsite backups depend on a habit.** Encrypted copies are in iCloud Drive (section 5),
+   but only as recent as the last time I copied them by hand. Route A (a copy made when
+   the server starts) would remove the habit; not tried yet.
 2. **The log holds message text** (first 300 characters of each message, and tool inputs
    and results), in up to 6 MB of files and the terminal. Notes will be kept out of it
    (section 5); other messages are a known trade-off for being able to debug.

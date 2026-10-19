@@ -112,7 +112,12 @@ not leave this Mac).
   It asks for the key without showing it, checks the result, and writes
   `jarvis-restored.db`; it never replaces `jarvis.db` itself.
 - **Once after setting up, practise:** restore last night's copy with the paper key. A
-  backup that has never been restored is not known to work.
+  backup that has never been restored is not known to work. Afterwards, remove
+  `jarvis-restored.db` with Delete Immediately (or empty the Trash): it is an unencrypted
+  copy of everything, and a file deleted in Finder only moves to the Trash.
+- **When copying to iCloud Drive, use Copy and Paste, not drag:** dragging into iCloud
+  Drive moves the files out of `backups/encrypted/`. Copy only that folder, never the plain
+  backups, `jarvis.db` or `logs/`.
 
 ## Pinned model
 
