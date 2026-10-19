@@ -11,7 +11,7 @@ from datetime import date
 
 import config
 from database import conn as db, lock
-from tools import NeedsConfirmation, tool
+from tools import PRIVATE, NeedsConfirmation, tool
 
 # Words that mean the note is about a secret. A safety net, not a guarantee: a note can
 # describe a secret without any of these words.
@@ -48,6 +48,10 @@ def _terms(words: str) -> list[str]:
     """
     unique = dict.fromkeys(re.findall(r"\w+", words.lower()))
     return [f'"{w}"*' for w in unique]
+
+
+# The log records only the length of these tools' words and results (SECURITY.md)
+PRIVATE.update({"remember", "recall", "forget"})
 
 
 def _is_saved(text: str) -> bool:
@@ -95,7 +99,7 @@ def remember(text: str):
         return f"Saved the note '{text}'."
 
     return NeedsConfirmation(
-        card=f"Save the note '{text}'?", apply=apply,
+        card=f"Save the note '{text}'?", apply=apply, private=True,
         reply="Confirmation required. The note has NOT been saved yet. "
               "Tell the user to confirm on screen.",
     )
@@ -151,7 +155,7 @@ def forget(about: str):
         return f"Forgot the note '{text}'."
 
     return NeedsConfirmation(
-        card=f"Forget the note '{text}'?", apply=apply,
+        card=f"Forget the note '{text}'?", apply=apply, private=True,
         reply="Confirmation required. The note has NOT been deleted yet. "
               "Tell the user to confirm on screen.",
     )
