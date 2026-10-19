@@ -76,6 +76,7 @@ def reset(case, model: str) -> brain.Assistant:
         db.execute("DELETE FROM events")
         db.execute("DELETE FROM event_exceptions")
         db.execute("DELETE FROM tasks")
+        db.execute("DELETE FROM notes")
         for ev in case.events:
             rd = ev.get("repeat_days")
             db.execute(
@@ -87,6 +88,8 @@ def reset(case, model: str) -> brain.Assistant:
             )
         for title in case.tasks:
             db.execute("INSERT INTO tasks (title) VALUES (?)", (title,))
+        for text in case.notes:
+            db.execute("INSERT INTO notes (text, created) VALUES (?, ?)", (text, NOW.date().isoformat()))
         db.commit()
     calls.clear()
     return RecordingAssistant(model=model, think=THINK[0])

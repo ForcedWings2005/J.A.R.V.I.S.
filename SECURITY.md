@@ -111,23 +111,30 @@ Later: Time Machine on an external drive, for the rest of the Mac as well.
 ### Notes and memory (Phase 5, item 4)
 
 Notes are for **trivial preferences only**: favourite food, places, how I like replies.
+Built in `notes.py` (CHANGELOG section 34).
 
-- **No passwords, codes or secrets.** `remember` refuses text that looks like one and
-  points to a password manager. A password in JARVIS would be in the database, the log, the
-  model's context, the screen, the speakers and 7 backups. Encrypting one of those copies
-  would not protect the others.
-- **Only I can make JARVIS remember something.** The model saves a note only when I ask
-  in my own message, never on its own, and never from text a tool returned. This protects
-  integrity.
-- **Recalled notes are data, not instructions.** The tool result says they are my saved
-  notes. Deletes and edits still need the confirmation card, so a planted note cannot act
-  on its own.
-- **`forget` uses the confirmation card**, like `delete_event`. A forgotten note can stay in
-  the backups for up to 7 days.
-- **The log never holds note text.** It records "note 12 saved, 84 characters" instead.
-- **`PRAGMA secure_delete`** is on, so a deleted note is wiped from the file instead of
-  only marked as free space.
-- **Limits** on note length and on how many notes one `recall` returns.
+- **No passwords, codes or secrets.** `remember` refuses text that looks like one (words
+  such as password or PIN, 6 or more digits in a row, password-shaped words) and points to a
+  password manager. A safety net, not a guarantee. A password in JARVIS would be in the
+  database, the model's context, the screen, the speakers and the backups. Encrypting one
+  of those copies would not protect the others.
+- **Only I can make JARVIS remember something.** `remember` only shows a card; the note is
+  saved when I click it. So a model talked into saving something, by me or by text from a
+  tool, can only ask. This protects integrity.
+- **Recalled notes are data, not instructions.** The tool result says so. Deletes and edits
+  still need the confirmation card, so a planted note cannot act on its own.
+- **`forget` uses the confirmation card**, like `delete_event`, and checks again when I
+  click. A forgotten note can stay in the plain backups for 7 days, in the encrypted
+  copies for 30, and in iCloud Drive until I delete the old copies there.
+- **The log never records what the note tools were given or returned**, or a note card's
+  text: only lengths, such as `tool remember(23 characters)`. My own message ("remember
+  that ...") and JARVIS's reply are still logged like any other turn. I chose that: notes
+  are trivial, and the log is needed for debugging (see gap 2).
+- **Deleted notes are wiped from the file**: `PRAGMA secure_delete` on every connection,
+  and FTS5's own secure-delete option. A test reads the raw file to prove it.
+- **Search words are plain words.** FTS5 has its own search language (OR, NOT, quotes, *);
+  `recall` and `forget` turn any text into quoted plain terms first.
+- **Limits**: 300 characters per note, 5 notes per `recall`.
 - Notes stay searchable with SQLite FTS5. They are not encrypted on their own: at this
   sensitivity, FileVault is enough on this Mac, and the backups are encrypted (above).
 
@@ -139,8 +146,9 @@ In rough order of importance.
    but only as recent as the last time I copied them by hand. Route A (a copy made when
    the server starts) would remove the habit; not tried yet.
 2. **The log holds message text** (first 300 characters of each message, and tool inputs
-   and results), in up to 6 MB of files and the terminal. Notes will be kept out of it
-   (section 5); other messages are a known trade-off for being able to debug.
+   and results), in up to 6 MB of files and the terminal. The note tools and note cards
+   are logged as lengths only (section 5), but a message such as "remember that ..." is
+   logged like any other: a known trade-off for being able to debug.
 3. **`/transcribe` has no `Origin` check.** Another website can upload audio to it. It
    cannot read the reply, but the check should exist (plan.md, Phase 6 item 1).
 4. **Files are readable by group and others** (`-rw-r--r--`). Low risk while I am the only
