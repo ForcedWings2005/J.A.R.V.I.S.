@@ -610,6 +610,17 @@ JARVIS can keep small facts about the owner, such as "my favourite food is sushi
 - 393 tests (`tests/test_notes.py` new; more in `test_database.py` and `test_brain.py`).
 - Not checked: the real app (cards on the dashboard, voice) and the migration on the real `jarvis.db`; both happen the first time the owner starts the server.
 
+## 35. Notes: a preference mentioned in passing gets a card
+
+The known limit from section 34: after "I absolutely love sushi, by the way", nothing was saved, but JARVIS sometimes said "I have duly noted" or "I shall take that into account", which was untrue.
+
+- **First try: an offer in words** ("Would you like me to remember that?", then "yes" saves). Three wordings, each checked with the note cases first. gemma4 could not keep "save when asked" and "offer when mentioned" apart: the more concrete the offer, the more it offered even after "Please remember that my favourite food is sushi" (that case fell from 3/3 to 0/3, then 1/3). More rewording risked fitting these test sentences rather than real ones, so it was stopped and the owner chose a different design.
+- **The design chosen by the owner: the card is the offer.** For a lasting preference (a like, dislike, favourite or allergy), whether the user asks or just mentions it, the model calls `remember`, which only shows a card. One rule instead of two, and it matches what the model tended to do anyway (section 34, first eval). Nothing is saved without a click, so the safety rule is unchanged (SECURITY.md). Moods such as "I'm tired" get no card.
+- Trade-offs: a card appears when a preference is only mentioned (ignored, it expires after 5 minutes); and only one card waits at a time, so a note card replaces an unanswered delete card.
+- **Eval cases**: `note_not_saved_casually` became `note_offered_for_a_preference` (remember must be called and the reply must point to the card); new `note_no_offer_for_a_mood`. Written first and seen failing on the old prompt (0/3). In the offered case, "I have noted your preference ... please confirm on screen" is honest while a card shows, so "noted" alone is allowed there; "has been saved" and "I will remember" are not.
+- **Evals** (gemma4:latest `dc35e8d9c606`, 3 runs per case): before, prompt `482653045a27` (the final run of section 34, same prompt, so not run again): 152/153. After, prompt `ea448f0bcc68`: **156/156 runs, 52/52 cases**. Replies for the three note cases read in full; one says "I have recorded your preference ... please confirm ... if you wish for it to be saved", which slightly overstates but corrects itself.
+- Not checked: the real app.
+
 ---
 
 ## Status
@@ -631,7 +642,7 @@ JARVIS can keep small facts about the owner, such as "my favourite food is sushi
 | Editing and moving events (Phase 5, item 1), empty-reply retry | Done, merged into `main`; 257 tests; evals 130/132 (section 28); not yet tried in the real app; the retry has not yet triggered on the real model |
 | Model eval suite (Phase 2) | Done, merged into `main`; baseline 80/90 runs, 90/90 after fixes (sections 21, 22) |
 | Decimals in speech | Fixed and tested against Kokoro's phonemes; not yet heard in a real conversation (section 22) |
-| Notes and memory (Phase 5, item 4) | Built and tested (393 tests, evals 152/153, section 34); not yet tried in the real app; a passing remark is never saved but the reply sometimes sounds as if it is |
+| Notes and memory (Phase 5, item 4) | Done and tried in the real app (section 34); a preference mentioned in passing now gets a card (section 35, evals 156/156), not yet tried in the real app |
 | Encrypted backups (Phase 5, item 3) | Done: 37 tests (section 32); key pair made 2026-10-17; first encrypted copy 2026-10-18; restore drill with the paper key passed; copies in iCloud Drive, by hand (section 33). Automatic copy (route A) not tried |
 
 ## Known limits

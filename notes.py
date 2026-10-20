@@ -73,9 +73,9 @@ def _label(found: list[str]) -> str:
             + "; ".join(found))
 
 
-@tool("Ask to save a short note about the user, such as a preference. Only when the user "
-      "asks you to remember something, never for a passing remark. Never for passwords, "
-      "PINs or other secrets. "
+@tool("Ask to save a short note about the user, such as a preference. Use it when the user "
+      "asks you to remember something, or mentions a lasting like, dislike, favourite or "
+      "allergy. Never for moods, passwords, PINs or other secrets. "
       "The user must confirm on screen before it is saved.",
       text={"type": "string", "description": "The note, in a few plain words"})
 def remember(text: str):

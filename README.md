@@ -62,6 +62,9 @@ sushi". It uses them when they matter ("what should I have for dinner?"), or ask
 you remember about me?".
 
 - Saving and forgetting show a card; nothing changes until you click it.
+- Mention a lasting preference in passing ("I love sushi, by the way") and JARVIS offers
+  a card to save it. Ignore the card if you don't want it; it expires after 5 minutes.
+  Moods ("I'm tired") get no card.
 - "Remember **to** call the bank" is a to-do task, not a note.
 - Passwords, PINs and other secrets are refused: keep them in a password manager.
 - A forgotten note is wiped from `jarvis.db`, but old backups keep it for up to 7 days
