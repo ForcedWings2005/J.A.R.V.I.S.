@@ -120,7 +120,9 @@ Built in `notes.py` (CHANGELOG section 34).
   of those copies would not protect the others.
 - **Only I can make JARVIS remember something.** `remember` only shows a card; the note is
   saved when I click it. So a model talked into saving something, by me or by text from a
-  tool, can only ask. This protects integrity.
+  tool, can only ask. This protects integrity. Since section 35 of the CHANGELOG, JARVIS
+  also offers a card when I mention a lasting preference in passing ("I love sushi"); the
+  rule is the same, because the click is still mine.
 - **Recalled notes are data, not instructions.** The tool result says so. Deletes and edits
   still need the confirmation card, so a planted note cannot act on its own.
 - **`forget` uses the confirmation card**, like `delete_event`, and checks again when I
