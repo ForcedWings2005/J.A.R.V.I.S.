@@ -23,18 +23,23 @@ STATIC_DIR = ROOT / "static"
 MODELS_DIR = ROOT / "models"
 
 # Language model (Ollama). Check the pinned ID in README.md after an update.
-MODEL = "gemma4:latest"
+# gemma4:26b replaced gemma4:latest (the small e4b) after evals on both: just as reliable,
+# and about twice as fast, because only about 4 billion of its 26 billion parameters work
+# on each word (CHANGELOG section 37). 31b was as reliable but 6 times slower.
+MODEL = "gemma4:26b"
 MAX_ROUNDS = 4          # tool rounds per message, so a confused model can't loop forever
 # gemma4 "thinks" (hidden reasoning) before it answers. Keep it ON: with it off, replies
 # came 7x faster but the evals fell from 102/102 to 73/102, with wrong arithmetic stated
-# as fact and tasks claimed as done without any tool call (CHANGELOG section 27).
+# as fact and tasks claimed as done without any tool call (CHANGELOG section 27; measured
+# on the small e4b model, not yet on 26b).
 # The cost is a pause of up to a few seconds before the first spoken word.
 MODEL_THINK = True
 # How long Ollama keeps the model loaded after the last request (its default is 5 minutes).
-# Reloading costs about 2.4 s on the first message after a pause; the model uses ~1.4 GB.
+# Loading gemma4:26b takes about 3 s on the first message after a pause (measured
+# 2026-10-21); it is 18 GB on disk.
 MODEL_KEEP_ALIVE = "1h"
 # The conversation is trimmed when the model was given more than HISTORY_MAX_TOKENS
-# (the model's window is 131072), down to about HISTORY_KEEP_TOKENS, oldest exchanges
+# (gemma4:26b's window is 262144), down to about HISTORY_KEEP_TOKENS, oldest exchanges
 # first. Each trim makes Ollama re-read everything once, so it cuts a lot, rarely.
 HISTORY_MAX_TOKENS = 60_000
 HISTORY_KEEP_TOKENS = 30_000

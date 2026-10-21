@@ -634,6 +634,27 @@ Step 5 of the owner's security learning path, and Phase 6 item 1 of `plan.md`. A
 - **Noticed, not changed:** each time Whisper loads, the output shows "Fetching 4 files ... 0.00B". Nothing is downloaded, but the Hugging Face library probably asks its servers whether the files changed. Added to `plan.md` (upkeep) to check, and probably to set `HF_HUB_OFFLINE=1`.
 - Not changed: this stops other websites, not other people; a login is still Phase 6 item 2.
 
+## 37. A bigger, faster model: gemma4:26b
+
+The owner asked whether a better model would help with JARVIS's personality. Three models were tried against the small `gemma4:latest` (e4b, `dc35e8d9c606`), each first with a 10-message personality test (`experiments/personality_compare.py`), then with the full eval on the unchanged prompt `ea448f0bcc68`.
+
+| | gemma4:latest (e4b) | qwen3.5 | **gemma4:26b** | gemma4:31b |
+|---|---|---|---|---|
+| ID | `dc35e8d9c606` | `56671c2ab938` | `001e5dafc3c7` | `17ba34c06c80` |
+| False claims in 10 messages | 0 | 3 | 0 | 0 |
+| Full eval | 156/156 | not run | 154/156 checks, 156/156 read in full | 154/156 checks, 156/156 read in full |
+| Full eval time | about 18 min | | 9.3 min | 51.2 min |
+| Typical reply (median) | | | 2.8 s | 17.6 s |
+
+- **qwen3.5 was dropped** after the 10-message test: it said a task was on the list and that two cards were on screen when no tool had run. The tools were available to it (it called `get_events` and `recall` elsewhere), but it chose wrongly. The prompt was tuned on gemma4, so this says "not with this prompt", not "never".
+- **gemma4:26b is a mixture-of-experts model**: about 4 billion of its 25.2 billion parameters work on each word, so it is faster than the small model while knowing more. Ollama's `gemma4:26b` gave the "mtp" build (`001e5dafc3c7`), not the ID the library page listed for that tag; the ID is what is pinned.
+- **gemma4:31b** was as reliable and slightly wittier, but a typical wait of 17.6 s (up to 52 s) before speaking is too slow for voice.
+- **Switched**: `config.MODEL = "gemma4:26b"`, README pinned ID and setup command, CLAUDE.md (model, eval time about 10 minutes), `config.py` comments (load about 3 s, measured; context window 262144). `MODEL_THINK` stays on; its 102 to 73 measurement was on the small model and was not repeated on 26b.
+- **Two checks widened, after reading the replies**: "strictly prohibited from storing passwords, PINs" is a correct refusal; "I have noted that you like sushi ... please confirm on your screen" is honest while a card shows. Note cases on 26b after that: 24/24.
+- **Found:** Ollama's `gemma4:latest` now points to a different build (`009acb0d7fe1`) from the one tested. Running `ollama pull gemma4:latest` would have changed JARVIS silently; the README now says so.
+- Not checked: the real app with 26b (voice, and how the speed feels). `ollama ps` reported 3.7 GB in use with the model loaded, against 18 GB on disk; not understood yet, so not written down as a fact.
+- Still on the Mac and no longer used: `gemma4:latest`, `gemma4:31b` (20 GB), `qwen3.5:latest`. `ollama rm <name>` removes one.
+
 ---
 
 ## Status
