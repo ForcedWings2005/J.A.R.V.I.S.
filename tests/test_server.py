@@ -59,11 +59,13 @@ def test_other_host_names_are_refused():
 
 def test_json_sent_as_plain_text_is_refused(client):
     """Another website can send text/plain to 127.0.0.1 without a browser preflight check.
-    Because these endpoints only accept real JSON, such a request cannot drive JARVIS."""
+    Because these endpoints only accept real JSON, such a request cannot drive JARVIS.
+    No Origin header here, so this tests the JSON rule on its own; the Origin check, the
+    other lock, has its own tests below."""
     tasks.add_task("Buy milk")
     tid = tasks.tasks_list()[0]["id"]
     r = client.post(f"/tasks/{tid}", content='{"done": true}',
-                    headers={"Content-Type": "text/plain", "Origin": "https://evil.example"})
+                    headers={"Content-Type": "text/plain"})
     assert r.status_code == 422
     assert tasks.tasks_list()[0]["done"] is False
     r = client.post("/chat", content='{"message": "hi"}', headers={"Content-Type": "text/plain"})
@@ -178,6 +180,80 @@ def test_transcribe_refuses_large_uploads(client, whisper, monkeypatch):
     r = client.post("/transcribe", files={"file": ("clip.webm", b"x" * 11, "audio/webm")})
     assert r.status_code == 413
     assert "path" not in whisper                         # never reached Whisper
+
+
+# ---------- other websites: the Origin check ----------
+# A page on any other website can make the browser POST a form to 127.0.0.1:8000.
+# The browser says where it came from in the Origin header, so the server checks it.
+# Proven first with experiments/attack_page.html (CHANGELOG section 36).
+
+STRANGER = "http://localhost:9000"      # where attack_page.html is served
+
+
+def test_another_website_cannot_make_jarvis_transcribe(client, whisper):
+    r = client.post("/transcribe", headers={"Origin": STRANGER},
+                    files={"file": ("silence.wav", b"audio", "audio/wav")})
+    assert r.status_code == 403
+    assert "another website" in r.json()["detail"]
+    assert "path" not in whisper                         # Whisper was never started
+
+
+@pytest.mark.parametrize("path, body", [
+    ("/chat", {"message": "hi"}),
+    ("/confirm", {"id": "x", "approve": True}),
+    ("/reset", {}),
+    ("/tasks/1", {"done": True}),
+    ("/speak", {"text": "hi"}),
+])
+def test_another_website_is_refused_on_every_post(client, model, monkeypatch, path, body):
+    """The JSON endpoints were already safe; this is a second, independent lock."""
+    model()                             # a fake model with no rounds: any call would fail
+    monkeypatch.setattr(speech, "synthesize", lambda text: pytest.fail("Kokoro was started"))
+    r = client.post(path, json=body, headers={"Origin": "https://evil.example"})
+    assert r.status_code == 403
+
+
+def test_a_null_origin_is_refused(client, whisper):
+    """Sandboxed frames and local files send Origin: null."""
+    r = client.post("/transcribe", headers={"Origin": "null"},
+                    files={"file": ("a.wav", b"audio", "audio/wav")})
+    assert r.status_code == 403
+
+
+def test_the_dashboard_itself_is_allowed(whisper):
+    for base in ("http://127.0.0.1:8000", "http://localhost:8000"):
+        own = TestClient(server.app, base_url=base)
+        r = own.post("/transcribe", headers={"Origin": base},
+                     files={"file": ("clip.webm", b"audio", "audio/webm")})
+        assert r.status_code == 200, base
+
+
+def test_the_same_machine_on_another_port_or_name_is_another_website(whisper):
+    own = TestClient(server.app, base_url="http://127.0.0.1:8000")
+    for origin in ("http://127.0.0.1:9000", "http://localhost:8000", "https://127.0.0.1:8000"):
+        r = own.post("/transcribe", headers={"Origin": origin},
+                     files={"file": ("clip.webm", b"audio", "audio/webm")})
+        assert r.status_code == 403, origin
+    assert "path" not in whisper
+
+
+def test_requests_without_an_origin_are_allowed(client, whisper):
+    """Browsers always send Origin on a cross-site POST; tools like curl and the tests don't."""
+    r = client.post("/transcribe", files={"file": ("clip.webm", b"audio", "audio/webm")})
+    assert r.status_code == 200
+
+
+def test_reading_is_not_affected(client):
+    """GET requests change nothing, and the browser never lets another site read the reply."""
+    assert client.get("/tasks", headers={"Origin": STRANGER}).status_code == 200
+
+
+def test_refusals_are_logged(client, whisper, caplog):
+    caplog.set_level("WARNING", logger="jarvis")
+    client.post("/transcribe", headers={"Origin": STRANGER},
+                files={"file": ("a.wav", b"audio", "audio/wav")})
+    assert "refused POST /transcribe from another website" in caplog.text
+    assert STRANGER in caplog.text
 
 
 # ---------- logging ----------
