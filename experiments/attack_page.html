@@ -1,0 +1,119 @@
+<!doctype html>
+<!--
+  A pretend "stranger's website", for testing JARVIS's defences on this Mac only.
+  Not part of the app. See experiments/README.md and CHANGELOG section 36.
+
+  Serve it on another port, so the browser treats it as a different website:
+      python -m http.server 9000 --bind 127.0.0.1 --directory experiments
+  then open http://localhost:9000/attack_page.html while JARVIS runs on port 8000.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attack test page</title>
+<style>
+  body { font: 16px/1.5 -apple-system, system-ui, sans-serif; max-width: 46rem;
+         margin: 2rem auto; padding: 0 1rem; color: #222; background: #fafafa; }
+  h1 { font-size: 1.4rem; }
+  section { background: #fff; border: 1px solid #ddd; border-radius: 8px;
+            padding: 1rem 1.2rem; margin: 1rem 0; }
+  button { font: inherit; padding: .4rem .9rem; border-radius: 6px; border: 1px solid #888;
+           background: #f0f0f0; cursor: pointer; }
+  pre { background: #f4f4f4; padding: .6rem; border-radius: 6px; white-space: pre-wrap;
+        min-height: 1.5em; margin: .6rem 0 0; }
+  .note { color: #555; font-size: .92rem; }
+</style>
+</head>
+<body>
+<h1>Pretend stranger's website</h1>
+<p class="note">This page is served from <b id="me"></b>. To your browser that is a
+different website from JARVIS at <b>http://127.0.0.1:8000</b>, just like any site on the
+internet. Each button tries to make JARVIS do something. Watch JARVIS's Terminal tab while
+you click.</p>
+
+<section>
+  <h2>1. Upload fake audio to /transcribe</h2>
+  <p>Sends one second of silence, made by this page, as a form upload. Browsers allow
+  form uploads to other websites without asking first.</p>
+  <button onclick="attackTranscribe()">Upload fake audio</button>
+  <pre id="out1"></pre>
+  <p class="note">If the attack works, JARVIS's Terminal shows <code>POST /transcribe</code>
+  and <code>transcribed ... bytes</code>: it ran Whisper for a stranger. This page still
+  cannot read the reply.</p>
+</section>
+
+<section>
+  <h2>2. Send JSON to /chat</h2>
+  <p>A real JSON message. For JSON, the browser first asks JARVIS for permission (a
+  "preflight" OPTIONS request). JARVIS never gives it.</p>
+  <button onclick="attackChatJson()">Send JSON</button>
+  <pre id="out2"></pre>
+  <p class="note">Expected: JARVIS's Terminal shows only <code>OPTIONS /chat</code>
+  (refused). The message itself is never sent.</p>
+</section>
+
+<section>
+  <h2>3. Send JSON disguised as plain text to /chat</h2>
+  <p>The same message labelled <code>text/plain</code>, which browsers send without
+  asking. JARVIS only accepts real JSON, so it should refuse.</p>
+  <button onclick="attackChatText()">Send disguised JSON</button>
+  <pre id="out3"></pre>
+  <p class="note">Expected: JARVIS's Terminal shows <code>POST /chat</code> with
+  <code>422</code>: it arrived, but JARVIS refused it.</p>
+</section>
+
+<script>
+const JARVIS = 'http://127.0.0.1:8000';
+document.getElementById('me').textContent = location.origin;
+
+function show(id, text) { document.getElementById(id).textContent = text; }
+
+// One second of silence as a WAV file: a 44-byte header, then 16,000 zero samples
+function silentWav() {
+  const rate = 16000, samples = rate, bytes = 44 + samples * 2;
+  const v = new DataView(new ArrayBuffer(bytes));
+  const text = (at, s) => [...s].forEach((c, i) => v.setUint8(at + i, c.charCodeAt(0)));
+  text(0, 'RIFF'); v.setUint32(4, bytes - 8, true); text(8, 'WAVE');
+  text(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);   // PCM
+  v.setUint16(22, 1, true); v.setUint32(24, rate, true);                   // mono, 16 kHz
+  v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  text(36, 'data'); v.setUint32(40, samples * 2, true);
+  return new Blob([v.buffer], { type: 'audio/wav' });
+}
+
+// The browser sends the request either way. What it blocks is THIS PAGE reading the
+// reply, so fetch fails here even when the attack worked. Check JARVIS's Terminal.
+async function tryFetch(id, url, options) {
+  show(id, 'Sending...');
+  try {
+    const res = await fetch(url, options);
+    show(id, `Got a readable reply (${res.status}): ${await res.text()}`);
+  } catch (err) {
+    show(id, `The browser would not let this page read a reply (${err.message}).\n` +
+             'That does not tell you whether JARVIS did the work: look at its Terminal.');
+  }
+}
+
+function attackTranscribe() {
+  const form = new FormData();
+  form.append('file', silentWav(), 'silence.wav');
+  tryFetch('out1', JARVIS + '/transcribe', { method: 'POST', body: form });
+}
+
+function attackChatJson() {
+  tryFetch('out2', JARVIS + '/chat', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: 'Hello from a stranger' }),
+  });
+}
+
+function attackChatText() {
+  tryFetch('out3', JARVIS + '/chat', {
+    method: 'POST', headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ message: 'Hello from a stranger' }),
+  });
+}
+</script>
+</body>
+</html>

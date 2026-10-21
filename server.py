@@ -10,7 +10,7 @@ from logging.handlers import RotatingFileHandler
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 import backup_db
@@ -57,6 +57,29 @@ async def lifespan(app):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
+
+# Methods that only read. Everything else can change something or start work.
+READ_ONLY = {"GET", "HEAD", "OPTIONS"}
+
+
+@app.middleware("http")
+async def refuse_other_websites(request, call_next):
+    """Any website open in the browser can make it POST a form here (SECURITY.md gap 3).
+
+    The browser adds an Origin header saying which site the request came from, and the
+    page cannot change it. Only JARVIS's own address may send requests that do something.
+    No Origin at all means it is not a browser request from another site (the tests,
+    curl), so it is allowed: such a program already runs on this Mac.
+    If JARVIS is ever served through HTTPS or another address (Phase 6), check this again.
+    """
+    origin = request.headers.get("origin")
+    own = f"{request.url.scheme}://{request.headers.get('host', '')}"
+    if request.method not in READ_ONLY and origin is not None and origin != own:
+        log.warning("refused %s %s from another website (Origin %r)",
+                    request.method, request.url.path, origin)
+        return JSONResponse(status_code=403, content={
+            "detail": "Refused: this request came from another website."})
+    return await call_next(request)
 
 stt_lock = threading.Lock()
 assistant = brain.Assistant()
