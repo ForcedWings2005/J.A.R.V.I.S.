@@ -145,12 +145,19 @@ Not before Phases 3 and 4. In this order:
    today; a test pins this. `/transcribe` takes a form upload, which another site *can*
    send. It only returns text the other site cannot read, but the `Origin` check should
    still cover it.
+   *Done: CHANGELOG section 36. Every POST checks `Origin`. Check it again when HTTPS or
+   Tailscale changes JARVIS's address.*
 2. **A login** (a single user, with the session held in a cookie) on every endpoint.
 3. **Tailscale** for the network, with HTTPS from `tailscale serve`. Never port forwarding.
 4. **A phone layout** for the page.
 
 ## Ongoing upkeep (small, any time)
 
+- **Whisper may contact the internet when it loads.** The server's output shows
+  "Fetching 4 files ... 0.00B" each time: nothing is downloaded, but the Hugging Face
+  library usually asks its servers whether the files changed. Not personal data, but it
+  does not fit "nothing leaves the machine". Check first, then probably set
+  `HF_HUB_OFFLINE=1` (CHANGELOG section 36).
 - **Split the requirements.** `requirements.txt` is a `pip freeze` dump (it includes `torch`).
   Keep a short `requirements.in` listing what the project uses directly, a
   `requirements-dev.txt` (pytest, ruff, pre-commit), and a generated lock file.

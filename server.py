@@ -64,7 +64,7 @@ READ_ONLY = {"GET", "HEAD", "OPTIONS"}
 
 @app.middleware("http")
 async def refuse_other_websites(request, call_next):
-    """Any website open in the browser can make it POST a form here (SECURITY.md gap 3).
+    """Any website open in the browser can make it POST a form here (SECURITY.md section 4).
 
     The browser adds an Origin header saying which site the request came from, and the
     page cannot change it. Only JARVIS's own address may send requests that do something.

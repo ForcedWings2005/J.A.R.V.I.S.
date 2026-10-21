@@ -59,7 +59,7 @@ jarvis/
 ├── ruff.toml           Lint settings
 ├── .pre-commit-config.yaml  Checks that run before every commit
 ├── .github/workflows/tests.yml  Runs lint and tests on GitHub for every push
-├── experiments/        Not part of the app: old scripts (agent.py, compare.py) and crypto_lab.py
+├── experiments/        Not part of the app: old scripts, crypto_lab.py, attack_page.html
 ├── README.md           Setup, run, tests, backups, pinned model
 ├── CLAUDE.md           Instructions for Claude Code when it works on this project
 ├── plan.md             The plan from Phase 2 onward
@@ -621,6 +621,19 @@ The known limit from section 34: after "I absolutely love sushi, by the way", no
 - **Evals** (gemma4:latest `dc35e8d9c606`, 3 runs per case): before, prompt `482653045a27` (the final run of section 34, same prompt, so not run again): 152/153. After, prompt `ea448f0bcc68`: **156/156 runs, 52/52 cases**. Replies for the three note cases read in full; one says "I have recorded your preference ... please confirm ... if you wish for it to be saved", which slightly overstates but corrects itself.
 - Not checked: the real app.
 
+## 36. Other websites can no longer make JARVIS work (the Origin check)
+
+Step 5 of the owner's security learning path, and Phase 6 item 1 of `plan.md`. Any website open in the browser can make it send requests to `127.0.0.1:8000`. It cannot read the replies (the same-origin policy), and it cannot send JSON without the browser asking first (a "preflight", which JARVIS never answers), but it can send a form upload. `/transcribe` takes one (`SECURITY.md`, gap 3).
+
+- **The attack, shown first.** `experiments/attack_page.html` is a pretend stranger's website with three buttons, served on another port (`python -m http.server 9000 --bind 127.0.0.1 --directory experiments`). The owner ran it against JARVIS: the form upload worked (`transcribed 32044 bytes`, `POST /transcribe 200`), JSON was stopped by the browser (`OPTIONS /chat 405`, never sent), and JSON labelled as plain text arrived but was refused (`POST /chat 422`). The page could read none of the replies, even for the attack that worked.
+- **The fix**: `refuse_other_websites`, a middleware in `server.py`. Every request that is not GET, HEAD or OPTIONS and carries an `Origin` header other than JARVIS's own address (built from the request's scheme and `Host`) gets 403 with a plain reason, before any endpoint runs, and a warning in the log. No `Origin` is allowed: browsers always send it on a cross-site POST, so its absence means the tests or a tool like curl, which already run on this Mac.
+- **After the fix**, run again by the owner: `refused POST /transcribe from another website`, `403 Forbidden`, no `transcribed` line; `POST /chat 403`. The page was opened as `127.0.0.1:9000`, the same address on another port, and was still treated as another website, as the browser's rule says. The dashboard was then used normally (voice input, chat, a delete card confirmed, spoken replies) with no refusal.
+- **Tests first** (9 failed before the fix): a stranger cannot transcribe and Whisper is never reached; every POST endpoint refuses a stranger; `Origin: null` is refused; another port, another name for the same machine (`localhost` against `127.0.0.1`) and `https` are all other websites; the dashboard's own origin, a request without `Origin`, and GET requests are allowed; refusals are logged. 406 tests.
+- **Two locks, tested separately.** The old JSON-only test sent an `Origin` and so now got 403 before the JSON rule was reached; it now sends none, so it tests the JSON rule alone.
+- **Found while testing:** the first version of the `/chat` case had no fake model, so before the fix it reached the real Ollama (the suite took 9.9 s instead of 0.4 s). It now uses a fake model. And `python -m http.server` listens on every network by default, so the instructions add `--bind 127.0.0.1`.
+- **Noticed, not changed:** each time Whisper loads, the output shows "Fetching 4 files ... 0.00B". Nothing is downloaded, but the Hugging Face library probably asks its servers whether the files changed. Added to `plan.md` (upkeep) to check, and probably to set `HF_HUB_OFFLINE=1`.
+- Not changed: this stops other websites, not other people; a login is still Phase 6 item 2.
+
 ---
 
 ## Status
@@ -630,6 +643,7 @@ The known limit from section 34: after "I absolutely love sushi, by the way", no
 | Chat, tools, calendar, tasks, delete confirmation, ticker | Tested and working |
 | HUD layout, orb, panel focus, reduce motion | Tested and working |
 | Host protection | Tested and working |
+| Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
 | Event durations and repeating events | Logic tested (51 automated tests pass); real requests to JARVIS, such as "every Wednesday and Friday", not yet re-checked |

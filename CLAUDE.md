@@ -92,8 +92,10 @@ of the risk and the owner's agreement first.
 - There is **no login and no HTTPS**. This is only acceptable while the server stays local.
   Never add `--host 0.0.0.0`, port forwarding or remote access without Phase 6 of `plan.md`.
 - JSON endpoints reject `text/plain` bodies (422), so other websites cannot drive `/chat`,
-  `/confirm` or `/tasks`; `tests/test_server.py` pins this. `/transcribe` accepts a form upload
-  and is not yet protected by an `Origin` check (noted in `plan.md`).
+  `/confirm` or `/tasks`; `tests/test_server.py` pins this.
+- Every POST whose `Origin` header is not JARVIS's own address gets 403 before any work
+  (`refuse_other_websites` in `server.py`); no `Origin` is allowed, `GET` is unaffected. This
+  is what protects `/transcribe`, a form upload. Each lock has its own tests; keep them separate.
 - Input limits: uploads 10 MB (unknown file extensions are saved as `.webm`), the temporary
   audio file is always deleted;
   `/speak` text capped at 2000 characters; `/calendar` range at most 400 days; `get_events` at

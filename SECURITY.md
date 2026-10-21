@@ -63,6 +63,7 @@ Each of these is in the code or the system and has been checked.
 | Server listens on `127.0.0.1` only | Everything on the network. |
 | `TrustedHostMiddleware` allows only `127.0.0.1` and `localhost` | DNS rebinding (a website pretending to be this Mac). |
 | JSON endpoints refuse `text/plain` bodies (pinned by a test) | Other websites driving `/chat`, `/confirm` or `/tasks`. |
+| Every POST whose `Origin` is not JARVIS's own address is refused with 403, before any work (`server.py`, pinned by tests) | Other websites making JARVIS act or work, such as running Whisper through `/transcribe`. A second, independent lock on the JSON endpoints. Shown with `experiments/attack_page.html`: before, "transcribed 32044 bytes"; after, 403. |
 | Deletes and edits only through a confirmation card and `POST /confirm` | The model deleting or changing events by itself. |
 | Input limits (upload size, text length, date ranges, calculator) | Requests that use up memory or time. |
 | Every SQL value goes through `?` parameters | SQL injection. |
@@ -151,8 +152,8 @@ In rough order of importance.
    and results), in up to 6 MB of files and the terminal. The note tools and note cards
    are logged as lengths only (section 5), but a message such as "remember that ..." is
    logged like any other: a known trade-off for being able to debug.
-3. **`/transcribe` has no `Origin` check.** Another website can upload audio to it. It
-   cannot read the reply, but the check should exist (plan.md, Phase 6 item 1).
+3. **Closed (CHANGELOG section 36):** `/transcribe` had no `Origin` check, so any website
+   open in the browser could make JARVIS run Whisper. Every POST now checks `Origin`.
 4. **Files are readable by group and others** (`-rw-r--r--`). Low risk while I am the only
    user, but `chmod 600` on the files and `700` on the folders is free.
 5. **Dependencies are pinned by version, not by hash.** A version on PyPI could in theory
@@ -171,7 +172,8 @@ In rough order of importance.
 ## 8. When to revisit
 
 - Before Phase 6 (anything leaving `127.0.0.1`): the network becomes an attack surface, and
-  a login, HTTPS and the `Origin` check are needed first.
+  a login and HTTPS are needed first. The `Origin` check compares against the address the
+  request was sent to; HTTPS or a new address (Tailscale) means checking it again.
 - Before adding a tool that reads outside content (news, weather, web): prompt injection
   becomes real.
 - If JARVIS is ever asked to hold something more sensitive than it does today.
