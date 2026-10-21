@@ -31,7 +31,7 @@ pip install -r requirements.txt
 
 You also need:
 
-- Ollama with the model below (`ollama pull gemma4:latest`)
+- Ollama with the model below (`ollama pull gemma4:26b`)
 - `ffmpeg` (`brew install ffmpeg`)
 - The Kokoro files `kokoro-v1.0.onnx` and `voices-v1.0.bin` in `models/`
   (they are too large for git)
@@ -138,12 +138,13 @@ not leave this Mac).
 
 ## Pinned model
 
-Ollama's `latest` tag can change when Ollama updates. If JARVIS suddenly behaves
-differently, check this first.
+A tag such as `gemma4:26b` can point to a newer build after `ollama pull`. If JARVIS
+suddenly behaves differently, check this first. (This happened to `gemma4:latest`: by
+2026-10-21 it pointed to a different build from the one JARVIS had been tested with.)
 
 | Model | ID (from `ollama list`) | Date recorded |
 |---|---|---|
-| gemma4:latest | `dc35e8d9c606` | 2026-10-12 |
+| gemma4:26b | `001e5dafc3c7` | 2026-10-21 |
 
 ## Project history
 

@@ -14,3 +14,7 @@ run it from the project root.
                    While JARVIS runs, serve it on another port, on this Mac only:
                    `python -m http.server 9000 --bind 127.0.0.1 --directory experiments`
                    and open http://localhost:9000/attack_page.html.
+- `personality_compare.py`  sends the same messages through the real model with
+                   different personality texts and prints the replies side by side,
+                   with timings and a check for copied example lines (CHANGELOG
+                   section 37). `--model` tries another model.

@@ -133,7 +133,7 @@ Run from the project folder with the venv active (`source .venv/bin/activate`):
 ruff check .            # lint
 python -m pytest -q     # all tests, under a second; never touches jarvis.db or a model
 python -m evals --runs 1 -k <name>   # quick live check of some model cases (needs Ollama)
-python -m evals         # full suite, 52 cases x 3 runs, about 18 minutes
+python -m evals         # full suite, 52 cases x 3 runs, about 10 minutes
 ```
 
 - The pre-commit hook (installed) runs ruff and pytest on every commit with Python files.
@@ -155,7 +155,7 @@ python -m evals         # full suite, 52 cases x 3 runs, about 18 minutes
 - `requirements.txt` is a `pip freeze` of the Mac's venv; `requirements-dev.txt` is what CI
   needs. Pin versions to what is installed. Avoid new dependencies; ask first if one seems needed.
 - Settings belong in `config.py`, not as constants scattered through modules.
-- Ollama: model `config.MODEL` (`gemma4:latest`), called through the `ollama` client's default
+- Ollama: model `config.MODEL` (`gemma4:26b`), called through the `ollama` client's default
   address. The pinned model ID is in README; if behaviour changes, check `ollama list` first.
 - Keep `config.MODEL_THINK = True`. Turning gemma4's thinking off made replies 7x faster but
   dropped the evals from 102/102 to 73/102 (wrong arithmetic, actions claimed without tools).

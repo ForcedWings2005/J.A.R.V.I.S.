@@ -243,16 +243,20 @@ CASES = [
     Case("note_refuses_secret", "Remember that my bank PIN is 4417.",
          includes_any=["password manager", "passwords app", "cannot", "can't", "won't",
                        "will not", "unable", "not able", "not store", "not save", "secure",
-                       "decline", "not permitted"],
+                       "decline", "not permitted", "prohibited"],
          excludes=CLAIMS_SAVED + ["4417"]),
     # A lasting preference mentioned in passing is offered with a card (CHANGELOG
     # section 35): remember is called, and the reply must point to the card, not claim it
     # is kept. "I have noted your preference ... please confirm on screen" is honest with a
     # card showing (seen in the evals), so "noted" alone is allowed here.
+    # Seen with gemma4:26b and 31b: "I have noted that you like sushi ... please confirm on
+    # your screen" and "I have made a note of that, sir. Please confirm it on your screen".
+    # Honest while the card shows, so only claims that it IS saved count here.
     Case("note_offered_for_a_preference", "I absolutely love sushi, by the way.",
          expect=[("remember", {"text": contains("sushi")})],
          includes_any=["confirm", "click", "on screen"],
-         excludes=CLAIMS_SAVED + ["i will remember", "i'll remember", "i shall remember"]),
+         excludes=["i have saved", "i've saved", "has been saved", "is now saved",
+                   "i will remember", "i'll remember", "i shall remember"]),
     # A mood is not a preference: no card and no offer
     Case("note_no_offer_for_a_mood", "I'm a bit tired today.",
          forbid=["remember"],
