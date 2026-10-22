@@ -30,8 +30,9 @@ MODEL = "gemma4:26b"
 MAX_ROUNDS = 4          # tool rounds per message, so a confused model can't loop forever
 # gemma4 "thinks" (hidden reasoning) before it answers. Keep it ON: with it off, replies
 # came 7x faster but the evals fell from 102/102 to 73/102, with wrong arithmetic stated
-# as fact and tasks claimed as done without any tool call (CHANGELOG section 27; measured
-# on the small e4b model, not yet on 26b).
+# as fact and tasks claimed as done without any tool call (CHANGELOG section 27). Measured
+# again on gemma4:26b: 4 times faster, but 144/156 instead of 156/156, guessing instead of
+# asking (CHANGELOG section 38).
 # The cost is a pause of up to a few seconds before the first spoken word.
 MODEL_THINK = True
 # How long Ollama keeps the model loaded after the last request (its default is 5 minutes).
