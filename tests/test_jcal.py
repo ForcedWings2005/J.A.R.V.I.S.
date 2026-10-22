@@ -206,6 +206,15 @@ def test_delete_a_single_event():
     assert jcal.get_events(day(1)).startswith("No events")
 
 
+def test_delete_tells_the_model_the_card_text_as_a_fact():
+    """An order like 'Tell the user to confirm on screen' was read out word for word."""
+    jcal.add_event("Dentist", day(1), "14:00")
+    req = jcal.delete_event("dentist", day(1))
+    assert req.reply.startswith("Confirmation required.")
+    assert req.card in req.reply and "NOT been deleted" in req.reply
+    assert "Tell the user" not in req.reply
+
+
 def test_delete_one_occurrence_keeps_the_rest_of_the_series():
     jcal.add_event("Gym", day(1), "18:00", repeat="weekly")
     found = jcal.find_for_delete("Gym", day(8), scope="this")
@@ -537,6 +546,7 @@ def test_the_model_is_told_what_the_card_says():
     req = change("dentist", day(1), new_start_time="16:00")
     assert req.reply.startswith("Confirmation required.")
     assert req.card in req.reply and "NOT been changed" in req.reply
+    assert "Tell the user" not in req.reply                  # a fact, not an order
 
 
 # ---------- update_event without the event's current date ----------

@@ -102,8 +102,10 @@ def remember(text: str):
 
     return NeedsConfirmation(
         card=f"Save the note '{text}'?", apply=apply, private=True,
-        reply="Confirmation required. The note has NOT been saved yet. "
-              "Tell the user to confirm on screen.",
+        reply=f"Confirmation required. The note has NOT been saved yet. The card on screen "
+              f"asks: \"Save the note '{text}'?\" It is saved only if the user taps Confirm. "
+              "Make sure the user knows it needs their Confirm on the card; say that in "
+              "your own words.",
     )
 
 
@@ -158,6 +160,8 @@ def forget(about: str):
 
     return NeedsConfirmation(
         card=f"Forget the note '{text}'?", apply=apply, private=True,
-        reply="Confirmation required. The note has NOT been deleted yet. "
-              "Tell the user to confirm on screen.",
+        reply=f"Confirmation required. The note has NOT been deleted yet. The card on screen "
+              f"asks: \"Forget the note '{text}'?\" It is deleted only if the user taps "
+              "Confirm. Make sure the user knows it needs their Confirm on the card; say "
+              "that in your own words.",
     )

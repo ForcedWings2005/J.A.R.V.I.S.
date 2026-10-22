@@ -17,4 +17,4 @@ run it from the project root.
 - `personality_compare.py`  sends the same messages through the real model with
                    different personality texts and prints the replies side by side,
                    with timings and a check for copied example lines (CHANGELOG
-                   section 37). `--model` tries another model.
+                   sections 37 and 38). `--model` tries another model.

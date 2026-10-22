@@ -378,8 +378,12 @@ def delete_event(title: str, date: str = "", scope: str = "this"):
 
     return NeedsConfirmation(
         card=found["text"], apply=apply,
-        reply="Confirmation required. The event has NOT been deleted yet. "
-              "Tell the user to confirm on screen.",
+        # Facts for the model to put in its own words; an order such as "tell the user to
+        # confirm" was read out word for word (CHANGELOG section 38)
+        reply=f"Confirmation required. The event has NOT been deleted yet. The card on "
+              f"screen asks: \"{found['text']}\" It is deleted only if the user taps "
+              "Confirm. Make sure the user knows it needs their Confirm on the card; say "
+              "that in your own words.",
     )
 
 
@@ -586,5 +590,7 @@ def update_event(title: str, date: str = "", scope: str = "this", new_title: str
         card=plan["card"], apply=apply,
         # The model sees what the card says, so it can describe the change accurately
         reply=f"Confirmation required. The card on screen asks: \"{plan['card']}\" "
-              "The event has NOT been changed yet. Tell the user to confirm on screen.",
+              "The event has NOT been changed yet; it changes only if the user taps "
+              "Confirm. Make sure the user knows it needs their Confirm on the card; say "
+              "that in your own words.",
     )
