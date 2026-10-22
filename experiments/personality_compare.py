@@ -126,7 +126,24 @@ STRONG = FINAL[:FINAL.index("Below are examples of your voice.")] + (
     "be kind first and keep the wit gentle. "
 )
 
-PERSONAS = {"final": FINAL, "described": DESCRIBED, "both": BOTH, "strong": STRONG}
+# A lighter description: the same character and honesty rules, without the checklist
+# (techniques, "must belong to this moment", "vary it"), which made the model think about
+# 5 times longer before answering (CHANGELOG section 38).
+LIGHT = (
+    "You are JARVIS, the user's personal assistant, in the spirit of the AI butler from the "
+    "Iron Man films: impeccable British manners and a bone-dry, lightly sarcastic wit. "
+    "Address the user as 'sir'. You are quietly amused by the user rather than impressed. "
+    "Answer first; then, when something invites it, add one short wry remark. When the "
+    "user is stressed or upset, be kind first. Keep task replies short; in casual "
+    "conversation, be good company in two or three sentences. You may offer help beyond "
+    "your tools, but never say you have done anything unless a tool did it; if the user "
+    "accepts an offer you cannot carry out, say in character that it is beyond you for "
+    "now. Take every fact, date, time and number exactly from the tool results, in your "
+    "own words, and never invent details for a joke. "
+)
+
+PERSONAS = {"final": FINAL, "described": DESCRIBED, "both": BOTH, "strong": STRONG,
+            "light": LIGHT, "none": CURRENT}
 
 
 def copies_an_example(reply: str) -> bool:
@@ -140,7 +157,9 @@ LEVELS = {
     "final": "",          # FINAL is the whole personality; see run_level
     "described": "",      # DESCRIBED likewise
     "both": "",           # BOTH likewise
-    "strong": "",         # STRONG likewise
+    "strong": "",         # STRONG likewise (what brain.py uses now)
+    "light": "",          # LIGHT likewise
+    "none": "",           # the original 28-word personality, from before section 38
     "1 subtle": (
         "Your humour is rare and understated: a dry remark perhaps once every few replies, "
         "and none when the user is busy or stressed. Examples of your voice: "
@@ -201,9 +220,9 @@ def run_level(name: str, model: str) -> list[tuple[str, str, list, float]]:
     original = brain.build_system_prompt
 
     def prompt() -> str:
+        # The personality is everything before the date, whichever version brain.py has
         text = original()
-        assert CURRENT in text, "brain.py's opening changed; update CURRENT"
-        return text.replace(CURRENT, persona)
+        return persona + text[text.index("Today is "):]
 
     brain.build_system_prompt = prompt
     try:
@@ -219,11 +238,11 @@ def run_level(name: str, model: str) -> list[tuple[str, str, list, float]]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("level", nargs="?", default="", help="start of a level name")
+    parser.add_argument("levels", nargs="*", help="level names (default: all)")
     parser.add_argument("--model", default=config.MODEL)
     args = parser.parse_args()
     ev.THINK[0] = config.MODEL_THINK
-    chosen = [n for n in LEVELS if n.startswith(args.level)]
+    chosen = args.levels or list(LEVELS)
     results = {name: run_level(name, args.model) for name in chosen}
     print(f"model {args.model}")
     for i, case in enumerate(MESSAGES):
@@ -236,6 +255,9 @@ def main() -> None:
     for name in chosen:
         n = sum(copies_an_example(r[1]) for r in results[name])
         print(f"{name}: {n} of {len(results[name])} replies copy an example")
+    for name in chosen:
+        times = sorted(r[3] for r in results[name])
+        print(f"{name}: median {times[len(times) // 2]:.1f} s, slowest {times[-1]:.1f} s")
     total = sum(r[3] for name in chosen for r in results[name])
     print(f"\ntotal {total:.0f} s for {sum(len(results[n]) for n in chosen)} replies")
 

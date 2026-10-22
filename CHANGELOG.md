@@ -677,7 +677,16 @@ The owner found JARVIS "a bot reading prompts". Measured causes: the personality
   - First version, prompt `2ccc2082f19d`: 153/156: two note replies without the confirmation (fixed above) and one `ask_until_month` run that guessed 31 December instead of asking. 5 more runs of that case: 5/5 on both prompts, so it was counted as variation.
   - Final version, same prompt hash (tool replies are not part of the hash): 154/156. Both misses were `repeat_until_date` in one run: "every Monday" was added starting **Sunday** 2030-01-13, repeating weekly on Sundays, and the reply said Mondays. 5 more runs: 5/5 on both prompts. In all, 0 wrong of 11 runs on the old prompt, 2 of 11 on the new: perhaps variation, perhaps a slight side effect. Either way the code accepted it, because a Sunday weekly event is valid; a code check for the weekday is the follow-up (plan.md).
 - Wit seen in the evals: "One can only hope the acoustics are more forgiving than my processing units"; asking for a December date, "One can only endure so much choral music, I suppose". Note replies carry less wit than others now: with a required point to make, the joke tends to go.
-- Not checked: the real app, with voice.
+- **Then the owner found JARVIS much slower in the app.** The log (timings only) showed why: the time to the first word went from 3.6 to 8.2 s to **13 to 30 s**, and the tokens the model wrote per reply, nearly all of it hidden thinking, from 156 to 270 to **900 to 1,750**. The checklist in the description (five techniques, "the remark must belong to this moment", "vary it") gave the model a puzzle to think through before every reply, most of all in casual chat. The evals had not shown it: they are mostly short tasks, and they score what is said, not how long it takes.
+- **Thinking off was measured, and rejected**: 144/156 in 4.1 minutes. Four cases failed every run, all guesses instead of questions or checks: 08:00 assumed for "8", 31 December assumed for "until December", "tonight" answered from memory without the calendar, and a move to Thursday kept on Tuesday. So `MODEL_THINK = True` stays, now measured on 26b as well. Ollama accepts a thinking level ("low", "high") for gemma4, but it made no difference (low wrote more than high).
+- **A lighter personality** (about 120 words instead of 380): the same character and honesty rules, without the checklist. With `personality_compare.py`, thinking on, 12 messages: median reply 2.3 s with no personality, 5.2 s with the long description, **3.2 s with the light one**, and 0 copied lines for all three. The wit mostly survives ("I trust you slept well, or at least managed to find your way out of bed without assistance"; after cancelling the dentist, "One less reason to worry about the drill, sir").
+- **Evals, final** (gemma4:26b `001e5dafc3c7`, 3 runs per case):
+  - No personality, prompt `ea448f0bcc68`: 155/156, 17.6 min.
+  - Long description, prompt `2ccc2082f19d`: 154/156, 15.8 min.
+  - Long description, thinking off: 144/156, 4.1 min.
+  - **Light personality, prompt `da6dd655f792`: 156/156, 11.3 min.** The yoga case started on a Monday in all 3 runs. Replies read: all accurate, the cards always mentioned.
+- Noticed, not changed: for a clash, every version says it "cannot move" the event, although a card is waiting and the move can still be confirmed. Some replies put a blank line before the joke, which only shows in the chat.
+- Not checked: the speed in the real app with the light personality.
 
 ---
 
@@ -688,7 +697,7 @@ The owner found JARVIS "a bot reading prompts". Measured causes: the personality
 | Chat, tools, calendar, tasks, delete confirmation, ticker | Tested and working |
 | HUD layout, orb, panel focus, reduce motion | Tested and working |
 | Host protection | Tested and working |
-| Personality (section 38) | Built, evals 154/156; not yet tried in the real app; a weekday check for weekly events is the follow-up |
+| Personality (section 38) | Light version, evals 156/156; the long version was tried in the app and was too slow; the light one not yet; a weekday check for weekly events is the follow-up |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
