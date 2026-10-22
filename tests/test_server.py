@@ -108,7 +108,7 @@ def test_chat_needs_a_message(client):
 # ---------- calendar ----------
 
 def test_calendar_range(client):
-    jcal.add_event("Gym", "2030-01-08", "18:00", repeat="weekly")
+    jcal.add_event("Gym", "2030-01-08", "18:00", repeat="weekly", repeat_days="tue")
     r = client.get("/calendar", params={"start": "2030-01-07", "end": "2030-01-21"})
     assert [e["date"] for e in r.json()["events"]] == ["2030-01-08", "2030-01-15"]
 

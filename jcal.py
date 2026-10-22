@@ -7,6 +7,7 @@ from tools import NeedsConfirmation, tool
 REPEATS = ("none", "daily", "weekdays", "weekly", "biweekly", "monthly")
 DAYS = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
 DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+FULL_DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 REPEAT_WORDS = {
     "daily": "daily", "weekdays": "every weekday (Mon-Fri)", "weekly": "weekly",
     "biweekly": "every 2 weeks", "monthly": "monthly",
@@ -192,6 +193,11 @@ def add_event(title: str, date: str, start_time: str, end_time: str = "",
         if repeat not in ("none", "weekly"):
             return "Error: repeat_days only works with a weekly repeat."
         repeat = "weekly"
+    elif repeat == "weekly":
+        # The weekday must come from the user's words, and the code works out the date from
+        # it: the model once gave a Sunday date for "every Monday" (CHANGELOG section 39).
+        return ("Error: a weekly event needs repeat_days: the weekday or weekdays the user "
+                "said, such as 'mon' or 'tue,thu'. The first date is worked out from them.")
 
     try:
         when = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %H:%M")
@@ -258,7 +264,9 @@ def add_event(title: str, date: str, start_time: str, end_time: str = "",
             (title, date, start_t, end_t, repeat, until, stored_days),
         )
         db.commit()
-    msg = f"Added '{title}' starting {date} from {start_t} to {end_t}"
+    # The weekday by name, so a wrong date is visible to the model and to the user
+    msg = (f"Added '{title}' starting {date} (a {FULL_DAY_NAMES[start_d.weekday()]}) "
+           f"from {start_t} to {end_t}")
     if defaulted:
         msg += " (one hour by default)"
     if repeat != "none":

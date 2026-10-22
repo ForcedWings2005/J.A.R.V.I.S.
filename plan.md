@@ -153,11 +153,9 @@ Not before Phases 3 and 4. In this order:
 
 ## Ongoing upkeep (small, any time)
 
-- **Check the weekday of weekly events in code.** In one eval run, "yoga every Monday" was
-  added starting on a Sunday and repeating on Sundays, and JARVIS said Mondays (CHANGELOG
-  section 38). The calendar accepted it because the event is valid. A weekly event could
-  require `repeat_days`, or the tool could refuse a start date whose weekday is not among
-  them, so the model cannot get it silently wrong.
+- **Check the weekday of fortnightly events too.** A weekly event must now name its weekday
+  (CHANGELOG section 39). Fortnightly ("biweekly") still follows the model's date, with the
+  same risk of landing on the wrong day; it would need repeat_days to work with biweekly.
 - **Whisper may contact the internet when it loads.** The server's output shows
   "Fetching 4 files ... 0.00B" each time: nothing is downloaded, but the Hugging Face
   library usually asks its servers whether the files changed. Not personal data, but it
