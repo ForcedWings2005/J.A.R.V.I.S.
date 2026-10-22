@@ -686,7 +686,7 @@ The owner found JARVIS "a bot reading prompts". Measured causes: the personality
   - Long description, thinking off: 144/156, 4.1 min.
   - **Light personality, prompt `da6dd655f792`: 156/156, 11.3 min.** The yoga case started on a Monday in all 3 runs. Replies read: all accurate, the cards always mentioned.
 - Noticed, not changed: for a clash, every version says it "cannot move" the event, although a card is waiting and the move can still be confirmed. Some replies put a blank line before the joke, which only shows in the chat.
-- Not checked: the speed in the real app with the light personality.
+- **In the real app, light personality** (2026-10-22, the owner: "the response times were good"). From the log, timings only: first word 3.2 to 9.6 s (the 9.6 s includes loading the model), 234 to 568 tokens written per reply, against 13 to 30 s and 901 to 1,886 tokens with the long version.
 
 ---
 
@@ -697,7 +697,7 @@ The owner found JARVIS "a bot reading prompts". Measured causes: the personality
 | Chat, tools, calendar, tasks, delete confirmation, ticker | Tested and working |
 | HUD layout, orb, panel focus, reduce motion | Tested and working |
 | Host protection | Tested and working |
-| Personality (section 38) | Light version, evals 156/156; the long version was tried in the app and was too slow; the light one not yet; a weekday check for weekly events is the follow-up |
+| Personality (section 38) | Light version: evals 156/156, tried in the app, response times good; a weekday check for weekly events is the follow-up |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
