@@ -100,8 +100,38 @@ def test_legacy_event_without_end_time_counts_as_one_hour():
 # ---------- repeating events ----------
 
 def test_weekly_repeat_expands_each_week():
-    jcal.add_event("Gym", day(1), "18:00", repeat="weekly")
+    jcal.add_event("Gym", day(1), "18:00", repeat="weekly", repeat_days="tue")
     assert dates(0, 21) == [day(1), day(8), day(15)]
+
+
+# A weekly event must name its weekday, so the code works out the date (CHANGELOG
+# section 39). In an eval run the model gave a Sunday date for "every Monday", and with
+# no repeat_days the series silently repeated on Sundays.
+
+def test_weekly_without_repeat_days_is_refused_and_nothing_is_saved():
+    msg = jcal.add_event("Yoga", day(6), "18:00", repeat="weekly")
+    assert msg.startswith("Error:") and "repeat_days" in msg
+    assert occurrences(0, 30) == []
+
+
+def test_every_monday_with_a_sunday_date_still_lands_on_mondays():
+    """The eval case: date 2030-01-13 (a Sunday), but the user said Monday."""
+    msg = jcal.add_event("Yoga", "2030-01-13", "18:00", repeat="weekly", repeat_days="mon")
+    assert "starting 2030-01-14 (a Monday)" in msg and "weekly on Mon" in msg
+    assert {jcal._d(e["date"]).weekday() for e in occurrences(0, 60, "Yoga")} == {0}
+
+
+def test_the_result_names_the_weekday():
+    assert "starting 2030-01-08 (a Tuesday)" in jcal.add_event("Dentist", day(1), "15:00")
+
+
+def test_weekly_events_saved_before_this_rule_still_repeat():
+    """Events already in the calendar may have no repeat_days: reading them is unchanged."""
+    with jcal.lock:
+        jcal.db.execute("INSERT INTO events (title, date, time, end_time, repeat_rule) "
+                        "VALUES ('Old gym', ?, '18:00', '19:00', 'weekly')", (day(1),))
+        jcal.db.commit()
+    assert [e["date"] for e in occurrences(0, 15, "Old gym")] == [day(1), day(8), day(15)]
 
 
 def test_biweekly_repeat_skips_every_other_week():
@@ -120,12 +150,12 @@ def test_weekdays_rule_skips_the_weekend():
 
 
 def test_repeat_until_stops_the_series():
-    jcal.add_event("Gym", day(1), "18:00", repeat="weekly", repeat_until=day(9))
+    jcal.add_event("Gym", day(1), "18:00", repeat="weekly", repeat_days="tue", repeat_until=day(9))
     assert dates(0, 60) == [day(1), day(8)]
 
 
 def test_repeat_until_before_the_start_is_rejected():
-    msg = jcal.add_event("Gym", day(5), "18:00", repeat="weekly", repeat_until=day(1))
+    msg = jcal.add_event("Gym", day(5), "18:00", repeat="weekly", repeat_days="sat", repeat_until=day(1))
     assert msg.startswith("Error")
 
 
@@ -146,7 +176,7 @@ def test_monthly_repeat_on_the_31st_skips_short_months():
 
 def test_repeating_event_checks_conflicts_in_the_future():
     jcal.add_event("Dentist", day(15), "18:30", end_time="19:30")       # two weeks out
-    msg = jcal.add_event("Gym", day(1), "18:00", end_time="19:00", repeat="weekly")
+    msg = jcal.add_event("Gym", day(1), "18:00", end_time="19:00", repeat="weekly", repeat_days="tue")
     assert msg.startswith("Error")
     assert "conflicts with 'Dentist'" in msg
 
@@ -216,7 +246,7 @@ def test_delete_tells_the_model_the_card_text_as_a_fact():
 
 
 def test_delete_one_occurrence_keeps_the_rest_of_the_series():
-    jcal.add_event("Gym", day(1), "18:00", repeat="weekly")
+    jcal.add_event("Gym", day(1), "18:00", repeat="weekly", repeat_days="tue")
     found = jcal.find_for_delete("Gym", day(8), scope="this")
     assert "only" in found["text"]
     jcal.apply_delete(found["action"])
@@ -224,7 +254,7 @@ def test_delete_one_occurrence_keeps_the_rest_of_the_series():
 
 
 def test_delete_the_whole_series():
-    jcal.add_event("Gym", day(1), "18:00", repeat="weekly")
+    jcal.add_event("Gym", day(1), "18:00", repeat="weekly", repeat_days="tue")
     found = jcal.find_for_delete("Gym", day(8), scope="all")
     assert "ALL" in found["text"]
     jcal.apply_delete(found["action"])
@@ -252,7 +282,7 @@ def test_delete_still_matches_part_of_the_title():
 
 
 def test_delete_whole_series_without_a_date():
-    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly", repeat_days="tue")
     found = jcal.find_for_delete("piano lessons", scope="all")
     assert "ALL" in found["text"]
     jcal.apply_delete(found["action"])
@@ -260,13 +290,13 @@ def test_delete_whole_series_without_a_date():
 
 
 def test_delete_one_occurrence_needs_a_date():
-    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly", repeat_days="tue")
     assert jcal.find_for_delete("piano", scope="this").startswith("Error")
 
 
 def test_delete_without_a_date_ignores_events_that_are_over(clock):
-    jcal.add_event("Yoga", day(1), "18:00", repeat="weekly", repeat_until=day(8))
-    jcal.add_event("Yoga", day(30), "18:00", repeat="weekly")
+    jcal.add_event("Yoga", day(1), "18:00", repeat="weekly", repeat_days="tue", repeat_until=day(8))
+    jcal.add_event("Yoga", day(30), "18:00", repeat="weekly", repeat_days="wed")
     clock.set(9, day=20)            # the first series ended on day 8
     found = jcal.find_for_delete("yoga", scope="all")
     assert isinstance(found, dict)
@@ -274,7 +304,7 @@ def test_delete_without_a_date_ignores_events_that_are_over(clock):
 
 
 def test_delete_without_a_date_with_two_series_asks_which_one():
-    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly", repeat_days="tue")
     jcal.add_event("Piano practice", day(2), "08:00", repeat="daily")
     found = jcal.find_for_delete("piano", scope="all")
     assert isinstance(found, str) and "several" in found
@@ -420,7 +450,7 @@ def test_renaming_an_event():
 
 
 def test_changing_one_occurrence_leaves_the_rest_of_the_series():
-    jcal.add_event("Piano lesson", day(1), "16:00", "17:00", repeat="weekly")
+    jcal.add_event("Piano lesson", day(1), "16:00", "17:00", repeat="weekly", repeat_days="tue")
     req = change("piano", day(8), new_start_time="17:30")
     assert req.card.startswith(f"Change only the {day(8)} occurrence of 'Piano lesson'")
     req.apply()
@@ -430,7 +460,7 @@ def test_changing_one_occurrence_leaves_the_rest_of_the_series():
 
 
 def test_changing_the_whole_series_without_a_date():
-    jcal.add_event("Piano lesson", day(1), "16:00", "17:00", repeat="weekly")
+    jcal.add_event("Piano lesson", day(1), "16:00", "17:00", repeat="weekly", repeat_days="tue")
     req = change("piano lessons", scope="all", new_start_time="17:00")
     assert req.card.startswith("Change ALL occurrences of 'Piano lesson'")
     assert req.apply() == "Done. Every 'Piano lesson' is now from 17:00 to 18:00."
@@ -438,7 +468,7 @@ def test_changing_the_whole_series_without_a_date():
 
 
 def test_a_whole_series_cannot_move_to_other_days():
-    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly", repeat_days="tue")
     result = jcal.update_event("piano", scope="all", new_date=day(2))
     assert isinstance(result, str) and "cannot be moved to other dates or days" in result
 
@@ -457,7 +487,7 @@ def test_moving_half_an_hour_does_not_clash_with_itself():
 
 
 def test_a_series_change_checks_every_upcoming_occurrence():
-    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly", repeat_days="tue")
     jcal.add_event("Recital", day(22), "17:00")                       # clashes in 3 weeks
     result = jcal.update_event("piano", scope="all", new_start_time="17:00")
     assert result == f"Error: conflicts with 'Recital' at 17:00 on {day(22)}."
@@ -504,7 +534,7 @@ def test_bad_changes_come_back_as_errors(kwargs, error):
 
 
 def test_changing_one_occurrence_needs_its_date():
-    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly", repeat_days="tue")
     assert jcal.update_event("piano", new_start_time="17:00").startswith(
         "Error: give the date of the occurrence to change")
 
@@ -565,7 +595,7 @@ def test_the_only_upcoming_event_can_move_to_a_new_day_without_its_date():
 
 def test_the_current_date_put_in_new_date_is_understood():
     """Seen in the evals: the model put the event's own date in new_date, not in date."""
-    jcal.add_event("Piano lesson", day(1), "16:00", "17:00", repeat="weekly")
+    jcal.add_event("Piano lesson", day(1), "16:00", "17:00", repeat="weekly", repeat_days="tue")
     req = change("piano", new_date=day(8), new_start_time="17:00")
     assert req.card.startswith(f"Change only the {day(8)} occurrence of 'Piano lesson'")
     assert "date to" not in req.card                     # nothing moves to another day
@@ -582,7 +612,7 @@ def test_with_two_dentists_the_date_in_new_date_picks_the_right_one():
 
 
 def test_without_a_safe_guess_the_error_explains_the_two_dates():
-    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly")
+    jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly", repeat_days="tue")
     result = jcal.update_event("piano", new_date=day(3), new_start_time="17:00")   # no piano on day 3
     assert result.startswith("Error: give the date of the occurrence to change")
     assert "CURRENT date" in result

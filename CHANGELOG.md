@@ -688,6 +688,22 @@ The owner found JARVIS "a bot reading prompts". Measured causes: the personality
 - Noticed, not changed: for a clash, every version says it "cannot move" the event, although a card is waiting and the move can still be confirmed. Some replies put a blank line before the joke, which only shows in the chat.
 - **In the real app, light personality** (2026-10-22, the owner: "the response times were good"). From the log, timings only: first word 3.2 to 9.6 s (the 9.6 s includes loading the model), 234 to 568 tokens written per reply, against 13 to 30 s and 901 to 1,886 tokens with the long version.
 
+## 39. A weekly event must name its weekday
+
+In one eval run (section 38), "yoga every Monday" was added starting on a Sunday and repeating on Sundays, while JARVIS said Mondays. The cause, found in `add_event`: with `repeat_days` given (such as "mon"), the code works out the first date itself; without it, a weekly event simply repeats on whatever weekday the model's date falls on, and the result said only "repeating weekly", so the wrong day was invisible. (Section 38 said the result read "on Sun"; that was wrong.)
+
+- **The rule, in code**: `add_event` refuses a weekly repeat without `repeat_days`, with an error that says what to send ("the weekday or weekdays the user said, such as 'mon'"). Nothing is saved. Naming the day is copying the user's words, which the model gets right; the date arithmetic stays in code.
+- **Every result names the weekday**: "Added 'yoga' starting 2030-01-07 (a Monday) ...". The day goes after the date, so existing text such as "starting 2030-01-07" is unchanged.
+- **Events already in the calendar** without `repeat_days` still repeat as before (a test checks it); only adding changed.
+- Tests: 4 new (the refusal, a Sunday date for "every Monday" landing on Mondays, the weekday in the result, old events unchanged), and 20 existing test setups now name their weekday. 412 tests.
+- **First version also changed the tool descriptions** ("repeat_days: required for a weekly repeat"). The full eval then went from 156/156 to 153/156: "I bought the milk" was answered "I have marked Buy milk as finished" without any `complete_task` call, in 3 of 3 runs, and 2 of 5 more (old prompt: 8 of 8 correct). The descriptions were put back word for word: `task_complete` 5/5 again. The code rule does not need them; the error message teaches the model when it matters.
+- **Evals** (gemma4:26b `001e5dafc3c7`, 3 runs per case):
+  - Before, prompt `da6dd655f792`: 156/156.
+  - With new descriptions, prompt `48f04588c47a`: 153/156 (above).
+  - **Final, prompt `da6dd655f792` (descriptions unchanged; tool results now name the weekday): 154/156.** Yoga on a Monday in all 3 runs; the model gave `repeat_days` for all 10 weekly events, so no refusals were needed. The 2 misses had already happened in earlier runs and are before or outside the changed results: `ask_until_month` guessed 31 December once (also seen in section 38), and `edit_move_to_another_day` kept the dentist on Tuesday once (the card would show the wrong change). Same prompt as the 156/156 runs, so counted as variation.
+- **Known limit, not changed**: fortnightly ("biweekly") and monthly repeats still follow the model's date, because `repeat_days` only works with weekly. Fortnightly has the same risk as weekly had.
+- Not checked: the real app.
+
 ---
 
 ## Status
@@ -697,7 +713,8 @@ The owner found JARVIS "a bot reading prompts". Measured causes: the personality
 | Chat, tools, calendar, tasks, delete confirmation, ticker | Tested and working |
 | HUD layout, orb, panel focus, reduce motion | Tested and working |
 | Host protection | Tested and working |
-| Personality (section 38) | Light version: evals 156/156, tried in the app, response times good; a weekday check for weekly events is the follow-up |
+| Personality (section 38) | Light version: evals 156/156, tried in the app, response times good |
+| Weekday check for weekly events (section 39) | Done in code, evals 154/156 (variation); fortnightly and monthly repeats not covered |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
