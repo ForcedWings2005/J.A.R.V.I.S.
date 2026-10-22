@@ -655,6 +655,30 @@ The owner asked whether a better model would help with JARVIS's personality. Thr
 - Not checked: the real app with 26b (voice, and how the speed feels). `ollama ps` reported 3.7 GB in use with the model loaded, against 18 GB on disk; not understood yet, so not written down as a fact.
 - Still on the Mac and no longer used: `gemma4:latest`, `gemma4:31b` (20 GB), `qwen3.5:latest`. `ollama rm <name>` removes one.
 
+## 38. A personality for JARVIS
+
+The owner found JARVIS "a bot reading prompts". Measured causes: the personality was 28 words of a 1,075-word prompt; tool results were written as orders ("Tell the user to confirm on screen") that the model read out; and the prompt asked it to describe events "exactly as the tool result says".
+
+- **The character**, chosen by the owner: the butler AI of the Iron Man films, dry and lightly sarcastic, "sir", between "classic" and "playful" humour, noticing things, chatting in casual conversation. He may **offer** things he cannot do yet (a source of feature ideas for the owner), but never claim he did them; when an offer is accepted, he says in character that it is beyond him for now.
+- **How it was chosen**, with `experiments/personality_compare.py` on gemma4:26b, the same 12 messages each time, and a counter for replies sharing 5 or more words in a row with an example line:
+
+  | Personality text | Replies copying an example | Wit |
+  |---|---|---|
+  | 12 example lines | 11 of 12 | strong, but the same lines every time ("coffee remains your department" three greetings in a row) |
+  | Examples + "never copy, they are used up" | 6 of 12 | weaker |
+  | A description only | 0 of 12 | weak |
+  | **A stronger description** (techniques, wit in almost every reply, the remark must belong to this moment) | **0 of 12** | a fitting remark in about 8 of 12 |
+
+  So the prompt describes the humour and shows no lines: the model copied examples however it was told not to.
+- **Tool replies** (`delete_event`, `update_event`, `remember`, `forget`): still start with "Confirmation required" (the ticker uses it), now say what the card asks and that it happens only on Confirm. First version: "Say this in your own words". In the eval, note replies then sometimes left out the confirmation ("I shall keep it in mind for your next culinary excursion"). Final version: "Make sure the user knows it needs their Confirm on the card; say that in your own words": say what must be conveyed, leave the wording to the model. Note cases 24/24 afterwards. Tests check the card text is in each reply and no order is.
+- The add-event rule became "give its details exactly as the tool result says, in your own words".
+- **Evals** (gemma4:26b `001e5dafc3c7`, 3 runs per case; the before run used a separate worktree of `main`, so it could not see the changes):
+  - Before, prompt `ea448f0bcc68`: 155/156 (one borderline note reply).
+  - First version, prompt `2ccc2082f19d`: 153/156: two note replies without the confirmation (fixed above) and one `ask_until_month` run that guessed 31 December instead of asking. 5 more runs of that case: 5/5 on both prompts, so it was counted as variation.
+  - Final version, same prompt hash (tool replies are not part of the hash): 154/156. Both misses were `repeat_until_date` in one run: "every Monday" was added starting **Sunday** 2030-01-13, repeating weekly on Sundays, and the reply said Mondays. 5 more runs: 5/5 on both prompts. In all, 0 wrong of 11 runs on the old prompt, 2 of 11 on the new: perhaps variation, perhaps a slight side effect. Either way the code accepted it, because a Sunday weekly event is valid; a code check for the weekday is the follow-up (plan.md).
+- Wit seen in the evals: "One can only hope the acoustics are more forgiving than my processing units"; asking for a December date, "One can only endure so much choral music, I suppose". Note replies carry less wit than others now: with a required point to make, the joke tends to go.
+- Not checked: the real app, with voice.
+
 ---
 
 ## Status
@@ -664,6 +688,7 @@ The owner asked whether a better model would help with JARVIS's personality. Thr
 | Chat, tools, calendar, tasks, delete confirmation, ticker | Tested and working |
 | HUD layout, orb, panel focus, reduce motion | Tested and working |
 | Host protection | Tested and working |
+| Personality (section 38) | Built, evals 154/156; not yet tried in the real app; a weekday check for weekly events is the follow-up |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |

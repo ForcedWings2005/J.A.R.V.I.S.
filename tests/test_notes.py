@@ -193,3 +193,16 @@ def test_recall_with_null_lists_the_latest_notes():
 def test_remember_and_forget_with_null_return_an_error_instead_of_crashing():
     assert notes.remember(None).startswith("Error:")
     assert notes.forget(None).startswith("Error:")
+
+
+# --- what the model is told while a card waits (CHANGELOG section 38) ---------------------
+
+def test_the_model_is_told_the_card_text_as_a_fact_not_an_order():
+    """An order like 'Tell the user to confirm on screen' was read out word for word."""
+    to_save = notes.remember("Likes jazz")
+    save("Prefers tea")
+    to_forget = notes.forget("tea")
+    for result in (to_save, to_forget):
+        assert result.reply.startswith("Confirmation required")
+        assert result.card in result.reply
+        assert "Tell the user" not in result.reply
