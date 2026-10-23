@@ -124,7 +124,7 @@ reported.
    full-text search. Start with that before reaching for embeddings. Trivial preferences
    only, and the rules in `SECURITY.md` section 5: no secrets, saved only when I ask, `forget`
    through the confirmation card, note text kept out of the log.
-   *Done: CHANGELOG section 34. Still to come: a notes panel on the dashboard.*
+   *Done: CHANGELOG section 34. A read-only notes panel on the dashboard: section 40.*
 5. **Morning briefing.** Today's events, overdue tasks and open reminders in one reply. Most
    of it can be put together in code, with the model only writing the sentences.
 6. **Weather, then news and sports**, as plain read-only tools with a timeout and a cached

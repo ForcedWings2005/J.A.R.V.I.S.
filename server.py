@@ -24,6 +24,7 @@ except Exception as e:                  # a backup problem must never stop JARVI
 
 import brain  # noqa: E402
 import jcal  # noqa: E402
+import notes  # noqa: E402
 import speech  # noqa: E402
 import tasks  # noqa: E402
 
@@ -169,6 +170,11 @@ def calendar_range(start: str, end: str):
 @app.get("/tasks")
 def list_tasks_endpoint():
     return {"tasks": tasks.tasks_list()}
+
+
+@app.get("/notes")
+def list_notes_endpoint():
+    return {"notes": notes.notes_list()}
 
 
 @app.post("/tasks/{task_id}")

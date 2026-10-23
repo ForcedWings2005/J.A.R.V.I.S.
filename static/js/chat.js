@@ -116,6 +116,7 @@ async function send(spoken) {
   if (!pendingId) input.focus();
   loadEvents();
   loadTasks();
+  loadNotes();
 }
 
 async function resolveAction(approve) {
@@ -137,5 +138,6 @@ async function resolveAction(approve) {
   }
   input.focus();
   loadEvents();
+  loadNotes();
 }
 

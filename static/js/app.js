@@ -109,5 +109,6 @@ input.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
 buildOrb();
 loadEvents();
 loadTasks();
+loadNotes();
 setVoice(false);
 input.focus();

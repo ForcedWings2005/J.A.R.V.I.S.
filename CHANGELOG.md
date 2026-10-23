@@ -718,6 +718,12 @@ The owner asked for recommendations to make the dashboard look better. Looked at
 
 **Step 1: the dashboard fits the screen.** The page is exactly one screen tall (`height: 100vh`, `overflow: hidden`), the panels scroll inside themselves, and the orb is at most 40% of the screen height so the conversation fits under it. Measured in the demo: at 1440x900 the page was 1,016 px tall with 2 panels cut off, now 900 px with none; at 1280x720 nothing is cut off and the text box is visible. At phone width (under 900 px) the page still scrolls as before, with no sideways scrolling.
 
+**Step 2: real panels instead of "Coming soon".**
+- **Up next** (top left, replacing "Current events"): the event happening now ("Now · until 11:13 AM", in amber) or the next one, with a countdown ("Today 1 PM · in 2 h 26 min"), and the one after it. Worked out in the page from the 7 days of events the schedule already loads, and recomputed every 30 seconds. All three states checked in the demo: now, coming up, nothing in the next 7 days.
+- **Notes and memory** (bottom right) lists the saved notes, newest first, from a new read-only endpoint `GET /notes` (`notes.notes_list()`, at most 100). Saving and forgetting still go only through the chat and the card; the panel refreshes after each reply and after a card is clicked. Checked in the demo: after "remember that I prefer window seats" and Confirm, the note appeared at once. Tests: empty list, newest first, and `POST /notes` refused (405).
+- **Weather and Sports** removed until they exist.
+- Docs: step 0 had dropped `/chat` from the endpoint list in CLAUDE.md by mistake; put back.
+
 **Found while testing, not fixed:** asked to "cancel the dentist" without a date, `delete_event` returned an error (it needs the date), so no card was shown, but JARVIS replied "I'll need you to confirm on screen". A claim about a card that does not exist; added to `plan.md`.
 
 ---
