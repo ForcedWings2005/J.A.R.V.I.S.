@@ -129,6 +129,8 @@ reported.
    of it can be put together in code, with the model only writing the sentences.
 6. **Weather, then news and sports**, as plain read-only tools with a timeout and a cached
    result, so a slow API never blocks a reply.
+7. **Sound effects for the dashboard.** The animations are done (CHANGELOG section 42);
+   the owner chose to leave sound for later. Quiet, short, and off with voice mode off.
 
 Each new tool gets its own eval cases before it ships.
 

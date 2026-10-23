@@ -117,6 +117,7 @@ function renderTimeline() {
     const state = endOf(ev) <= now ? ' past' : startOf(ev) <= now ? ' live' : '';
     const bar = h('div', 'ev' + state, ev.title);
     bar.title = ev.title + ', ' + fmtRange(ev);
+    bar.dataset.key = ev.id + '|' + ev.date;
     bar.style.left = pos(a);
     bar.style.width = 'calc(' + pos(b) + ' - ' + pos(a) + ')';
     box.appendChild(bar);
@@ -162,6 +163,7 @@ async function loadEvents() {
     if (!list.length) box.appendChild(h('div', 'sempty', 'Nothing scheduled'));
     for (const ev of list) {
       const card = h('div', 'evc');
+      card.dataset.key = ev.id + '|' + ev.date;     // lets motion.js spot new and removed events
       card.dataset.start = +startOf(ev);
       card.dataset.end = +endOf(ev);
       card.appendChild(h('div', 'et', ev.title));

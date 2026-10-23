@@ -30,7 +30,8 @@ jarvis/
 ├── static/
 │   ├── index.html      The dashboard page: only its structure
 │   ├── css/jarvis.css  Its styles
-│   └── js/             Its scripts, loaded in order: orb, chat, tasks, voice, calendar, app
+│   ├── css/motion.css  The animations' styles (section 42)
+│   └── js/             Its scripts, loaded in order: orb, chat, tasks, notes, voice, calendar, app, motion
 ├── models/
 │   ├── kokoro-v1.0.onnx
 │   └── voices-v1.0.bin
@@ -712,7 +713,7 @@ The owner asked for recommendations to make the dashboard look better. Looked at
 
 **Step 0: `index.html` split into files** (1,044 lines to 67). The styles went to `static/css/jarvis.css`, the scripts to six files in `static/js/` (orb, chat, tasks, voice, calendar, app), by their existing section headings. Mechanical: a script moved the lines and checked that the pieces joined back equal the original exactly. They are plain scripts loaded in order, which share their top-level names just as one script did, so no build step. The server now serves the folder: `app.mount("/static", StaticFiles(...))`, built into FastAPI (no new dependency), GET only, files inside `static/` only. Tests: the files are served with the right types, `../` paths are refused, and every file the page links to exists.
 
-**A check that was not what it seemed.** The first browser check after the split (and the commit message of `c031277`) reported no errors and every panel working. It had in fact tested the **old** page: the browser had kept its copy from before the split, because the server sent no caching instructions. Found during step 1, when a style change did not show: the loaded page had its styles inline and one inline script. The fix is below; the check was then repeated on the real new page (6 scripts and the stylesheet loaded): no console errors, the to-do list, schedule, orb, the calendar in all four views, closing it with Escape, ticking and unticking a task, a chat, and a confirmation card with Cancel all work.
+**A check that was not what it seemed.** The first browser check after the split (and the commit message of `e1de8dd`) reported no errors and every panel working. It had in fact tested the **old** page: the browser had kept its copy from before the split, because the server sent no caching instructions. Found during step 1, when a style change did not show: the loaded page had its styles inline and one inline script. The fix is below; the check was then repeated on the real new page (6 scripts and the stylesheet loaded): no console errors, the to-do list, schedule, orb, the calendar in all four views, closing it with Escape, ticking and unticking a task, a chat, and a confirmation card with Cancel all work.
 
 **Caching**: `/` and `/static/...` now send `Cache-Control: no-cache`, so the browser may keep the files but asks the server before using them. Without it, an update to the page could stay invisible until a forced reload. Test: the header is on the page and its files. A browser that already holds an old copy needs one forced reload (Cmd+Shift+R), once.
 
@@ -759,6 +760,33 @@ The owner wanted the dashboard to feel more like the films' HUD. Three direction
 - **Checked in the demo** (made-up calendar): boot sequence, clock, readouts (model, green dot, backup time), timeline, Up next, counts, a chat with a confirmation card and Cancel, ticking and unticking a task (count 3 to 2 to 3), the expanded calendar in the new look (month labels unaffected), Escape, New conversation, Reduce motion (no animation, no boot), 1440x900 and 1280x720 (fits, nothing cut off) and phone width (one column, no sideways scrolling, timeline hidden). No console errors.
 - **Not checked**: Safari (the built-in browser is not Safari; the blur has Safari's `-webkit-` spelling), the real data, the microphone and speech.
 
+## 42. Motion: the dashboard comes alive
+
+The owner listed which animations they wanted from a brainstorm. Sound effects are left for later. A throwaway prototype was tried first (made-up data, scratch folder, this Mac only). The first version of the screen opening, built on the browser's View Transitions, was turned down: "too short and out of sync". The to-do list appeared before the animation ran, the calendar appeared while its loading bar was still filling, and the bar was tucked in a corner and gone too fast. It was rebuilt as a sequence in which each stage waits for the one before, and the owner approved it ("I like it a lot").
+
+All of it lives in two new files, `static/js/motion.js` and `static/css/motion.css`, loaded after everything else. `motion.js` **wraps** existing functions: for example, `loadTasks` becomes "remember which tasks were ticked, call the original `loadTasks`, then animate the rows that changed". The original still does all the real work, so turning the file off would leave the dashboard working as before. Every class it adds starts with `fx-`, because two earlier names (`chip`, `ghost`) had already clashed with classes the page used.
+
+- **Opening a screen (the "access sequence")**: the panel charges and sends out a shockwave. An empty frame flies to full size, then shows "ACCESSING TO-DO" decoding in, a 20-block bar, a percentage and a line from the real contents ("3 OPEN · 1 DONE"). Then "ACCESS GRANTED" in green, and the content beams open from a bright line, with corner brackets locking on, a short glitch and the items arriving one by one. The glitch was first almost invisible: its red and cyan split was 1 to 2 pixels for a few hundredths of a second, and the title's own glow hid it, so the owner saw only a shake. It now splits the text, title included, by 4 to 6 pixels in frames held about 60 ms each, for 0.4 s, with a smaller shake (at most 2 pixels); the owner approved it in the demo. The real content stays hidden until the end. The bar reaches 90% on time but 100% only once the content is ready: the calendar draws itself late, so the bar waits for it, for up to 3 seconds. A click or Escape skips straight to the content. Closing: the content collapses to a line like an old TV, and the frame shrinks back. Each stage has a safety time limit, so a hidden tab (where browsers pause animations) cannot leave it stuck.
+- **The orb**: it reacts to sound, a radar arc and 24 segments sweep while JARVIS thinks, and its colour follows the state (cyan, green while listening, amber while a card waits). It breathes slowly when idle, and a radar sweep turns behind it.
+- **How the orb hears sound**: your microphone is measured directly while it records (it is never played back, so there is no echo). JARVIS's voice is **not** routed through the browser's audio engine: a mistake there could make him silent. Instead, each sentence's sound file is read before it plays, its loudness is measured every 50 ms into a "loudness map", and the orb follows the map as the sentence plays. The speech itself plays exactly as before. `voice.js` has three one-line hooks for this.
+- **Feedback**: a new event pings, a deleted one is wiped away by a red scan line before it goes, a ticked task's diamond bursts and the strike-through draws across, new tasks and notes slide in, and counts count up or down. Up next flashes amber as an event starts. To recognise rows, the calendar cards and timeline bars now carry their event id and date (`data-key`), and tasks and notes carry their id (`data-id`).
+- **Text**: panel titles decode in after the boot, the clock flips when the minute changes, and a cursor blinks while JARVIS is still replying.
+- **The confirmation card** slides up with an amber pulse and shows a ring counting down the 5 minutes the server keeps it (`config.CONFIRM_TIMEOUT_SECONDS`). When it runs out, the card says "EXPIRED · ASK AGAIN" instead of failing when you click.
+- **Ambient**: on hover, the corner brackets slide outward, a light runs along the top edge, and the panel tilts a little towards the mouse (at most 3 degrees). After **3 minutes** without mouse or keys, the panels dim and the orb grows (ambient mode); any movement brings them back.
+- **Reduce motion** (the switch or the Mac's setting) turns all of it off: screens open instantly, and the radar and countdown ring are hidden.
+- **Found and fixed while checking**:
+  - The page loads its lists before `motion.js` runs, so the first new event, task or note after opening the page would not have animated. `motion.js` now loads the lists once more at start, so it knows what is already there.
+  - Deleting one day of a repeating event would have wiped every copy on screen; now only that date is wiped.
+- **Checked in the demo** (made-up data, port 8001, built-in browser):
+  - every stage of the sequence in order, with the content hidden until the end; Escape closing it; a click skipping the calendar's sequence (the calendar was drawn);
+  - a task, an event and a note added to the demo database, each animated on the next reload;
+  - ticking (burst, count 4 to 3), the card (amber orb, a 300-second ring, back to normal when hidden), the wipe for a single, an "ALL occurrences" and a one-day delete;
+  - the thinking radar; the loudness map of a made-up sound (quiet half 0.03, loud half 1.0);
+  - Reduce motion (instant, no frame); no console errors. Ruff passes, 437 tests pass (no Python changed).
+- **Checked by the owner in Safari** (where they use JARVIS): the animations, and the orb following the microphone and JARVIS's voice.
+- **Not checked**: the 5-minute expiry and the 3-minute ambient mode at full length (the pieces were checked, the wait was not).
+- **A note on testing**: the built-in browser first showed a page from long before the split, which it had kept from an earlier session on the same port, without asking the server. Found because the page had one inline script; loading the address with `?fresh=42` fetched the real page. Section 40 made the server tell browsers to check again, but a copy saved before that change can still be reused, so a hard refresh (Cmd+Shift+R) after updating is still worth doing.
+
 ---
 
 ## Status
@@ -772,6 +800,7 @@ The owner wanted the dashboard to feel more like the films' HUD. Three direction
 | Weekday check for weekly events (section 39) | Done in code, evals 154/156 (variation); fortnightly and monthly repeats not covered |
 | Dashboard redesign (section 40) | Done in a demo with a made-up calendar; not yet tried with real data, voice or the microphone |
 | Cinematic HUD look (section 41) | Done in a demo; not yet checked in Safari or with real data |
+| Motion layer (section 42) | Done; checked in a demo and by the owner in Safari, including the orb with the microphone and voice |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |

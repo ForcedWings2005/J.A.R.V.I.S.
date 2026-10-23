@@ -18,6 +18,7 @@ async function loadNotes() {
   for (const n of data.notes) {
     const row = document.createElement('div');
     row.className = 'note';
+    row.dataset.id = n.id;
     row.textContent = n.text;
     box.appendChild(row);
   }
