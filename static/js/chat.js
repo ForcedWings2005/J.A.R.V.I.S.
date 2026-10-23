@@ -53,7 +53,7 @@ function say(text) { botEl = addLine('bot', text); }
 // ---------- Ticker and confirmation ----------
 function showSteps(steps) {
   tickerEl.textContent = '';
-  if (steps.length === 0) { tickerEl.textContent = '\u00a0'; return; }
+  if (steps.length === 0) { tickerEl.textContent = ''; return; }
   for (const s of steps) {
     const span = document.createElement('span');
     span.className = 'step ' + s.status;
@@ -82,9 +82,11 @@ async function send(spoken) {
   if (!text) return;
   if (typeof spoken !== 'string') input.value = '';
   stopSpeaking();
-  hideConfirm();
+  // A waiting card stays until it is clicked, replaced by a new one, or the conversation is
+  // reset: the server keeps the request that long, and hiding it here let JARVIS say "it is
+  // waiting on screen" while nothing was shown (CHANGELOG section 40).
   startExchange(text);
-  tickerEl.textContent = 'working...';
+  tickerEl.textContent = 'Thinking\u2026';
   setState('thinking');
   sendBtn.disabled = true;
 
@@ -147,7 +149,7 @@ async function send(spoken) {
   } catch (err) {
     stopSpeaking();
     botEl.textContent = full ? full + ' [Error: ' + err.message + ']' : 'Error: ' + err.message;
-    tickerEl.textContent = '\u00a0';
+    tickerEl.textContent = '';
     setState('idle');
   }
   endExchange();
