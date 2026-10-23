@@ -732,6 +732,8 @@ The owner asked for recommendations to make the dashboard look better. Looked at
 
 **Step 5: easier to read.** Measured first: the colours already pass the usual guideline for text contrast (WCAG asks for 4.5:1; the main text is 15.9:1, the muted colour 7.0:1, the accent 9.6:1), so they stay. The difficulty was size and style: 7 places used 10 or 11 px text, and sentences such as "No tasks yet" and the voice hint used the monospace label font. Now nothing is below 12 px except the year view's weekday letters (11 px), tasks and notes are 15 px, event times 13 px, label letter spacing is a little tighter, and `.muted` sentences use the normal font; monospace stays for the short HUD labels. Measured in the demo at 1440x900: smallest visible text 12 px, page still fits the screen.
 
+**Step 6: now and next in the schedule.** Each event card in the schedule carries its start and end time; `markSchedule()` dims the ones that are over, gives the one happening now an amber edge (the same colour as "Now" in Up next), and gives the next one a thicker, brighter edge. It runs when the schedule loads and every 30 seconds with the Up next countdown. One rule changed after trying it: an event happening now does not stop the following one being marked next, as Up next also shows "Then: ...". Checked in the demo by changing two cards' times in the browser only: over, now and next all showed as intended.
+
 **Found while testing, not fixed:** asked to "cancel the dentist" without a date, `delete_event` returned an error (it needs the date), so no card was shown, but JARVIS replied "I'll need you to confirm on screen". A claim about a card that does not exist; added to `plan.md`.
 
 ---
