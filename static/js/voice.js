@@ -33,6 +33,8 @@ function playBlob(blob, token) {
     if (token !== speakToken) { resolve(); return; }
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
+    // motion.js reads the file's loudness to move the orb; the sound itself is untouched
+    if (typeof fxFollowSpeech === 'function') fxFollowSpeech(audio, blob);
     const done = () => {
       audio.pause();
       URL.revokeObjectURL(url);
@@ -131,6 +133,7 @@ let pressStart = 0;
 let latchTimer = null;
 
 function releaseMic() {
+  if (typeof fxHearStop === 'function') fxHearStop();
   if (stream) stream.getTracks().forEach(t => t.stop());
   stream = null;
 }
@@ -152,6 +155,7 @@ async function startRecording() {
   recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
   recorder.onstop = finishRecording;
   recorder.start();
+  if (typeof fxHearMic === 'function') fxHearMic(stream);
   recStart = Date.now();
   latchTimer = setTimeout(stopRecording, MAX_RECORD_MS);
   micBtn.classList.add('live');

@@ -1,0 +1,177 @@
+/* ===================== Motion (CHANGELOG section 42) =====================
+   The animations added by js/motion.js. Every class here starts with "fx-", so none can clash
+   with the page's own classes. Reduce motion (the header switch or the Mac's setting) turns
+   all of it off: jarvis.css stops every animation, and the end of this file hides the rest. */
+
+/* Lets the bracket length animate (Safari 16.4 and later understand @property) */
+@property --s { syntax:'<length>'; inherits:false; initial-value:16px; }
+
+/* ---------- The orb ---------- */
+#orb { transition:color .5s ease; }
+body[data-state="listening"] #orb { color:var(--green); }
+body.fx-awaiting #orb { color:var(--amber); }                 /* a card needs your Confirm */
+body.fx-awaiting .orbwrap::before { box-shadow:0 0 90px rgba(240,180,41,.35), inset 0 0 40px rgba(240,180,41,.2); }
+/* The whole orb grows a little with the sound level (--level, 0 to 1, set by motion.js) */
+#orb .fx-react { transform-box:view-box; transform-origin:center; transform:scale(calc(1 + var(--level, 0) * .09)); transition:transform 70ms linear; }
+#orb .fx-react .core { transform:scale(calc(1 + var(--level, 0) * .5)); transform-box:view-box; transform-origin:center; }
+/* Idle breathing: a slow glow, so the orb never looks frozen */
+@keyframes fx-breathe { 50% { opacity:.55; } }
+body[data-state="idle"] .orbwrap::before { animation:fx-breathe 5s ease-in-out infinite; }
+/* Thinking: a bright arc sweeps round like a radar, and outer segments light in turn */
+#orb .fx-radar, #orb .fx-segs { opacity:0; transition:opacity .4s; }
+body[data-state="thinking"] #orb .fx-radar, body[data-state="thinking"] #orb .fx-segs { opacity:1; }
+#orb .fx-radar { animation:spin 1.6s linear infinite; transform-box:view-box; transform-origin:center; }
+@keyframes fx-seglight { 0%, 100% { opacity:.12; } 10% { opacity:1; } }
+#orb .fx-segs path { opacity:.12; }
+body[data-state="thinking"] #orb .fx-segs path { animation:fx-seglight 1.2s linear infinite; animation-delay:calc(var(--i) * 50ms); }
+
+/* ---------- Screens: the access sequence ---------- */
+/* The dashboard recedes behind an open screen */
+header, .timeline, .center { transition:transform .45s ease, filter .45s ease, opacity .45s ease; }
+.col > .panel { transition:--s .3s ease, transform .45s ease, filter .45s ease, opacity .45s ease; }
+body.fx-receding header, body.fx-receding .timeline, body.fx-receding .center, body.fx-receding .col > .panel:not(.focused) {
+  transform:scale(.95); filter:blur(3px); opacity:.45; }
+body.fx-receding #scrim { background:rgba(3,7,15,.55); }
+/* A screen that is open but not shown yet keeps its place, invisibly */
+.panel.fx-hidden { visibility:hidden; }
+/* 1. Charge: the panel pulses, a shockwave bursts out of it */
+@keyframes fx-charge { 0% { --c:var(--accent); filter:brightness(1); } 50% { filter:brightness(1.8); transform:scale(1.02); } 100% { filter:brightness(1); transform:scale(1); } }
+.panel.fx-charge { animation:fx-charge .25s ease; }
+.fx-shock { position:fixed; z-index:22; border-radius:50%; border:2px solid var(--accent); pointer-events:none; box-shadow:0 0 30px var(--glow), inset 0 0 30px var(--glow); }
+/* 2-4. The empty frame that flies out and holds the access readout */
+.fx-frame { position:fixed; z-index:21; pointer-events:none; border:1px solid var(--line-strong); background:rgba(4,12,24,.88);
+  box-shadow:0 0 40px rgba(76,201,240,.25), inset 0 0 60px rgba(76,201,240,.08);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; overflow:hidden; }
+.fx-frame::before { content:""; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg, rgba(76,201,240,.06) 0 1px, transparent 1px 24px), repeating-linear-gradient(90deg, rgba(76,201,240,.06) 0 1px, transparent 1px 24px); }
+.fx-corner { position:absolute; width:40px; height:40px; border:0 solid var(--accent); filter:drop-shadow(0 0 8px var(--glow)); }
+.fx-corner:nth-child(1) { top:-1px; left:-1px; border-width:3px 0 0 3px; }
+.fx-corner:nth-child(2) { top:-1px; right:-1px; border-width:3px 3px 0 0; }
+.fx-corner:nth-child(3) { bottom:-1px; left:-1px; border-width:0 0 3px 3px; }
+.fx-corner:nth-child(4) { bottom:-1px; right:-1px; border-width:0 3px 3px 0; }
+.fx-readout { display:flex; flex-direction:column; align-items:center; gap:14px; opacity:0; transition:opacity .2s; }
+.fx-frame.fx-loading .fx-readout { opacity:1; }
+.fx-title { font-family:var(--display); font-size:44px; letter-spacing:8px; color:var(--accent); text-shadow:0 0 18px var(--glow); text-align:center; }
+.fx-bar { display:flex; gap:4px; width:min(520px,60vw); }
+.fx-bar i { flex:1; height:18px; border:1px solid rgba(76,201,240,.4); background:rgba(76,201,240,.05); transition:background .08s, box-shadow .08s; }
+.fx-bar i.fx-on { background:var(--accent); box-shadow:0 0 10px var(--glow); }
+.fx-pct { font-family:var(--display); font-size:30px; letter-spacing:3px; color:var(--text); min-width:4ch; text-align:center; }
+.fx-line { font-family:var(--mono); font-size:12px; letter-spacing:3px; color:var(--muted); }
+.fx-frame.fx-granted .fx-title { color:var(--green); text-shadow:0 0 22px rgba(61,220,151,.8); }
+.fx-frame.fx-granted .fx-bar i.fx-on { background:var(--green); box-shadow:0 0 12px rgba(61,220,151,.8); }
+@keyframes fx-grantflash { 0% { box-shadow:0 0 40px rgba(76,201,240,.25); } 40% { box-shadow:0 0 90px rgba(61,220,151,.6), inset 0 0 120px rgba(61,220,151,.25); } 100% { box-shadow:0 0 40px rgba(76,201,240,.25); } }
+.fx-frame.fx-granted { animation:fx-grantflash .3s ease; }
+/* 5. Reveal: the content beams open from a bright line through the middle */
+@keyframes fx-beam { 0% { clip-path:inset(50% 0 50% 0); filter:brightness(2.5); } 100% { clip-path:inset(0 0 0 0); filter:none; } }
+.panel.fx-reveal > :not(.fx-lockon) { animation:fx-beam .45s cubic-bezier(.3,.8,.3,1) both; }
+@keyframes fx-beamline { 0% { transform:scaleX(0); opacity:1; } 45% { transform:scaleX(1); opacity:1; } 100% { transform:scaleX(1); opacity:0; } }
+.panel.focused.fx-reveal::before { content:""; position:absolute; left:0; right:0; top:50%; height:3px; z-index:6; pointer-events:none;
+  background:linear-gradient(90deg, transparent, #fff, var(--accent), #fff, transparent); box-shadow:0 0 24px var(--accent); animation:fx-beamline .6s ease both; }
+/* Targeting brackets close in and lock onto the corners */
+.fx-lockon { display:none; position:absolute; inset:0; pointer-events:none; z-index:6; }
+.fx-lockon span { position:absolute; width:34px; height:34px; border:0 solid var(--accent); filter:drop-shadow(0 0 6px var(--glow)); }
+.fx-lockon span:nth-child(1) { top:0; left:0; border-width:3px 0 0 3px; }
+.fx-lockon span:nth-child(2) { top:0; right:0; border-width:3px 3px 0 0; }
+.fx-lockon span:nth-child(3) { bottom:0; left:0; border-width:0 0 3px 3px; }
+.fx-lockon span:nth-child(4) { bottom:0; right:0; border-width:0 3px 3px 0; }
+@keyframes fx-lockin { 0% { inset:-60px; opacity:0; } 55% { inset:-6px; opacity:1; } 70% { inset:0; opacity:1; filter:brightness(2); } 100% { inset:0; opacity:0; } }
+.panel.fx-reveal .fx-lockon { display:block; animation:fx-lockin .6s cubic-bezier(.2,.8,.2,1) forwards; }
+/* A short glitch as it settles: the text splits into red and cyan copies and the panel jumps a
+   little. steps(1) holds each frame until the next one, so every split stays long enough to see. */
+@keyframes fx-glitch {
+  0%   { transform:translate(-2px, 0);    text-shadow:5px 0 rgba(255,60,90,.85), -5px 0 rgba(76,201,240,.9); }
+  15%  { transform:translate(2px, -1px);  text-shadow:-4px 0 rgba(255,60,90,.85), 4px 0 rgba(76,201,240,.9); }
+  30%  { transform:translate(-1px, 1px);  text-shadow:6px 0 rgba(255,60,90,.8), -6px 0 rgba(76,201,240,.85); opacity:.85; }
+  45%  { transform:translate(1px, 0);     text-shadow:-3px 0 rgba(255,60,90,.75), 3px 0 rgba(76,201,240,.8); opacity:1; }
+  60%  { transform:translate(0);          text-shadow:4px 0 rgba(255,60,90,.7), -4px 0 rgba(76,201,240,.75); }
+  75%  { transform:translate(0);          text-shadow:-2px 0 rgba(255,60,90,.6), 2px 0 rgba(76,201,240,.65); }
+  90%  { transform:translate(0);          text-shadow:1px 0 rgba(255,60,90,.4), -1px 0 rgba(76,201,240,.45); }
+  100% { transform:translate(0);          text-shadow:none; } }
+/* The title has its own cyan glow, which would hide the split, so it gets the same frames plus its glow */
+@keyframes fx-glitch-title {
+  0%   { text-shadow:5px 0 rgba(255,60,90,.85), -5px 0 rgba(76,201,240,.9), 0 0 8px var(--glow); }
+  15%  { text-shadow:-4px 0 rgba(255,60,90,.85), 4px 0 rgba(76,201,240,.9), 0 0 8px var(--glow); }
+  30%  { text-shadow:6px 0 rgba(255,60,90,.8), -6px 0 rgba(76,201,240,.85), 0 0 8px var(--glow); }
+  45%  { text-shadow:-3px 0 rgba(255,60,90,.75), 3px 0 rgba(76,201,240,.8), 0 0 8px var(--glow); }
+  60%  { text-shadow:4px 0 rgba(255,60,90,.7), -4px 0 rgba(76,201,240,.75), 0 0 8px var(--glow); }
+  75%  { text-shadow:-2px 0 rgba(255,60,90,.6), 2px 0 rgba(76,201,240,.65), 0 0 8px var(--glow); }
+  90%  { text-shadow:1px 0 rgba(255,60,90,.4), -1px 0 rgba(76,201,240,.45), 0 0 8px var(--glow); }
+  100% { text-shadow:0 0 8px var(--glow); } }
+.panel.fx-glitch { animation:fx-glitch .4s steps(1, end) both; }
+.panel.fx-glitch .h .l { animation:fx-glitch-title .4s steps(1, end) both; }
+/* Closing: the content collapses to a bright line, like a screen switching off */
+@keyframes fx-crtoff { 0% { transform:scaleY(1); filter:none; } 60% { transform:scaleY(.02); filter:brightness(3); } 100% { transform:scaleY(.02) scaleX(0); filter:brightness(3); opacity:0; } }
+.panel.fx-off > :not(.h) { animation:fx-crtoff .26s ease-in forwards; transform-origin:center; }
+/* The content arrives item by item (--i is each item's position, set by motion.js) */
+@keyframes fx-arrive-seq { from { opacity:0; transform:translateX(-10px); } }
+.fx-seq { animation:fx-arrive-seq .35s ease both; animation-delay:calc(var(--i) * 35ms); }
+
+/* ---------- Feedback when something changes ---------- */
+/* An event added: a glow ripple */
+@keyframes fx-ping { 0% { box-shadow:0 0 0 0 rgba(76,201,240,.8); background:rgba(76,201,240,.35); } 100% { box-shadow:0 0 0 14px rgba(76,201,240,0); } }
+.evc.fx-ping, #timeline .ev.fx-ping { animation:fx-ping 1.2s ease-out 2; }
+/* An event deleted: a scan-line wipe */
+@keyframes fx-wipe { 0% { clip-path:inset(0 0 0 0); } 100% { clip-path:inset(0 0 100% 0); opacity:.2; } }
+.evc.fx-wipe, #timeline .ev.fx-wipe { animation:fx-wipe .55s ease-in forwards; border-bottom:2px solid var(--red); }
+/* A task ticked: the diamond bursts, the strike-through draws across */
+@keyframes fx-burst { 0% { box-shadow:0 0 0 0 rgba(76,201,240,.9); } 100% { box-shadow:0 0 0 12px rgba(76,201,240,0); } }
+.task.fx-done input { animation:fx-burst .6s ease-out; }
+.task.done .t { text-decoration:none; background:linear-gradient(var(--muted), var(--muted)) left 55% / 100% 1px no-repeat; }
+@keyframes fx-strike { from { background-size:0 1px; } }
+.task.fx-done .t { animation:fx-strike .45s ease-out .1s both; }
+/* New tasks and notes slide in with a glow */
+@keyframes fx-slidein { from { opacity:0; transform:translateX(-14px); background:rgba(76,201,240,.25); } 60% { background:rgba(76,201,240,.12); } }
+.task.fx-arrive, .note.fx-arrive { animation:fx-slidein .7s ease-out; }
+/* Up next: the progress bar fills smoothly; an event starting flashes amber */
+.next .progress i { transition:width 1s ease; }
+@keyframes fx-nowflash { 0%, 100% { box-shadow:inset 0 0 30px rgba(76,201,240,.05); } 30% { box-shadow:inset 0 0 60px rgba(240,180,41,.45), 0 0 30px rgba(240,180,41,.4); --c:var(--amber); } }
+#upnext-panel.fx-flash { animation:fx-nowflash 1.2s ease 3; }
+
+/* ---------- Text ---------- */
+/* The clock flips when the minute changes */
+@keyframes fx-flip { 0% { transform:rotateX(0); } 50% { transform:rotateX(90deg); } 100% { transform:rotateX(0); } }
+.clock .t.fx-flip { animation:fx-flip .5s ease; display:inline-block; }
+/* A soft cursor while JARVIS is still talking */
+@keyframes fx-blink { 50% { opacity:0; } }
+.msg.bot.fx-streaming::after { content:"\258D"; color:var(--accent); margin-left:2px; animation:fx-blink 1s steps(1) infinite; }
+
+/* ---------- The confirmation card ---------- */
+@keyframes fx-cardin { from { opacity:0; transform:translateY(16px); } }
+@keyframes fx-amberpulse { 50% { box-shadow:0 0 40px rgba(240,180,41,.55); } }
+#confirm.show { animation:fx-cardin .35s cubic-bezier(.2,.8,.2,1), fx-amberpulse 1.4s ease .35s 2; }
+.fx-countdown { width:34px; height:34px; flex:none; margin-right:4px; }
+.fx-countdown circle { fill:none; stroke-width:3; }
+.fx-countdown .fx-track { stroke:rgba(240,180,41,.2); }
+.fx-countdown .fx-left { stroke:var(--amber); stroke-dasharray:88; stroke-dashoffset:0; transform:rotate(-90deg); transform-origin:center;
+  animation:fx-drain var(--secs, 300s) linear forwards; }
+@keyframes fx-drain { to { stroke-dashoffset:88; } }
+#confirm.fx-expired { border-color:var(--muted); box-shadow:none; animation:none; }
+#confirm.fx-expired .warn { color:var(--muted); }
+
+/* ---------- Ambient life ---------- */
+/* A radar sweep behind the orb (on while body has fx-radar) */
+.orbwrap::after { content:""; position:absolute; inset:2%; border-radius:50%; pointer-events:none; opacity:0; transition:opacity .6s;
+  background:conic-gradient(from 0deg, rgba(76,201,240,.0) 0deg, rgba(76,201,240,.0) 300deg, rgba(76,201,240,.22) 360deg);
+  -webkit-mask:radial-gradient(circle, transparent 30%, #000 31%); mask:radial-gradient(circle, transparent 30%, #000 31%);
+  animation:spin 6s linear infinite; }
+body.fx-radar .orbwrap::after { opacity:1; }
+/* Hover: the brackets slide outward and a light runs along the top edge */
+.panel:not(.focused):hover { --s:26px; }
+@keyframes fx-edgerun { from { left:-40%; } to { left:100%; } }
+.panel:not(.focused):hover::before { content:""; position:absolute; top:-1px; width:40%; height:1px; pointer-events:none;
+  background:linear-gradient(90deg, transparent, var(--accent), transparent); animation:fx-edgerun .9s ease-out forwards; }
+/* Holographic tilt: set by motion.js from the mouse position */
+.panel.fx-tilt { transform:perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
+/* Ambient mode: after 3 idle minutes the panels dim and the orb takes the stage */
+.col, .timeline, .transcript, .bar, .readouts { transition:opacity .5s ease; }
+body.fx-ambient .col, body.fx-ambient .timeline, body.fx-ambient .transcript, body.fx-ambient .ticker,
+body.fx-ambient .bar, body.fx-ambient #hint, body.fx-ambient .readouts { opacity:.12; transition:opacity 1.2s ease; }
+body.fx-ambient .orbwrap { width:min(460px,100%,52vh) !important; }
+
+/* ---------- Reduce motion turns all of this off ---------- */
+body.reduce .orbwrap::after, body.reduce .panel::before, body.reduce .panel::after, body.reduce .fx-countdown { display:none; }
+body.reduce .panel { transform:none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .orbwrap::after, .panel::before, .panel::after, .fx-countdown { display:none; }
+  .panel { transform:none !important; }
+}

@@ -47,6 +47,11 @@ Open http://127.0.0.1:8000 and hard refresh with Cmd+Shift+R. The header shows w
 Ollama answers (green or red dot) and when the last backup was made; press / to jump to
 the command box.
 
+Clicking a panel opens it with a short "access" animation; click anywhere or press
+Escape to skip it. After 3 minutes without the mouse or keyboard the panels dim and the
+orb takes the stage; move the mouse to bring them back. The REDUCE MOTION switch in the
+header turns every animation off.
+
 ## Settings and logs
 
 - Settings (model, voice speed, limits, folders) are in `config.py`.

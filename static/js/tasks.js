@@ -32,6 +32,7 @@ async function loadTasks() {
   for (const t of data.tasks) {
     const label = document.createElement('label');
     label.className = 'task' + (t.done ? ' done' : '');
+    label.dataset.id = t.id;
     label.addEventListener('click', e => e.stopPropagation());
     const cb = document.createElement('input');
     cb.type = 'checkbox';
