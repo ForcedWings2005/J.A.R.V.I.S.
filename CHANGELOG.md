@@ -734,6 +734,14 @@ The owner asked for recommendations to make the dashboard look better. Looked at
 
 **Step 6: now and next in the schedule.** Each event card in the schedule carries its start and end time; `markSchedule()` dims the ones that are over, gives the one happening now an amber edge (the same colour as "Now" in Up next), and gives the next one a thicker, brighter edge. It runs when the schedule loads and every 30 seconds with the Up next countdown. One rule changed after trying it: an event happening now does not stop the following one being marked next, as Up next also shows "Then: ...". Checked in the demo by changing two cards' times in the browser only: over, now and next all showed as intended.
 
+**Step 7: small fixes.**
+- The header reads the model's name from a new read-only endpoint `GET /info` (`{"model": config.MODEL}`) instead of "MODEL gemma4" written into the page, which had been wrong since section 37.
+- Due dates in the to-do list say "Today", "Tomorrow" or "Tue 27 Oct", and an open task past its date says "Overdue · Tue 20 Oct" in red; the exact date shows on hover.
+- The voice hint is a normal sentence instead of capitals.
+- **A bug from step 2, fixed**: clicking Up next threw an error (it has no EXPAND label) and left the page dimmed with Up next blown up, and Escape failed the same way, so only a reload got out. Only panels with an EXPAND label respond to clicks now. Checked in the demo: no error, the to-do list still expands and closes with Escape.
+
+**Overall, checked in the demo** (made-up calendar, 1440x900 unless said): no console errors; the page fits the screen; Up next, the notes panel, the transcript, the plain-words activity line, the schedule marks and the small fixes as described above; the calendar's four views; a confirmation card with Cancel. **Not checked**: the real app with real data, the microphone, and spoken replies (the browser pane has no microphone or speakers).
+
 **Found while testing, not fixed:** asked to "cancel the dentist" without a date, `delete_event` returned an error (it needs the date), so no card was shown, but JARVIS replied "I'll need you to confirm on screen". A claim about a card that does not exist; added to `plan.md`.
 
 ---
@@ -747,6 +755,7 @@ The owner asked for recommendations to make the dashboard look better. Looked at
 | Host protection | Tested and working |
 | Personality (section 38) | Light version: evals 156/156, tried in the app, response times good |
 | Weekday check for weekly events (section 39) | Done in code, evals 154/156 (variation); fortnightly and monthly repeats not covered |
+| Dashboard redesign (section 40) | Done in a demo with a made-up calendar; not yet tried with real data, voice or the microphone |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |

@@ -225,8 +225,8 @@ function setVoice(on) {
   micBtn.disabled = !on;
   micState.textContent = on ? 'READY' : 'OFF';
   hintEl.textContent = on
-    ? 'HOLD THE MIC OR SPACE TO TALK, OR TAP THE MIC TO START AND TAP AGAIN TO STOP'
-    : 'VOICE MODE IS OFF - SWITCH IT ON TO USE THE MIC AND SPOKEN REPLIES';
+    ? 'Hold the mic or Space to talk, or tap the mic to start and tap again to stop.'
+    : 'Voice mode is off. Switch it on to talk to JARVIS and hear his replies.';
   if (!on) { cancelRecording(); stopSpeaking(); }
 }
 

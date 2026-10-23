@@ -61,6 +61,7 @@ body.chatting #orb { width:min(200px,100%,22vh); }
 .task input { accent-color:var(--accent); width:16px; height:16px; cursor:pointer; }
 .task.done .t { text-decoration:line-through; color:var(--muted); }
 .task .due { margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--muted); }
+.task .due.late { color:#ff8c8c; }
 .panel.focused .task { font-size:18px; }
 /* ---- Up next and notes ---- */
 #upnext-panel { flex:0 0 auto; cursor:default; }
