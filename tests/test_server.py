@@ -50,6 +50,31 @@ def test_home_page(client):
     assert r.status_code == 200 and "<html" in r.text.lower()
 
 
+def test_the_page_files_are_served(client):
+    """The styles and scripts live in static/css and static/js (CHANGELOG section 40)."""
+    css = client.get("/static/css/jarvis.css")
+    assert css.status_code == 200 and css.headers["content-type"].startswith("text/css")
+    js = client.get("/static/js/app.js")
+    assert js.status_code == 200 and "javascript" in js.headers["content-type"]
+
+
+@pytest.mark.parametrize("path", ["/static/../server.py", "/static/..%2Fserver.py",
+                                  "/static/%2e%2e/config.py"])
+def test_only_files_inside_static_are_served(client, path):
+    r = client.get(path)
+    assert r.status_code == 404 or "import" not in r.text
+
+
+def test_every_file_the_page_loads_exists(client):
+    """A typo in a script or stylesheet link would break the page silently."""
+    import re
+    page = client.get("/").text
+    links = re.findall(r'(?:src|href)="(/static/[^"]+)"', page)
+    assert links, "the page loads no files"
+    for link in links:
+        assert client.get(link).status_code == 200, link
+
+
 def test_other_host_names_are_refused():
     """Protects against DNS rebinding: a page on another domain pointed at 127.0.0.1."""
     evil = TestClient(server.app, base_url="http://evil.example")

@@ -11,6 +11,7 @@ from logging.handlers import RotatingFileHandler
 from fastapi import FastAPI, HTTPException, UploadFile, File, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import backup_db
@@ -109,6 +110,11 @@ class ResetRequest(BaseModel):
 @app.get("/")
 def home():
     return FileResponse(config.STATIC_DIR / "index.html")
+
+
+# The page's styles and scripts (static/css, static/js). StaticFiles serves only files
+# inside this folder, and only to GET requests.
+app.mount("/static", StaticFiles(directory=config.STATIC_DIR), name="static")
 
 
 @app.post("/chat")
