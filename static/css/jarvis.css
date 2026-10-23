@@ -22,9 +22,16 @@ button.pill:disabled { opacity:.5; cursor:wait; }
 #scrim { display:none; position:fixed; inset:0; background:rgba(5,11,22,.85); z-index:9; }
 body.has-focus #scrim { display:block; }
 .center { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; min-width:0; min-height:0; }
-#orb { width:min(380px,100%,40vh); height:auto; flex-shrink:0; color:var(--accent); }
+#orb { width:min(380px,100%,40vh); height:auto; flex-shrink:0; color:var(--accent); transition:width .4s ease; }
+body.chatting #orb { width:min(200px,100%,22vh); }
 .status { font-family:var(--mono); letter-spacing:4px; color:var(--accent); font-size:12px; }
-.tx { text-align:center; max-width:560px; min-height:90px; font-size:17px; }
+/* The conversation: your lines on the right, JARVIS on the left, newest at the bottom */
+.transcript { flex:1 1 auto; min-height:60px; width:100%; max-width:560px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding:4px 2px; }
+.transcript:empty { flex:0 0 auto; min-height:0; }
+.msg { max-width:85%; padding:8px 12px; border-radius:10px; font-size:15px; line-height:1.4; white-space:pre-wrap; overflow-wrap:anywhere; }
+.msg:empty { display:none; }
+.msg.you { align-self:flex-end; background:rgba(76,201,240,.14); border:1px solid rgba(76,201,240,.3); border-bottom-right-radius:3px; }
+.msg.bot { align-self:flex-start; border-left:3px solid var(--accent); background:var(--panel); border-bottom-left-radius:3px; }
 .bar { display:flex; gap:10px; width:100%; max-width:560px; }
 #input { flex:1; padding:14px; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:15px; }
 #send { padding:0 22px; border-radius:6px; border:1px solid var(--accent); background:rgba(76,201,240,.14); color:var(--accent); font-weight:600; cursor:pointer; }
