@@ -44,6 +44,47 @@ function groupByDate(events) {
   return map;
 }
 
+// --- up next: the event happening now, or the next one ---
+let upcoming = [];         // the last 7 days of events loaded, for recomputing the countdown
+
+function startOf(ev) { const d = parseISO(ev.date); d.setMinutes(mins(ev.time)); return d; }
+function endOf(ev) {
+  const d = parseISO(ev.date);
+  d.setMinutes(ev.end_time ? mins(ev.end_time) : mins(ev.time) + 60);
+  return d;
+}
+function inWords(minutes) {
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return 'in ' + minutes + ' min';
+  const hrs = Math.floor(minutes / 60), rest = minutes % 60;
+  return 'in ' + hrs + ' h' + (rest ? ' ' + rest + ' min' : '');
+}
+function dayWord(d, now) {
+  const days = Math.round((parseISO(iso(d)) - parseISO(iso(now))) / 86400000);
+  return days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : DOWS[d.getDay()];
+}
+function renderUpNext() {
+  const box = document.getElementById('upnext');
+  const now = new Date();
+  const next = upcoming.filter(ev => endOf(ev) > now).sort((a, b) => startOf(a) - startOf(b));
+  box.innerHTML = '';
+  if (!next.length) { box.appendChild(h('div', 'muted', 'Nothing in the next 7 days')); return; }
+  const ev = next[0], start = startOf(ev);
+  const card = h('div', 'next');
+  const when = start <= now
+    ? 'Now \u00b7 until ' + fmtTime(ev.end_time || ev.time)
+    : dayWord(start, now) + ' ' + fmtTime(ev.time) + ' \u00b7 ' + inWords(Math.round((start - now) / 60000));
+  card.appendChild(h('div', 'nwhen' + (start <= now ? ' live' : ''), when));
+  card.appendChild(h('div', 'ntitle', ev.title));
+  box.appendChild(card);
+  if (next[1]) {
+    const then = startOf(next[1]);
+    box.appendChild(h('div', 'nthen', 'Then: ' + next[1].title + ', ' +
+      (dayWord(then, now) === 'Today' ? '' : dayWord(then, now) + ' ') + fmtTime(next[1].time)));
+  }
+}
+setInterval(renderUpNext, 30000);
+
 // --- compact view: the next 7 days ---
 async function loadEvents() {
   const box = document.getElementById('sched');
@@ -51,6 +92,8 @@ async function loadEvents() {
   let evs;
   try { evs = await fetchEvents(today, addDays(today, 6)); }
   catch (e) { box.textContent = 'Could not load the schedule.'; return; }
+  upcoming = evs;
+  renderUpNext();
   const map = groupByDate(evs);
   box.innerHTML = '';
   for (let i = 0; i < 7; i++) {

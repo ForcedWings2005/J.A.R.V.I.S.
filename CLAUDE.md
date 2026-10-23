@@ -39,7 +39,7 @@ is checked in code, never left to the model.** The model chooses tools; code val
 | `tasks.py`, `calc.py` | To-do list; safe arithmetic (parses the expression with `ast`, never `eval`). |
 | `notes.py` | Notes and memory (FTS5 search). Trivial preferences only; secrets refused; saving and forgetting go through the confirmation card. |
 | `static/` | The dashboard: `index.html` (structure), `css/jarvis.css`, `js/*.js` (plain scripts loaded in order and sharing globals: orb, chat, tasks, voice, calendar, app; no build step). Served by `/` and `/static`. |
-| `server.py` | Endpoints `/`, `/static` (the page's files), `/confirm`, `/calendar`, `/tasks`, `/tasks/{id}`, `/transcribe`, `/speak`; logging setup at start-up. |
+| `server.py` | Endpoints `/`, `/static` (the page's files), `/chat` (NDJSON stream), `/confirm`, `/calendar`, `/tasks`, `/tasks/{id}`, `/notes` (read-only), `/transcribe`, `/speak`; logging setup at start-up. |
 | `speech.py`, `speech_text.py` | Kokoro synthesis; text clean-up before speaking (numbers, pronunciations). |
 | `backup_db.py` | Daily SQLite backup via the backup API, integrity-checked, 7 kept; the nightly run (`main()`) then makes an encrypted copy, 30 kept. |
 | `backup_crypto.py`, `backup_keys.py`, `restore_backup.py` | Encrypted backups: lock/unlock and the file format; making the key pair (owner only); restoring (owner only). |

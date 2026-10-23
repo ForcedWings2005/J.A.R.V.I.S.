@@ -49,6 +49,15 @@ body.has-focus #scrim { display:block; }
 .task.done .t { text-decoration:line-through; color:var(--muted); }
 .task .due { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--muted); }
 .panel.focused .task { font-size:18px; }
+/* ---- Up next and notes ---- */
+#upnext-panel { flex:0 0 auto; cursor:default; }
+.next { padding:10px 12px; border-left:3px solid var(--accent); background:rgba(76,201,240,.08); border-radius:0 6px 6px 0; }
+.nwhen { font-family:var(--mono); font-size:12px; letter-spacing:1px; color:var(--accent); }
+.nwhen.live { color:#f0b429; }
+.ntitle { font-size:18px; margin-top:4px; }
+.nthen { font-size:13px; color:var(--muted); margin-top:10px; }
+.note { font-size:14px; padding:7px 0; border-top:1px solid rgba(76,201,240,.15); }
+.panel.focused .note { font-size:18px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 50% { transform: scale(1.15); } }
 #orb g { transform-box:view-box; transform-origin:center; }

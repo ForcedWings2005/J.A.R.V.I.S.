@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 import brain
 import config
 import jcal
+import notes
 import server
 import speech
 import tasks
@@ -101,6 +102,25 @@ def test_json_sent_as_plain_text_is_refused(client):
     assert tasks.tasks_list()[0]["done"] is False
     r = client.post("/chat", content='{"message": "hi"}', headers={"Content-Type": "text/plain"})
     assert r.status_code == 422
+
+
+# ---------- notes panel (CHANGELOG section 40) ----------
+
+def test_notes_panel_starts_empty(client):
+    assert client.get("/notes").json() == {"notes": []}
+
+
+def test_notes_panel_lists_saved_notes_newest_first(client):
+    for text in ("Favourite food is sushi", "Prefers window seats"):
+        notes.remember(text).apply()
+    listed = client.get("/notes").json()["notes"]
+    assert [n["text"] for n in listed] == ["Prefers window seats", "Favourite food is sushi"]
+    assert set(listed[0]) == {"id", "text", "created"}
+
+
+def test_notes_panel_is_read_only(client):
+    """Saving and forgetting go only through the chat and the confirmation card."""
+    assert client.post("/notes", json={"text": "x"}).status_code == 405
 
 
 # ---------- chat and confirmation ----------
