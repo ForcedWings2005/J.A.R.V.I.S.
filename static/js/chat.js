@@ -7,12 +7,48 @@ function setState(name) {
 
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send');
-const youEl = document.getElementById('you');
-const botEl = document.getElementById('bot');
+const transcriptEl = document.getElementById('transcript');
+// The newest exchange: your message and JARVIS's reply, as lines in the transcript
+let youEl = null;
+let botEl = null;
+let exchangeOpen = false;   // true from your message until the reply has finished
 const tickerEl = document.getElementById('ticker');
 const confirmEl = document.getElementById('confirm');
 const confirmText = document.getElementById('confirm-text');
 let pendingId = null;
+
+// ---------- Transcript ----------
+const KEEP_LINES = 40;
+
+function addLine(who, text) {
+  const line = document.createElement('div');
+  line.className = 'msg ' + who;
+  line.textContent = text;
+  transcriptEl.appendChild(line);
+  // Once you have said something, the orb steps back to make room for the conversation
+  if (who === 'you') document.body.classList.add('chatting');
+  while (transcriptEl.children.length > KEEP_LINES) transcriptEl.firstChild.remove();
+  scrollTranscript();
+  return line;
+}
+
+function scrollTranscript() { transcriptEl.scrollTop = transcriptEl.scrollHeight; }
+
+// Starts an exchange, or fills in the one the microphone started with "..."
+function startExchange(text) {
+  if (!exchangeOpen) {
+    youEl = addLine('you', '');
+    botEl = addLine('bot', '');
+    exchangeOpen = true;
+  }
+  youEl.textContent = text;
+  botEl.textContent = '';
+}
+
+function endExchange() { exchangeOpen = false; scrollTranscript(); }
+
+// A line from JARVIS outside an exchange, such as the answer to a card
+function say(text) { botEl = addLine('bot', text); }
 
 // ---------- Ticker and confirmation ----------
 function showSteps(steps) {
@@ -30,12 +66,14 @@ function showConfirm(c) {
   pendingId = c.id;
   confirmText.textContent = c.text;
   confirmEl.classList.add('show');
+  scrollTranscript();                           // the card makes the transcript shorter
   document.getElementById('ok').focus();
 }
 
 function hideConfirm() {
   pendingId = null;
   confirmEl.classList.remove('show');
+  scrollTranscript();
 }
 
 // ---------- Chat ----------
@@ -45,8 +83,7 @@ async function send(spoken) {
   if (typeof spoken !== 'string') input.value = '';
   stopSpeaking();
   hideConfirm();
-  youEl.textContent = text;
-  botEl.textContent = '';
+  startExchange(text);
   tickerEl.textContent = 'working...';
   setState('thinking');
   sendBtn.disabled = true;
@@ -88,6 +125,7 @@ async function send(spoken) {
           full += msg.text;
           buf += msg.text;
           botEl.textContent = full;
+          scrollTranscript();
           feed(false);
         } else if (msg.type === 'step') {
           steps.push(msg.step);
@@ -112,6 +150,7 @@ async function send(spoken) {
     tickerEl.textContent = '\u00a0';
     setState('idle');
   }
+  endExchange();
   sendBtn.disabled = false;
   if (!pendingId) input.focus();
   loadEvents();
@@ -131,10 +170,10 @@ async function resolveAction(approve) {
     });
     if (!res.ok) throw new Error('Server error ' + res.status);
     const data = await res.json();
-    botEl.textContent = data.reply;
+    say(data.reply);
     speak(data.reply).catch(() => {});
   } catch (err) {
-    botEl.textContent = 'Error: ' + err.message;
+    say('Error: ' + err.message);
   }
   input.focus();
   loadEvents();

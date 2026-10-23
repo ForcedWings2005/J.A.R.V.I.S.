@@ -143,7 +143,7 @@ async function startRecording() {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (err) {
     holding = false;
-    botEl.textContent = 'Microphone unavailable: ' + err.message;
+    say('Microphone unavailable: ' + err.message);
     return;
   }
   if (!holding || !voiceOn) { holding = false; releaseMic(); return; }
@@ -194,8 +194,7 @@ async function finishRecording() {
 
   const form = new FormData();
   form.append('file', new Blob(chunks, { type: type }), type.includes('mp4') ? 'speech.mp4' : 'speech.webm');
-  youEl.textContent = '...';
-  botEl.textContent = '';
+  startExchange('...');
   tickerEl.textContent = 'transcribing...';
   setState('thinking');
   try {
@@ -203,8 +202,9 @@ async function finishRecording() {
     if (!res.ok) throw new Error('Server error ' + res.status);
     const data = await res.json();
     if (!data.text) {
-      youEl.textContent = '\u00a0';
+      youEl.textContent = '(nothing heard)';
       botEl.textContent = "I didn't catch that.";
+      endExchange();
       tickerEl.textContent = '\u00a0';
       setState('idle');
       return;
@@ -212,6 +212,7 @@ async function finishRecording() {
     await send(data.text);
   } catch (err) {
     botEl.textContent = 'Error: ' + err.message;
+    endExchange();
     tickerEl.textContent = '\u00a0';
     setState('idle');
   }

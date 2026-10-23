@@ -92,12 +92,13 @@ async function newConversation() {
       body: '{}'
     });
     if (!res.ok) throw new Error('Server error ' + res.status);
-    youEl.textContent = '\u00a0';
-    botEl.textContent = 'New conversation started.';
+    transcriptEl.innerHTML = '';
+    document.body.classList.remove('chatting');
+    say('New conversation started.');
     tickerEl.textContent = '\u00a0';
     setState('idle');
   } catch (err) {
-    botEl.textContent = 'Error: ' + err.message;
+    say('Error: ' + err.message);
   }
   newChatBtn.disabled = false;
   input.focus();

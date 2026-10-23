@@ -724,6 +724,8 @@ The owner asked for recommendations to make the dashboard look better. Looked at
 - **Weather and Sports** removed until they exist.
 - Docs: step 0 had dropped `/chat` from the endpoint list in CLAUDE.md by mistake; put back.
 
+**Step 3: a real conversation view.** The two fixed lines ("YOU" and "JARVIS", only the last exchange) became a transcript that keeps the last 40 lines: your messages on the right, JARVIS's on the left, newest at the bottom. `youEl` and `botEl` still exist but point at the newest exchange, so most code was unchanged. The microphone starts an exchange with "..." while transcribing and the text fills that same exchange. The answer to a card ("Okay, I left it alone.") is a new line instead of overwriting the reply. The orb shrinks (360 to 198 px at 1440x900) once you have said something, and grows back on New conversation, so the conversation gets the room. Two problems found in the demo and fixed: the newest reply was hidden when the card made the transcript shorter (it now scrolls to the bottom when the card appears or closes and when a reply ends), and the orb never grew back because "New conversation started." counted as chatting (only your lines count now). Checked in the demo: three exchanges, a card and Cancel, New conversation. Not checked: the microphone path (the browser pane has no microphone).
+
 **Found while testing, not fixed:** asked to "cancel the dentist" without a date, `delete_event` returned an error (it needs the date), so no card was shown, but JARVIS replied "I'll need you to confirm on screen". A claim about a card that does not exist; added to `plan.md`.
 
 ---
