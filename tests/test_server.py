@@ -5,6 +5,7 @@ The model, Whisper and Kokoro are all replaced by fakes, so these run anywhere.
 import json
 import logging
 import os
+from datetime import datetime
 import sys
 import types
 
@@ -104,9 +105,52 @@ def test_json_sent_as_plain_text_is_refused(client):
     assert r.status_code == 422
 
 
-def test_info_names_the_model_in_use(client):
+@pytest.fixture
+def info_env(monkeypatch, tmp_path):
+    """/info with a pretend backup folder and a pretend Ollama check (CI has no Ollama)."""
+    monkeypatch.setattr(config, "BACKUP_DIR", tmp_path)
+    state = {"ollama": True}
+    monkeypatch.setattr(server, "_ollama_ok", lambda: state["ollama"])
+    return tmp_path, state
+
+
+def test_info_names_the_model_in_use(client, info_env):
     """The header showed 'gemma4' written into the page by hand, wrong after the switch."""
-    assert client.get("/info").json() == {"model": config.MODEL}
+    assert client.get("/info").json()["model"] == config.MODEL
+
+
+def test_info_gives_the_time_of_the_newest_backup(client, info_env):
+    folder, _ = info_env
+    assert client.get("/info").json()["last_backup"] is None
+    for name, stamp in (("jarvis-2030-01-06.db", 1894060800), ("jarvis-2030-01-07.db", 1894158000)):
+        f = folder / name
+        f.write_bytes(b"x")
+        os.utime(f, (stamp, stamp))
+    expected = datetime.fromtimestamp(1894158000).strftime("%Y-%m-%d %H:%M")
+    assert client.get("/info").json()["last_backup"] == expected
+
+
+def test_info_says_whether_ollama_answers(client, info_env):
+    _, state = info_env
+    assert client.get("/info").json()["ollama"] is True
+    state["ollama"] = False
+    assert client.get("/info").json()["ollama"] is False
+
+
+def test_the_ollama_check_gives_up_quickly_and_quietly(monkeypatch):
+    """A stopped Ollama must not hang the page or raise: the check has a short timeout."""
+    seen = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            seen.update(kwargs)
+
+        def list(self):
+            raise ConnectionError("Ollama is not running")
+
+    monkeypatch.setattr(server.ollama, "Client", FakeClient)
+    assert server._ollama_ok() is False
+    assert 0 < seen["timeout"] <= 2
 
 
 # ---------- notes panel (CHANGELOG section 40) ----------

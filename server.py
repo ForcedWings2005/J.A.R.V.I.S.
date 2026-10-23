@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
+import ollama
 from fastapi import FastAPI, HTTPException, UploadFile, File, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -172,10 +173,28 @@ def list_tasks_endpoint():
     return {"tasks": tasks.tasks_list()}
 
 
+def _ollama_ok() -> bool:
+    """Does Ollama answer? Gives up after a second, so a stopped Ollama never hangs the page."""
+    try:
+        ollama.Client(timeout=1.0).list()
+        return True
+    except Exception:
+        return False
+
+
+def _last_backup():
+    """The time of the newest daily backup, such as '2026-10-23 03:00', or None."""
+    newest = max(config.BACKUP_DIR.glob("jarvis-*.db"), key=lambda f: f.stat().st_mtime,
+                 default=None)
+    if newest is None:
+        return None
+    return datetime.fromtimestamp(newest.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+
+
 @app.get("/info")
 def info_endpoint():
-    """For the page's header: which model JARVIS is using."""
-    return {"model": config.MODEL}
+    """For the page's header: the model, whether Ollama answers, and the last backup."""
+    return {"model": config.MODEL, "ollama": _ollama_ok(), "last_backup": _last_backup()}
 
 
 @app.get("/notes")
