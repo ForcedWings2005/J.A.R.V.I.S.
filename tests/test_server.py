@@ -65,6 +65,12 @@ def test_only_files_inside_static_are_served(client, path):
     assert r.status_code == 404 or "import" not in r.text
 
 
+def test_page_files_are_checked_again_on_every_load(client):
+    """Without this the browser kept an old stylesheet after an update (CHANGELOG section 40)."""
+    for path in ("/", "/static/css/jarvis.css", "/static/js/app.js"):
+        assert client.get(path).headers.get("cache-control") == "no-cache", path
+
+
 def test_every_file_the_page_loads_exists(client):
     """A typo in a script or stylesheet link would break the page silently."""
     import re
