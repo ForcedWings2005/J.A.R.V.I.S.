@@ -85,7 +85,7 @@ function createSpeaker() {
     while (token === speakToken && queue.length) {
       let blob;
       try { blob = await queue.shift(); }
-      catch (err) { tickerEl.textContent = 'voice error: ' + err.message; continue; }
+      catch (err) { tickerEl.textContent = 'Speech error: ' + err.message; continue; }
       if (token !== speakToken) break;
       await playBlob(blob, token);
     }
@@ -195,7 +195,7 @@ async function finishRecording() {
   const form = new FormData();
   form.append('file', new Blob(chunks, { type: type }), type.includes('mp4') ? 'speech.mp4' : 'speech.webm');
   startExchange('...');
-  tickerEl.textContent = 'transcribing...';
+  tickerEl.textContent = 'Listening back\u2026';
   setState('thinking');
   try {
     const res = await fetch('/transcribe', { method: 'POST', body: form });
@@ -205,7 +205,7 @@ async function finishRecording() {
       youEl.textContent = '(nothing heard)';
       botEl.textContent = "I didn't catch that.";
       endExchange();
-      tickerEl.textContent = '\u00a0';
+      tickerEl.textContent = '';
       setState('idle');
       return;
     }
@@ -213,7 +213,7 @@ async function finishRecording() {
   } catch (err) {
     botEl.textContent = 'Error: ' + err.message;
     endExchange();
-    tickerEl.textContent = '\u00a0';
+    tickerEl.textContent = '';
     setState('idle');
   }
 }

@@ -95,7 +95,7 @@ async function newConversation() {
     transcriptEl.innerHTML = '';
     document.body.classList.remove('chatting');
     say('New conversation started.');
-    tickerEl.textContent = '\u00a0';
+    tickerEl.textContent = '';
     setState('idle');
   } catch (err) {
     say('Error: ' + err.message);

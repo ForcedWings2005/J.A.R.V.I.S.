@@ -159,16 +159,54 @@ def _message_text(message) -> str:
     return (message.content or "") + str(message.tool_calls or "")
 
 
+def _day(iso_date) -> str:
+    """'2030-01-08' -> 'Tue 8 Jan', for the activity line."""
+    try:
+        d = datetime.strptime(str(iso_date), "%Y-%m-%d")
+    except ValueError:
+        return str(iso_date)
+    return f"{d:%a} {d.day} {d:%b}"
+
+
+def _calendar_words(a: dict) -> str:
+    if a.get("end_date"):
+        return f"Checked the calendar, {_day(a.get('date'))} to {_day(a['end_date'])}"
+    return f"Checked the calendar for {_day(a.get('date'))}"
+
+
+# What each tool did, in plain words for the activity line on the page (the model never
+# sees these). The note tools name no words: notes are private (SECURITY.md).
+_STEP_WORDS = {
+    "get_events": _calendar_words,
+    "add_event": lambda a: f"Added '{a.get('title')}' to the calendar",
+    "delete_event": lambda a: f"Delete '{a.get('title')}'",
+    "update_event": lambda a: f"Change '{a.get('title')}'",
+    "add_task": lambda a: f"Added the task '{a.get('title')}'",
+    "list_tasks": lambda a: "Read the to-do list",
+    "complete_task": lambda a: f"Ticked off '{a.get('title')}'",
+    "calculate": lambda a: f"Calculated {a.get('expression')}",
+    "remember": lambda a: "A note to save",
+    "recall": lambda a: "Looked through your notes",
+    "forget": lambda a: "A note to forget",
+}
+
+
 def describe_step(call, result: str) -> dict:
-    """One line for the activity ticker under the transcript."""
-    args = ", ".join(f"{k}={v}" for k, v in call.function.arguments.items())
+    """One line for the activity ticker under the transcript, in plain words."""
+    args = call.function.arguments or {}
+    words = _STEP_WORDS.get(call.function.name)
+    text = words(args) if words else (
+        f"{call.function.name}(" + ", ".join(f"{k}={v}" for k, v in args.items()) + ")")
     if result.startswith("Error"):
         status = "error"
+        reason = result.removeprefix("Error:").strip()
+        text = _short(f"{text}: {reason}", 87) if reason else text
     elif result.startswith("Confirmation required"):
         status = "waiting"
+        text += ": waiting for your Confirm"
     else:
         status = "done"
-    return {"text": f"{call.function.name}({args})", "status": status}
+    return {"text": text, "status": status}
 
 
 class Assistant:

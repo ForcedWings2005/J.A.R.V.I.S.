@@ -115,7 +115,7 @@ def test_tool_round_runs_the_tool_and_feeds_back_the_result():
     assert reply == "Added, sir."
     assert [t["title"] for t in tasks.tasks_list()] == ["Buy milk"]
     steps = [e["step"] for e in events if e["type"] == "step"]
-    assert steps == [{"text": "add_task(title=Buy milk)", "status": "done"}]
+    assert steps == [{"text": "Added the task 'Buy milk'", "status": "done"}]
     assert [e["type"] for e in events].count("break") == 1
     tool_msg = model.seen[1][-1]
     assert tool_msg == {"role": "tool", "tool_name": "add_task", "content": "Added task 'Buy milk'."}
@@ -133,6 +133,46 @@ def test_tool_errors_are_marked_as_errors():
     events, _ = run(brain.Assistant(chat=model), "Done with nothing")
     step = next(e["step"] for e in events if e["type"] == "step")
     assert step["status"] == "error"
+
+
+# --- the activity line, in plain words (CHANGELOG section 40) ---------------------
+
+@pytest.mark.parametrize("name, args, result, text, status", [
+    ("get_events", {"date": "2030-01-08"}, "Events on ...", "Checked the calendar for Tue 8 Jan", "done"),
+    ("get_events", {"date": "2030-01-07", "end_date": "2030-01-13"}, "Events ...",
+     "Checked the calendar, Mon 7 Jan to Sun 13 Jan", "done"),
+    ("add_event", {"title": "Gym", "date": "2030-01-08", "start_time": "18:00"}, "Added 'Gym' ...",
+     "Added 'Gym' to the calendar", "done"),
+    ("delete_event", {"title": "dentist", "date": "2030-01-08"}, "Confirmation required. ...",
+     "Delete 'dentist': waiting for your Confirm", "waiting"),
+    ("update_event", {"title": "dentist", "new_start_time": "16:00"}, "Confirmation required. ...",
+     "Change 'dentist': waiting for your Confirm", "waiting"),
+    ("list_tasks", {}, "Open tasks: ...", "Read the to-do list", "done"),
+    ("complete_task", {"title": "milk"}, "Marked 'Buy milk' as done.", "Ticked off 'milk'", "done"),
+    ("calculate", {"expression": "0.15 * 240"}, "36", "Calculated 0.15 * 240", "done"),
+    ("recall", {"about": "food"}, "Saved notes ...", "Looked through your notes", "done"),
+])
+def test_steps_are_described_in_plain_words(name, args, result, text, status):
+    assert brain.describe_step(call(name, **args), result) == {"text": text, "status": status}
+
+
+def test_a_failed_step_says_what_went_wrong_briefly():
+    step = brain.describe_step(call("delete_event", title="dentist"),
+                               "Error: give the date of the occurrence to delete, or use scope "
+                               "'all' to delete a whole repeating series.")
+    assert step["status"] == "error"
+    assert step["text"].startswith("Delete 'dentist': give the date of the occurrence")
+    assert len(step["text"]) <= 90
+
+
+def test_note_steps_never_show_the_note_itself():
+    for name, args in (("remember", {"text": "Likes xyzzy"}), ("forget", {"about": "xyzzy"}),
+                       ("recall", {"about": "xyzzy"})):
+        assert "xyzzy" not in brain.describe_step(call(name, **args), "Confirmation required.")["text"]
+
+
+def test_an_unknown_tool_is_still_described():
+    assert brain.describe_step(call("teleport", place="Mars"), "ok")["text"] == "teleport(place=Mars)"
 
 
 def test_rounds_are_capped():
