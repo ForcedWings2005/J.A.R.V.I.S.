@@ -117,6 +117,16 @@ def home():
 app.mount("/static", StaticFiles(directory=config.STATIC_DIR), name="static")
 
 
+@app.middleware("http")
+async def check_page_files_again(request, call_next):
+    """The browser may keep the page and its files, but must ask the server before using
+    them, so an update shows at once instead of an old stylesheet (CHANGELOG section 40)."""
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.post("/chat")
 def chat_endpoint(req: ChatRequest):
     def lines():
