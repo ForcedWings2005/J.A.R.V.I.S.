@@ -88,6 +88,9 @@ body.reduce * { animation:none !important; }
 #sched .sday { position:sticky; top:0; z-index:1; background:var(--panel); font-family:var(--mono); font-size:12px; letter-spacing:1px; color:var(--accent); padding:12px 0 4px; }
 .evc { padding:8px 10px; margin:4px 0; border-left:3px solid var(--accent); background:rgba(76,201,240,.07); border-radius:0 4px 4px 0; }
 .evc .et { font-size:15px; }
+.evc.past { opacity:.45; }
+.evc.live { border-left-color:#f0b429; background:rgba(240,180,41,.1); }
+.evc.next { border-left-width:5px; background:rgba(76,201,240,.14); }
 .evc .em { font-family:var(--mono); font-size:13px; color:var(--muted); margin-top:2px; }
 .sempty { font-size:13px; color:var(--muted); opacity:.7; padding:2px 0 6px; }
 

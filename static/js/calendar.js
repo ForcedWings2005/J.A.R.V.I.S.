@@ -83,7 +83,20 @@ function renderUpNext() {
       (dayWord(then, now) === 'Today' ? '' : dayWord(then, now) + ' ') + fmtTime(next[1].time)));
   }
 }
-setInterval(renderUpNext, 30000);
+// Marks the schedule's cards as over, happening now, or next
+function markSchedule() {
+  const now = new Date();
+  let nextFound = false;
+  for (const card of document.querySelectorAll('#sched .evc')) {
+    const start = new Date(+card.dataset.start), end = new Date(+card.dataset.end);
+    const state = end <= now ? 'past' : start <= now ? 'live' : nextFound ? '' : 'next';
+    if (state === 'next') nextFound = true;        // an event happening now is not 'next'
+    card.classList.toggle('past', state === 'past');
+    card.classList.toggle('live', state === 'live');
+    card.classList.toggle('next', state === 'next');
+  }
+}
+setInterval(() => { renderUpNext(); markSchedule(); }, 30000);
 
 // --- compact view: the next 7 days ---
 async function loadEvents() {
@@ -104,11 +117,14 @@ async function loadEvents() {
     if (!list.length) box.appendChild(h('div', 'sempty', 'Nothing scheduled'));
     for (const ev of list) {
       const card = h('div', 'evc');
+      card.dataset.start = +startOf(ev);
+      card.dataset.end = +endOf(ev);
       card.appendChild(h('div', 'et', ev.title));
       card.appendChild(h('div', 'em', metaLine(ev)));
       box.appendChild(card);
     }
   }
+  markSchedule();
   if (cal.open) renderCal();
 }
 
