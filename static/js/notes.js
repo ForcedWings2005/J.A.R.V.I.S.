@@ -6,6 +6,8 @@ async function loadNotes() {
   try { data = await (await fetch('/notes')).json(); }
   catch (e) { box.textContent = 'Could not load notes.'; return; }
   box.innerHTML = '';
+  document.getElementById('notes-count').textContent =
+    data.notes.length + (data.notes.length === 1 ? ' NOTE' : ' NOTES');
   if (data.notes.length === 0) {
     const none = document.createElement('div');
     none.className = 'muted';

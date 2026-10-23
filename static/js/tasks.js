@@ -19,6 +19,8 @@ async function loadTasks() {
   const res = await fetch('/tasks');
   const data = await res.json();
   const box = document.getElementById('tasks');
+  const open = data.tasks.filter(t => !t.done).length;
+  document.getElementById('tasks-count').textContent = open + ' OPEN';
   box.innerHTML = '';
   if (data.tasks.length === 0) {
     const none = document.createElement('div');

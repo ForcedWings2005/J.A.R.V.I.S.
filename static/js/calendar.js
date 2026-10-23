@@ -67,15 +67,25 @@ function renderUpNext() {
   const box = document.getElementById('upnext');
   const now = new Date();
   const next = upcoming.filter(ev => endOf(ev) > now).sort((a, b) => startOf(a) - startOf(b));
+  const inEl = document.getElementById('upnext-in');
   box.innerHTML = '';
-  if (!next.length) { box.appendChild(h('div', 'muted', 'Nothing in the next 7 days')); return; }
-  const ev = next[0], start = startOf(ev);
+  if (!next.length) {
+    inEl.textContent = '';
+    box.appendChild(h('div', 'muted', 'Nothing in the next 7 days'));
+    return;
+  }
+  const ev = next[0], start = startOf(ev), end = endOf(ev), live = start <= now;
+  inEl.textContent = live ? 'NOW' : inWords(Math.round((start - now) / 60000)).toUpperCase();
   const card = h('div', 'next');
-  const when = start <= now
-    ? 'Now \u00b7 until ' + fmtTime(ev.end_time || ev.time)
-    : dayWord(start, now) + ' ' + fmtTime(ev.time) + ' \u00b7 ' + inWords(Math.round((start - now) / 60000));
-  card.appendChild(h('div', 'nwhen' + (start <= now ? ' live' : ''), when));
-  card.appendChild(h('div', 'ntitle', ev.title));
+  card.appendChild(h('div', 'when' + (live ? ' live' : ''),
+    (live ? 'NOW' : dayWord(start, now).toUpperCase()) + ' \u00b7 ' + fmtRange(ev)));
+  card.appendChild(h('div', 'what', ev.title));
+  if (live) {                            // how far through it we are
+    const bar = h('div', 'progress'), fill = h('i');
+    fill.style.width = Math.min(100, Math.round((now - start) / (end - start) * 100)) + '%';
+    bar.appendChild(fill);
+    card.appendChild(bar);
+  }
   box.appendChild(card);
   if (next[1]) {
     const then = startOf(next[1]);
@@ -83,6 +93,40 @@ function renderUpNext() {
       (dayWord(then, now) === 'Today' ? '' : dayWord(then, now) + ' ') + fmtTime(next[1].time)));
   }
 }
+// --- today's timeline, across the top of the page ---
+function renderTimeline() {
+  const box = document.getElementById('timeline');
+  const now = new Date(), today = iso(now);
+  const evs = upcoming.filter(ev => ev.date === today);
+  const hourOf = d => d.getHours() + d.getMinutes() / 60;
+  // 07:00 to 23:00, widened to fit any event outside it
+  let first = 7, last = 23;
+  for (const ev of evs) {
+    first = Math.min(first, Math.floor(hourOf(startOf(ev))));
+    last = Math.max(last, Math.ceil(hourOf(endOf(ev)) || 24));
+  }
+  const pos = hrs => ((hrs - first) / (last - first) * 100) + '%';
+  box.innerHTML = '';
+  for (let hr = first; hr <= last; hr += 2) {
+    const mark = h('div', 'hour', String(hr % 24).padStart(2, '0') + ':00');
+    mark.style.left = pos(hr);
+    box.appendChild(mark);
+  }
+  for (const ev of evs) {
+    const a = hourOf(startOf(ev)), b = endOf(ev).getDate() !== startOf(ev).getDate() ? 24 : hourOf(endOf(ev));
+    const state = endOf(ev) <= now ? ' past' : startOf(ev) <= now ? ' live' : '';
+    const bar = h('div', 'ev' + state, ev.title);
+    bar.title = ev.title + ', ' + fmtRange(ev);
+    bar.style.left = pos(a);
+    bar.style.width = 'calc(' + pos(b) + ' - ' + pos(a) + ')';
+    box.appendChild(bar);
+  }
+  if (!evs.length) box.appendChild(h('div', 'tempty', 'Nothing on the calendar today'));
+  const nowLine = h('div', 'now');
+  nowLine.style.left = pos(Math.min(Math.max(hourOf(now), first), last));
+  box.appendChild(nowLine);
+}
+
 // Marks the schedule's cards as over, happening now, or next
 function markSchedule() {
   const now = new Date();
@@ -96,7 +140,7 @@ function markSchedule() {
     card.classList.toggle('next', state === 'next');
   }
 }
-setInterval(() => { renderUpNext(); markSchedule(); }, 30000);
+setInterval(() => { renderUpNext(); markSchedule(); renderTimeline(); }, 30000);
 
 // --- compact view: the next 7 days ---
 async function loadEvents() {
@@ -107,6 +151,7 @@ async function loadEvents() {
   catch (e) { box.textContent = 'Could not load the schedule.'; return; }
   upcoming = evs;
   renderUpNext();
+  renderTimeline();
   const map = groupByDate(evs);
   box.innerHTML = '';
   for (let i = 0; i < 7; i++) {

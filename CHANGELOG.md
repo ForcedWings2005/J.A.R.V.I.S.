@@ -744,6 +744,21 @@ The owner asked for recommendations to make the dashboard look better. Looked at
 
 **Found while testing, not fixed:** asked to "cancel the dentist" without a date, `delete_event` returned an error (it needs the date), so no card was shown, but JARVIS replied "I'll need you to confirm on screen". A claim about a card that does not exist; added to `plan.md`.
 
+## 41. A cinematic HUD look
+
+The owner wanted the dashboard to feel more like the films' HUD. Three directions were described (cinematic, calm glass, mission control); the owner chose cinematic, and a throwaway mockup (made-up data, in the scratch folder, served only on this Mac) was approved before the real page changed. Animated screens and other motion are the next step, to be discussed separately.
+
+- **Look**: panels framed with corner brackets instead of rounded boxes, numbered like a HUD (01 UP NEXT, 02 TO-DO, 03 SCHEDULE, 04 MEMORY); a faint grid, scanlines and a vignette behind everything; glow on the cyan; angled corners on buttons, readouts, your messages and the confirmation card; diamond checkboxes in the to-do list. Headline text uses **DIN Condensed**, which comes with macOS, so no font is downloaded (Google Fonts would contact Google on every load).
+- **Header**: the J.A.R.V.I.S. wordmark, status readouts (the model with a green dot when Ollama answers and red when it does not, the time of the last backup, the microphone, the switches, New conversation) and a live clock with the date.
+- **Today's timeline** across the page: today's events from 07:00 to 23:00 (wider if an event falls outside), those that are over dimmed, the one happening now in amber, and an amber NOW line; redrawn every 30 seconds.
+- **Up next** shows the title large, the time, and a progress bar while the event is happening; the countdown moved into the panel's header. Panels show counts ("3 OPEN", "2 NOTES").
+- **Boot sequence**: "INITIALISING J.A.R.V.I.S. ... MODEL ONLINE ... GOOD EVENING, SIR." for about 2.5 seconds, then the panels rise in. Once per browser session (`sessionStorage`), never with Reduce motion on or with the Mac's own reduce-motion setting. The MODEL line shows the real answer from `/info` ("NOT ANSWERING" if Ollama is down).
+- **"/" jumps to the command box** (unless you are typing somewhere), as the placeholder says.
+- **`/info`** now also returns `ollama` (does Ollama answer, with a 1-second timeout so a stopped Ollama cannot hang the page) and `last_backup` (the time of the newest daily backup file). Tests: the backup time from file times, Ollama answering or not, and the check giving up quickly; none of them contacts Ollama.
+- Every id the scripts use was kept, so all behaviour is unchanged. One clash found and fixed before it showed: the month view's event labels already used the class `chip`, which the new header readouts also used; the header styles now apply only inside the header.
+- **Checked in the demo** (made-up calendar): boot sequence, clock, readouts (model, green dot, backup time), timeline, Up next, counts, a chat with a confirmation card and Cancel, ticking and unticking a task (count 3 to 2 to 3), the expanded calendar in the new look (month labels unaffected), Escape, New conversation, Reduce motion (no animation, no boot), 1440x900 and 1280x720 (fits, nothing cut off) and phone width (one column, no sideways scrolling, timeline hidden). No console errors.
+- **Not checked**: Safari (the built-in browser is not Safari; the blur has Safari's `-webkit-` spelling), the real data, the microphone and speech.
+
 ---
 
 ## Status
@@ -756,6 +771,7 @@ The owner asked for recommendations to make the dashboard look better. Looked at
 | Personality (section 38) | Light version: evals 156/156, tried in the app, response times good |
 | Weekday check for weekly events (section 39) | Done in code, evals 154/156 (variation); fortnightly and monthly repeats not covered |
 | Dashboard redesign (section 40) | Done in a demo with a made-up calendar; not yet tried with real data, voice or the microphone |
+| Cinematic HUD look (section 41) | Done in a demo; not yet checked in Safari or with real data |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |

@@ -43,7 +43,9 @@ source .venv/bin/activate
 python -m uvicorn server:app --reload
 ```
 
-Open http://127.0.0.1:8000 and hard refresh with Cmd+Shift+R.
+Open http://127.0.0.1:8000 and hard refresh with Cmd+Shift+R. The header shows whether
+Ollama answers (green or red dot) and when the last backup was made; press / to jump to
+the command box.
 
 ## Settings and logs
 
