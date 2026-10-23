@@ -28,7 +28,9 @@ jarvis/
 ├── restore_backup.py  Opens an encrypted backup with the paper key; owner only
 ├── backup_public_key.txt  The public key (only locks; meant to be in git)
 ├── static/
-│   └── index.html      The dashboard page
+│   ├── index.html      The dashboard page: only its structure
+│   ├── css/jarvis.css  Its styles
+│   └── js/             Its scripts, loaded in order: orb, chat, tasks, voice, calendar, app
 ├── models/
 │   ├── kokoro-v1.0.onnx
 │   └── voices-v1.0.bin
@@ -703,6 +705,14 @@ In one eval run (section 38), "yoga every Monday" was added starting on a Sunday
   - **Final, prompt `da6dd655f792` (descriptions unchanged; tool results now name the weekday): 154/156.** Yoga on a Monday in all 3 runs; the model gave `repeat_days` for all 10 weekly events, so no refusals were needed. The 2 misses had already happened in earlier runs and are before or outside the changed results: `ask_until_month` guessed 31 December once (also seen in section 38), and `edit_move_to_another_day` kept the dentist on Tuesday once (the card would show the wrong change). Same prompt as the 156/156 runs, so counted as variation.
 - **Known limit, not changed**: fortnightly ("biweekly") and monthly repeats still follow the model's date, because `repeat_days` only works with weekly. Fortnightly has the same risk as weekly had.
 - Not checked: the real app.
+
+## 40. A better-looking dashboard
+
+The owner asked for recommendations to make the dashboard look better. Looked at in the built-in browser with a **demo** server: a launcher in the scratch folder that points the database, the backups and the log at scratch files and fills a made-up calendar, so the real `jarvis.db` stayed closed and no real data was shown in a screenshot. Found: 4 of 6 panels say "Coming soon"; at laptop size the page is taller than the window; only the last exchange is shown; the activity ticker looks like a second text box and shows code; small all-caps labels; ISO due dates in the to-do list against "Oct 24" in the schedule; "MODEL gemma4" written into the page by hand; nothing marks what is next. The owner chose to keep the HUD style and make all seven recommended changes, in order, after splitting the page.
+
+**Step 0: `index.html` split into files** (1,044 lines to 67). The styles went to `static/css/jarvis.css`, the scripts to six files in `static/js/` (orb, chat, tasks, voice, calendar, app), by their existing section headings. Mechanical: a script moved the lines and checked that the pieces joined back equal the original exactly. They are plain scripts loaded in order, which share their top-level names just as one script did, so no build step. The server now serves the folder: `app.mount("/static", StaticFiles(...))`, built into FastAPI (no new dependency), GET only, files inside `static/` only. Tests: the files are served with the right types, `../` paths are refused, and every file the page links to exists. Checked in the demo: no console errors, the to-do list, schedule, orb, expanded calendar, ticking a task, a chat, and a confirmation card with Cancel all work as before.
+
+**Found while testing, not fixed:** asked to "cancel the dentist" without a date, `delete_event` returned an error (it needs the date), so no card was shown, but JARVIS replied "I'll need you to confirm on screen". A claim about a card that does not exist; added to `plan.md`.
 
 ---
 

@@ -153,6 +153,9 @@ Not before Phases 3 and 4. In this order:
 
 ## Ongoing upkeep (small, any time)
 
+- **JARVIS can claim a card that was never shown.** When `delete_event` returned an error
+  (no date given), the reply still said "confirm on screen" (CHANGELOG section 40). Same
+  family as the clash wording, where he says he "cannot move" an event while a card waits.
 - **Check the weekday of fortnightly events too.** A weekly event must now name its weekday
   (CHANGELOG section 39). Fortnightly ("biweekly") still follows the model's date, with the
   same risk of landing on the wrong day; it would need repeat_days to work with biweekly.
@@ -167,8 +170,8 @@ Not before Phases 3 and 4. In this order:
 - **Keep backups off this disk.** `backups/` sits next to `jarvis.db`, so a disk failure or
   a lost laptop takes both. Now planned as Phase 5, item 3 (encrypted, to iCloud Drive).
   Time Machine on an external drive is still worth adding for the rest of the Mac.
-- **Split up `index.html`.** At over 1000 lines, move the scripts into `static/js/` modules
-  (orb, chat, speech, calendar). No build step is needed.
+- **Split up `index.html`.** *Done: CHANGELOG section 40.* The styles are in
+  `static/css/jarvis.css` and the scripts in `static/js/`, with no build step.
 - **Check model latency.** Measure the time to the first spoken word. Try Ollama's
   `keep_alive` setting so the model stays loaded between requests.
 - **Changelog status table:** mark "Streaming replies into speech" as tested, since every
