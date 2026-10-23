@@ -1,4 +1,20 @@
 // ---------- Tasks ----------
+// '2026-10-24' -> 'Tomorrow', 'Tue 27 Oct' or 'Overdue · Mon 19 Oct', for the to-do list
+const TASK_DOWS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const TASK_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function friendlyDue(isoDate, done) {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const due = new Date(y, m - 1, d);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((due - today) / 86400000);
+  const name = TASK_DOWS[due.getDay()] + ' ' + due.getDate() + ' ' + TASK_MONTHS[due.getMonth()];
+  if (days === 0) return { text: 'Today', late: false };
+  if (days === 1) return { text: 'Tomorrow', late: false };
+  if (days < 0) return { text: done ? name : 'Overdue \u00b7 ' + name, late: !done };
+  return { text: name, late: false };
+}
+
 async function loadTasks() {
   const res = await fetch('/tasks');
   const data = await res.json();
@@ -25,8 +41,10 @@ async function loadTasks() {
     label.append(cb, name);
     if (t.due) {
       const due = document.createElement('span');
-      due.className = 'due';
-      due.textContent = t.due;
+      const words = friendlyDue(t.due, t.done);
+      due.className = 'due' + (words.late ? ' late' : '');
+      due.textContent = words.text;
+      due.title = t.due;
       label.appendChild(due);
     }
     box.appendChild(label);

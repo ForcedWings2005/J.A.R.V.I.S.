@@ -172,6 +172,12 @@ def list_tasks_endpoint():
     return {"tasks": tasks.tasks_list()}
 
 
+@app.get("/info")
+def info_endpoint():
+    """For the page's header: which model JARVIS is using."""
+    return {"model": config.MODEL}
+
+
 @app.get("/notes")
 def list_notes_endpoint():
     return {"notes": notes.notes_list()}

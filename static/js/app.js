@@ -16,7 +16,10 @@ function closeFocus() {
   focused.querySelector('.hint').textContent = 'EXPAND +';
   focused = null;
 }
+// Only panels with an EXPAND label can expand: clicking Up next used to fail and leave the
+// page dimmed (CHANGELOG section 40)
 document.querySelectorAll('.panel').forEach(p => {
+  if (!p.querySelector('.hint')) return;
   p.addEventListener('click', () => focusPanel(p));
   p.addEventListener('keydown', e => { if (e.key === 'Enter') focusPanel(p); });
 });
@@ -111,5 +114,8 @@ buildOrb();
 loadEvents();
 loadTasks();
 loadNotes();
+fetch('/info').then(r => r.json())
+  .then(i => { document.getElementById('model-name').textContent = i.model; })
+  .catch(() => { document.getElementById('model-name').textContent = '?'; });
 setVoice(false);
 input.focus();

@@ -104,6 +104,11 @@ def test_json_sent_as_plain_text_is_refused(client):
     assert r.status_code == 422
 
 
+def test_info_names_the_model_in_use(client):
+    """The header showed 'gemma4' written into the page by hand, wrong after the switch."""
+    assert client.get("/info").json() == {"model": config.MODEL}
+
+
 # ---------- notes panel (CHANGELOG section 40) ----------
 
 def test_notes_panel_starts_empty(client):
