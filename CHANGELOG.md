@@ -29,7 +29,7 @@ jarvis/
 ├── backup_public_key.txt  The public key (only locks; meant to be in git)
 ├── static/
 │   ├── index.html      The dashboard page: only its structure
-│   ├── css/jarvis.css  Its styles
+│   ├── css/jarvis.css  Its styles: the glass look (section 43)
 │   ├── css/motion.css  The animations' styles (section 42)
 │   └── js/             Its scripts, loaded in order: orb, chat, tasks, notes, voice, calendar, app, motion
 ├── models/
@@ -787,6 +787,41 @@ All of it lives in two new files, `static/js/motion.js` and `static/css/motion.c
 - **Not checked**: the 5-minute expiry and the 3-minute ambient mode at full length (the pieces were checked, the wait was not).
 - **A note on testing**: the built-in browser first showed a page from long before the split, which it had kept from an earlier session on the same port, without asking the server. Found because the page had one inline script; loading the address with `?fresh=42` fetched the real page. Section 40 made the server tell browsers to check again, but a copy saved before that change can still be reused, so a hard refresh (Cmd+Shift+R) after updating is still worth doing.
 
+## 43. A glass look
+
+The owner asked whether the dashboard could look like Apple's Liquid Glass (iOS 26, macOS Tahoe). Glass on a web page is a see-through layer that blurs and brightens what is behind it (`backdrop-filter`), with a bright rim where light catches the edge. Safari supports all of that. It does not support the last ingredient, the background visibly *bending* near the edges, which needs an SVG filter inside `backdrop-filter`: as far as we know only Chrome does that, so it was left out.
+
+Three throwaway demos were compared in Safari (made-up data, scratch folder, this Mac only):
+- the HUD with glass surfaces;
+- full Liquid Glass;
+- a blend of the two.
+
+The owner liked Liquid Glass's shapes but found it "mostly grey". Apple's glass is tinted **white**, and white over a dark page comes out grey; the HUD's glass was tinted **navy-cyan**. The blend, Liquid Glass's shapes in the HUD's colour, was chosen, with the glitch kept and the corner brackets left out.
+
+- **`jarvis.css` rewritten** as the glass look, not layered on top of the HUD (that would have meant rules written and then cancelled):
+  - rounded panels and capsule buttons and readouts;
+  - Apple's system font, which comes with macOS, instead of DIN Condensed and monospace;
+  - round checkboxes, iPhone-style switches, and the timeline as one long capsule;
+  - the HUD's cyan for headings, the clock and the orb, with their glow.
+- **The glass itself**:
+  - every surface gets the same tint, blur and rim from three variables at the top of the file (`--glass`, `--blur`, `--rim`), so it can be tuned in one place;
+  - soft blue, teal, violet and cyan lights drift slowly behind everything (`body::before`), because glass only reads as glass when something colourful sits behind it.
+- **Gone from the HUD**: the background grid, the scanlines, the angled corners, the corner marks on every panel, the panel numbers (01 to 04, removed from `index.html`) and the HUD fonts.
+- **`motion.css` and `motion.js`**:
+  - the opening animation's frame is now a pane of glass with a smooth bar, and its grid and corner pieces are gone;
+  - the lock-on brackets (CSS and the `lockOn` function) and the running light on hover were removed;
+  - everything else is unchanged, glitch included.
+- **No other script or Python changed**; every id and class the scripts use was kept.
+- **Found and fixed while checking**: the lights kept drifting with the Reduce motion switch on. The rule `body.reduce *::before` covers everything *inside* the body, but not the body's own `::before`, which is where the lights are. The Mac's own setting was not affected, because its rule is written differently.
+- **Checked in a demo of the real page files** (made-up data, port 8014, built-in browser at 1440x900):
+  - the opening sequence in order (ACCESSING, ACCESS GRANTED), with the glitch and no brackets left behind; Escape closes it;
+  - the calendar's four views, each switched with a real click;
+  - ticking a task (count 3 to 2); a card with the amber orb;
+  - Reduce motion (screens open instantly, the lights stop);
+  - phone width (one column, no sideways scrolling). No console errors.
+  - Ruff passes and 437 tests pass (no Python changed).
+- **Not checked**: Safari (where the owner uses JARVIS, and where the glass matters most), real data, and whether the blur makes animations stutter on this Mac.
+
 ---
 
 ## Status
@@ -799,8 +834,9 @@ All of it lives in two new files, `static/js/motion.js` and `static/css/motion.c
 | Personality (section 38) | Light version: evals 156/156, tried in the app, response times good |
 | Weekday check for weekly events (section 39) | Done in code, evals 154/156 (variation); fortnightly and monthly repeats not covered |
 | Dashboard redesign (section 40) | Done in a demo with a made-up calendar; not yet tried with real data, voice or the microphone |
-| Cinematic HUD look (section 41) | Done in a demo; not yet checked in Safari or with real data |
+| Cinematic HUD look (section 41) | Replaced by the glass look (section 43) |
 | Motion layer (section 42) | Done; checked in a demo and by the owner in Safari, including the orb with the microphone and voice |
+| Glass look (section 43) | Done in a demo; not yet checked by the owner in Safari |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
