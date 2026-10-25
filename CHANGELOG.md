@@ -820,7 +820,8 @@ The owner liked Liquid Glass's shapes but found it "mostly grey". Apple's glass 
   - Reduce motion (screens open instantly, the lights stop);
   - phone width (one column, no sideways scrolling). No console errors.
   - Ruff passes and 437 tests pass (no Python changed).
-- **Not checked**: Safari (where the owner uses JARVIS, and where the glass matters most), real data, and whether the blur makes animations stutter on this Mac.
+- **Checked by the owner in Safari** (where they use JARVIS): looks good.
+- **Not checked**: real data.
 
 ---
 
@@ -836,7 +837,7 @@ The owner liked Liquid Glass's shapes but found it "mostly grey". Apple's glass 
 | Dashboard redesign (section 40) | Done in a demo with a made-up calendar; not yet tried with real data, voice or the microphone |
 | Cinematic HUD look (section 41) | Replaced by the glass look (section 43) |
 | Motion layer (section 42) | Done; checked in a demo and by the owner in Safari, including the orb with the microphone and voice |
-| Glass look (section 43) | Done in a demo; not yet checked by the owner in Safari |
+| Glass look (section 43) | Done; checked in a demo and by the owner in Safari |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
