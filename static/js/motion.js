@@ -200,10 +200,9 @@ function shockwave(r) {
   ], { duration: 600, easing: 'cubic-bezier(.2,.8,.3,1)' }).finished.then(() => ring.remove(), () => ring.remove());
 }
 
-function makeFrame(withReadout) {                           // the empty frame that flies out
+function makeFrame(withReadout) {                           // the empty pane of glass that flies out
   const f = document.createElement('div');
   f.className = 'fx-frame';
-  for (let i = 0; i < 4; i++) { const c = document.createElement('span'); c.className = 'fx-corner'; f.appendChild(c); }
   if (withReadout) {
     const body = document.createElement('div');
     body.className = 'fx-readout';
@@ -217,14 +216,6 @@ function makeFrame(withReadout) {                           // the empty frame t
   }
   document.body.appendChild(f);
   return f;
-}
-
-function lockOn(p) {                                         // corner brackets, added once per panel
-  if (p.querySelector('.fx-lockon')) return;
-  const lock = document.createElement('div');
-  lock.className = 'fx-lockon';
-  for (let i = 0; i < 4; i++) lock.appendChild(document.createElement('span'));
-  p.appendChild(lock);
 }
 
 function accessWords(p) {                                    // the readout, from the real contents
@@ -273,7 +264,6 @@ async function openScreen(p) {
     if (frame) frame.remove();
     if (!p.classList.contains('focused')) { focusPanelPlain(p); document.body.classList.add('fx-receding'); }
     p.classList.remove('fx-hidden');
-    lockOn(p);
     once(p, 'fx-reveal', 900);
     setTimeout(() => once(p, 'fx-glitch', 450), 420);
     decode(p.querySelector('.h .l'), 700);
