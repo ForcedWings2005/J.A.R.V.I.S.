@@ -165,6 +165,32 @@ def test_fortnights_are_counted_in_calendar_weeks():
     assert dates(0, 20) == [day(3), day(15), day(17)]
 
 
+# The model's date can be a day off either way. When it is not on a weekday the user named,
+# the nearest named weekday is used (CHANGELOG section 46). Before, the code only looked
+# forward: "every other Friday" given as a Saturday started a week late, on the other Fridays.
+
+def test_a_day_late_date_snaps_back_to_the_friday_before():
+    msg = jcal.add_event("Review", day(5), "15:00", repeat="biweekly", repeat_days="fri")  # Sat
+    assert f"starting {day(4)} (a Friday)" in msg
+    assert dates(0, 30) == [day(4), day(18)]
+
+
+def test_a_date_on_a_named_weekday_is_kept():
+    msg = jcal.add_event("Review", day(11), "15:00", repeat="biweekly", repeat_days="fri")
+    assert f"starting {day(11)} (a Friday)" in msg
+
+
+def test_snapping_back_into_the_past_moves_on_to_the_next_one(clock):
+    clock.set(16, day=12)                                   # Saturday afternoon
+    msg = jcal.add_event("Review", day(5), "15:00", repeat="biweekly", repeat_days="fri")
+    assert f"starting {day(11)} (a Friday)" in msg
+
+
+def test_a_tie_between_two_named_days_picks_the_earlier_one():
+    jcal.add_event("Lab", day(9), "10:00", repeat="biweekly", repeat_days="tue,thu")   # a Wednesday
+    assert dates(0, 30) == [day(8), day(10), day(22), day(24)]
+
+
 def test_a_fortnightly_event_does_not_clash_with_its_weeks_off():
     jcal.add_event("Dinner", day(11), "15:00")                     # the Friday in between
     msg = jcal.add_event("Review", day(4), "15:00", repeat="biweekly", repeat_days="fri")

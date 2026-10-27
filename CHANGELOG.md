@@ -866,6 +866,21 @@ The server's output showed "Fetching 4 files ... 0.00B" whenever Whisper loaded:
 - **Checked end to end**: a made-up sentence spoken by macOS's `say` was transcribed by the real Whisper, imported in the server's order: "at a team review every other Friday at 3pm" (the synthetic voice's "add a" heard as "at a"), with the variable not set beforehand, and no host contacted.
 - **Not checked**: the microphone in the real app.
 
+## 46. A fortnightly event starts in the right week
+
+In section 44's final eval, "every other Friday at 3pm" was saved starting on Friday the 18th instead of the 11th: the model gave Saturday the 12th, and the code, which only looked forward from the model's date, found the next Friday a week later. For a weekly event that hardly matters; for a fortnightly one it is the other set of Fridays.
+
+- **The fix** (`add_event` in `jcal.py`): when the model's date is not on a weekday the user named, move to the **nearest** named weekday, trying 1 day back, 1 on, 2 back and so on, so a tie picks the earlier day. Then, as before, move forward if that time has already passed. A date that is on a named weekday is used as it is.
+- **Why "nearest" and not "back to the Monday"** (the first idea, in plan.md): the model's mistakes go both ways. Section 39's "every Monday" came as a Sunday, a day *early*; starting from that week's Monday would have put yoga on the wrong Monday. The nearest weekday is right in both cases.
+- **Tests**: 4 new (a day-late date snaps back; a date on a named weekday is kept; snapping back into the past moves on; a tie picks the earlier day). Two of them failed before the fix; the other two pin behaviour that must not change. The existing weekly tests, including section 39's Sunday-for-Monday, pass unchanged. 465 tests.
+- **Evals** (gemma4:26b `001e5dafc3c7`, prompt `851b5394ed77`, unchanged):
+  - `repeat_fortnightly` 10 times on the old code: 9/10 (the model gave Saturday the 12th and the series started on the 18th). On the new code: 10/10, and in one of those runs the model again gave the 12th and the code moved it to the 11th.
+  - Full suite, before (section 44's last run, the same calendar code): 167/168. **After: 167/168.** Every repeat case 3/3.
+  - The one miss is not from this change (it only touches `add_event`): "Cancel piano." got "you will need to confirm your choice on the screen" after an error, 1 of 3. Section 44's prompt rule reduced that habit (3/3 in its run) but has not removed it.
+- **Seen, not changed**: in every run the model first called `add_event` for a fortnightly event without `repeat_days`, was refused (section 44), and then called it correctly: two rounds instead of one. The `repeat_days` description still says "for a weekly repeat"; changing a description needs its own full eval (section 39). Added to `plan.md`.
+- **Time Machine** was dropped from the plan (the owner's decision); SECURITY.md says so.
+- **Not checked**: the real app.
+
 ---
 
 ## Status
@@ -883,6 +898,7 @@ The server's output showed "Fetching 4 files ... 0.00B" whenever Whisper loaded:
 | Glass look (section 43) | Done; checked in a demo and by the owner in Safari |
 | Card claims, fortnightly weekdays (section 44) | Done: evals 167/168 (prompt `851b5394ed77`); not yet tried in the real app |
 | Whisper offline (section 45) | Done: a real transcription contacts no host; not yet tried with the microphone in the app |
+| Fortnightly start week (section 46) | Done: evals 167/168, `repeat_fortnightly` 10/10; not yet tried in the real app |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
@@ -918,4 +934,4 @@ The full roadmap, with the reasons and the order, is in `plan.md`. In short:
 3. Weather, then news and sports, as read-only tools. These are the first to read outside text, so prompt-injection evals come first (SECURITY.md).
 4. Sound effects for the dashboard.
 5. Phase 6, using JARVIS from a phone: a login, Tailscale with HTTPS, a phone layout.
-6. Upkeep: stop Whisper checking Hugging Face's servers when it loads, split the requirements, Time Machine for the rest of the Mac, and measuring the model's response time.
+6. Upkeep: split the requirements, and measure the model's response time.

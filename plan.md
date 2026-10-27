@@ -157,23 +157,26 @@ Not before Phases 3 and 4. In this order:
 
 - **JARVIS can claim a card that was never shown.** When `delete_event` returned an error
   (no date given), the reply still said "confirm on screen" (CHANGELOG section 40).
-  *Done: CHANGELOG section 44 ("cancel the dentist" finds the event, and the prompt rule
-  about cards is now conditional).* (The clash wording, "cannot move", turned out to be
+  *Mostly done: CHANGELOG section 44 ("cancel the dentist" finds the event, and the prompt
+  rule about cards is now conditional). Still seen once in 3 runs for a repeating event
+  without a date (section 46), so reduced, not gone.* (The clash wording, "cannot move", turned out to be
   true: a clash shows no card.)
 - **Check the weekday of fortnightly events too.** *Done: CHANGELOG section 44.*
-- **The first week of a fortnightly event.** When the model's date is a day late (a Saturday
-  for "every other Friday"), code slides forward to the next Friday, a week later than meant,
-  so the series falls on the other set of Fridays (CHANGELOG section 44, 1 eval run in 3).
-  One idea: when the model's date is not on the weekday the user said, start from the
-  beginning of that week instead. It changes when weekly events start too, so measure first.
+- **The first week of a fortnightly event.** *Done: CHANGELOG section 46 (the nearest
+  named weekday is used, back or forward).*
+- **Fortnightly events take two calls.** The model first calls `add_event` without
+  `repeat_days`, is refused, then calls again correctly (every run in CHANGELOG section 46).
+  It always gets there, but the extra round costs a few seconds. The `repeat_days`
+  description still says "for a weekly repeat"; changing it needs a full eval before and
+  after, since a description change once broke an unrelated case (section 39).
 - **Whisper may contact the internet when it loads.** *Done: CHANGELOG section 45. It did
   (huggingface.co, on the first transcription after each start); it is offline now.*
 - **Split the requirements.** `requirements.txt` is a `pip freeze` dump (it includes `torch`).
   Keep a short `requirements.in` listing what the project uses directly, a
   `requirements-dev.txt` (pytest, ruff, pre-commit), and a generated lock file.
 - **Keep backups off this disk.** `backups/` sits next to `jarvis.db`, so a disk failure or
-  a lost laptop takes both. Now planned as Phase 5, item 3 (encrypted, to iCloud Drive).
-  Time Machine on an external drive is still worth adding for the rest of the Mac.
+  a lost laptop takes both. *Done as Phase 5, item 3 (encrypted, to iCloud Drive). Time
+  Machine for the rest of the Mac is not planned (owner's decision, 2026-10-27).*
 - **Split up `index.html`.** *Done: CHANGELOG section 40.* The styles are in
   `static/css/jarvis.css` and the scripts in `static/js/`, with no build step.
 - **Check model latency.** Measure the time to the first spoken word. Try Ollama's
