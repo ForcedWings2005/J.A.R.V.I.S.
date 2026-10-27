@@ -897,6 +897,20 @@ The owner noticed in the real app: adding an event "every two weeks" worked, but
 - **Seen, not changed**: once, "I bought the milk" became `complete_task("the milk")`, which did not match "Buy milk"; JARVIS said so honestly.
 - **Not checked**: the grey "corrected" step on the page (only its class and CSS rule), and the real app.
 
+## 48. The evals check speed too
+
+During section 47, one eval reply looped for 39 minutes, and nothing said so: the output went to a file and Python held it back until the end, so the file stayed empty, and nothing marked one run as abnormal. Speed could only be judged from the total minutes.
+
+- **Lines appear as each case finishes**, even when the output goes to a file (`sys.stdout.reconfigure(line_buffering=True)`). Checked: the file showed the first case while the run was still going.
+- **Each run records more**: its seconds (as before), the **seconds to the first word** (what the user actually waits for) and the **tokens the model wrote**, all rounds together. They are saved in the JSON results, with the run's total minutes.
+- **SLOW**: a run over 30 seconds is marked on its case's line (`SLOW 1/3`). Normal runs take 2 to 10 seconds; a runaway stopped by section 47's cap takes about 80.
+- **At the end**: the median time per run and to the first word, the 5 slowest runs with their tokens, and a comparison with the last saved full run of the same model, which names any case at least 1.5 times **and** 3 seconds slower. Both limits, so a 1-second case that wobbles to 2 is not flagged.
+- **Warnings only**: timings depend on what else the Mac is doing, so speed never fails a case. The limits (30 s, 1.5 times, 3 s) are a first guess, to adjust once there are more runs.
+- **`evals/speed.py`**: the figures are plain functions on the saved results, so CI tests them without a model. Results saved before this section have no first-word or token figures; they still work for the comparison.
+- **Tests**: 6 new (SLOW, the summary, old results, the two limits, cases the last run did not have, finding the last full run of the same model). 477 tests.
+- **A real run** (`--runs 1`, prompt `851b5394ed77`, unchanged): 55/56 (`edit_move_to_another_day`, known to be flaky), 2.9 min. Median run 2.7 s, first word 2.2 s; slowest 7.7 s (582 tokens); no run SLOW; compared with section 47's final run, no case slower.
+- The README's eval section said "about 30 real requests" (56 now) and CLAUDE.md said 52 cases; both corrected.
+
 ---
 
 ## Status
@@ -916,6 +930,7 @@ The owner noticed in the real app: adding an event "every two weeks" worked, but
 | Whisper offline (section 45) | Done: a real transcription contacts no host; not yet tried with the microphone in the app |
 | Fortnightly start week (section 46) | Done: evals 167/168, `repeat_fortnightly` 10/10; not yet tried in the real app |
 | Delete asks, corrected steps, reply cap (section 47) | Done: evals 166/168, cap checked live; the ticker change not yet seen on the page |
+| Speed in the evals (section 48) | Done: checked with a real run (median 2.7 s, first word 2.2 s) |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
@@ -951,4 +966,4 @@ The full roadmap, with the reasons and the order, is in `plan.md`. In short:
 3. Weather, then news and sports, as read-only tools. These are the first to read outside text, so prompt-injection evals come first (SECURITY.md).
 4. Sound effects for the dashboard.
 5. Phase 6, using JARVIS from a phone: a login, Tailscale with HTTPS, a phone layout.
-6. Upkeep: split the requirements, and measure the model's response time.
+6. Upkeep: split the requirements.

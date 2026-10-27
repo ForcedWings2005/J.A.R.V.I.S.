@@ -96,7 +96,7 @@ Both also run automatically on GitHub for every push, and before every commit on
 
 ## Model evals
 
-The tests check the code. The evals check the model: about 30 real requests ("add piano
+The tests check the code. The evals check the model: 56 real requests ("add piano
 every Tuesday at 4pm", "how are we looking tonight") run through the real assistant
 against a frozen clock and a throwaway database, and are scored on the tools it calls
 and what it says. Ollama must be running. A full run takes about 10 minutes.
@@ -109,6 +109,12 @@ python -m evals -v                  # also show the reply and tool calls of fail
 
 Run it before and after every prompt or model change, and put both scores in the commit
 message. Cases live in `evals/cases.py`; results are saved to `evals/results/` (not in git).
+
+It also checks speed (CHANGELOG section 48). Lines appear as each case finishes, even when
+the output goes to a file. A run over 30 seconds is marked `SLOW` on its case's line. At the
+end come the median time per run and to the first word, the five slowest runs with the
+tokens they wrote, and any case at least 1.5 times and 3 seconds slower than in the last
+full run of the same model. Speed only warns: timings depend on what else the Mac is doing.
 
 ## Backups
 
