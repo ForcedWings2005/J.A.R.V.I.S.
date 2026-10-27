@@ -250,6 +250,30 @@ def test_speak_limits_and_refuses_empty_text(client, monkeypatch):
     assert len(spoken[0]) == 2000
 
 
+# Whisper's loader asked huggingface.co whether the model had changed, every time the
+# server started using it (CHANGELOG section 45). Importing config now turns that off.
+# A fresh Python is needed: config is already imported in this one.
+
+def _offline_setting(env_value):
+    import subprocess
+    env = {k: v for k, v in os.environ.items() if k != "HF_HUB_OFFLINE"}
+    env["JARVIS_DB"] = ":memory:"
+    if env_value is not None:
+        env["HF_HUB_OFFLINE"] = env_value
+    code = "import config, os; print(os.environ.get('HF_HUB_OFFLINE'))"
+    done = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True,
+                          text=True, cwd=os.path.dirname(config.__file__), check=True)
+    return done.stdout.strip()
+
+
+def test_importing_config_keeps_whisper_offline():
+    assert _offline_setting(None) == "1"
+
+
+def test_the_owner_can_still_turn_it_off_for_a_deliberate_download():
+    assert _offline_setting("0") == "0"
+
+
 @pytest.fixture
 def whisper(monkeypatch):
     """A fake mlx_whisper module that remembers the file it was given."""

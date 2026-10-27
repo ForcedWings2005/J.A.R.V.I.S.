@@ -166,11 +166,8 @@ Not before Phases 3 and 4. In this order:
   so the series falls on the other set of Fridays (CHANGELOG section 44, 1 eval run in 3).
   One idea: when the model's date is not on the weekday the user said, start from the
   beginning of that week instead. It changes when weekly events start too, so measure first.
-- **Whisper may contact the internet when it loads.** The server's output shows
-  "Fetching 4 files ... 0.00B" each time: nothing is downloaded, but the Hugging Face
-  library usually asks its servers whether the files changed. Not personal data, but it
-  does not fit "nothing leaves the machine". Check first, then probably set
-  `HF_HUB_OFFLINE=1` (CHANGELOG section 36).
+- **Whisper may contact the internet when it loads.** *Done: CHANGELOG section 45. It did
+  (huggingface.co, on the first transcription after each start); it is offline now.*
 - **Split the requirements.** `requirements.txt` is a `pip freeze` dump (it includes `torch`).
   Keep a short `requirements.in` listing what the project uses directly, a
   `requirements-dev.txt` (pytest, ruff, pre-commit), and a generated lock file.

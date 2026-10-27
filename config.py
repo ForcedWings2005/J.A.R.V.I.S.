@@ -53,6 +53,12 @@ NOTES_RECALL_LIMIT = 5     # notes given to the model per recall
 
 # Speech
 STT_MODEL = "mlx-community/whisper-large-v3-turbo"
+# Whisper loads from the copy already on this Mac and never asks huggingface.co whether the
+# model changed, so nothing leaves the Mac and the model cannot change by itself (CHANGELOG
+# section 45). The Hugging Face library reads this when it is first imported, which happens
+# only when Whisper first loads, long after config. To download or update the model on
+# purpose, use the command in README.md (it sets HF_HUB_OFFLINE=0, which setdefault keeps).
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
 MAX_AUDIO_BYTES = 10_000_000
 VOICE_LANG = "en-gb"
 VOICE_SPEED = 1.1       # 1.0 is normal speed
