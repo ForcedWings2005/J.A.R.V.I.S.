@@ -165,6 +165,35 @@ def test_a_failed_step_says_what_went_wrong_briefly():
     assert len(step["text"]) <= 90
 
 
+# A call the code refuses and the model then fixes in the same reply showed a red "!" in
+# the ticker, although it worked in the end (CHANGELOG section 47). It is now "corrected".
+
+def test_a_refused_call_the_model_then_fixes_is_shown_as_corrected():
+    jcal.add_event("Meeting", "2030-01-10", "09:00", repeat="biweekly", repeat_days="thu")
+    model = FakeModel(use(call("delete_event", title="meeting")),
+                      use(call("delete_event", title="Meeting", scope="all")),
+                      say("Please confirm on screen, sir."))
+    events, _ = run(brain.Assistant(chat=model), "Delete every meeting")
+    assert [s["status"] for s in events[-1]["steps"]] == ["corrected", "waiting"]
+
+
+def test_a_refused_call_that_is_not_fixed_stays_an_error():
+    jcal.add_event("Meeting", "2030-01-10", "09:00", repeat="biweekly", repeat_days="thu")
+    model = FakeModel(use(call("delete_event", title="meeting")),
+                      say("One date, or the whole series, sir?"))
+    events, _ = run(brain.Assistant(chat=model), "Delete the meeting")
+    assert [s["status"] for s in events[-1]["steps"]] == ["error"]
+
+
+def test_a_success_for_another_event_does_not_hide_an_error():
+    jcal.add_event("Dentist", "2030-01-08", "15:00")
+    model = FakeModel(use(call("delete_event", title="meeting")),
+                      use(call("delete_event", title="dentist", date="2030-01-08")),
+                      say("Please confirm on screen, sir."))
+    events, _ = run(brain.Assistant(chat=model), "Cancel the meeting and the dentist")
+    assert [s["status"] for s in events[-1]["steps"]] == ["error", "waiting"]
+
+
 def test_note_steps_never_show_the_note_itself():
     for name, args in (("remember", {"text": "Likes xyzzy"}), ("forget", {"about": "xyzzy"}),
                        ("recall", {"about": "xyzzy"})):
@@ -362,7 +391,25 @@ def test_token_counts_from_ollama_are_logged_and_kept(caplog):
 def test_think_and_keep_alive_settings_reach_the_model():
     model = FakeModel(say("Hello."))
     run(brain.Assistant(chat=model, think=False, keep_alive="1h"), "Hi")
-    assert model.options == {"think": False, "keep_alive": "1h"}
+    assert model.options["think"] is False and model.options["keep_alive"] == "1h"
+
+
+# One eval reply looped for 39 minutes and 121,120 tokens, and nothing stopped it
+# (CHANGELOG section 47). Every request now carries a cap on what one round may write.
+
+def test_every_request_caps_the_length_of_the_reply():
+    model = FakeModel(say("Hello."))
+    run(brain.Assistant(chat=model), "Hi")
+    assert model.options["options"] == {"num_predict": config.MODEL_MAX_TOKENS}
+
+
+def test_reaching_the_cap_is_logged(caplog):
+    def chat(**kwargs):
+        yield ollama.ChatResponse(message=ollama.Message(role="assistant", content="And so on"),
+                                  done=True, done_reason="length", eval_count=4096)
+
+    run(brain.Assistant(chat=chat), "Hi")
+    assert "model round 1 stopped at the 4096-token limit" in caplog.text
 
 
 def test_an_empty_model_round_is_logged(caplog):

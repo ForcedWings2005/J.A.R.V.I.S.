@@ -316,8 +316,13 @@ def _locate(title: str, date: str, scope: str, verb: str):
             only = _find_series(title)
             if isinstance(only, str):
                 return only
-            msg = (f"Error: give the date of the occurrence to {verb}, "
-                   f"or use scope 'all' to {verb} a whole repeating series.")
+            if only["repeat"] == "none":                   # one event: no date needed
+                return only, only["date"], scope
+            # A repeating event: one date or all of them is the user's choice. Offering
+            # "or use scope 'all'" here made the model pick all by itself after "delete
+            # the meeting" (CHANGELOG section 47), so it is told to ask instead.
+            msg = (f"Error: '{only['title']}' repeats {only['repeat_label']}. Ask the user "
+                   "whether they mean one date or the whole series.")
             if verb == "change":
                 msg += (" date is the event's CURRENT date; new_date is only for "
                         "moving it to a different day.")

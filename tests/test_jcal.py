@@ -360,6 +360,15 @@ def test_delete_one_occurrence_needs_a_date():
     assert jcal.find_for_delete("piano", scope="this").startswith("Error")
 
 
+def test_a_repeating_event_without_a_date_asks_instead_of_offering_all():
+    """The old error offered "or use scope 'all'", and the model then deleted every meeting
+    on its own after "delete the meeting" (CHANGELOG section 47). Now it is told to ask."""
+    jcal.add_event("Meeting", day(3), "09:00", repeat="biweekly", repeat_days="thu")
+    result = jcal.delete_event("meeting")
+    assert result == ("Error: 'Meeting' repeats every 2 weeks on Thu. Ask the user whether "
+                      "they mean one date or the whole series.")
+
+
 # "Cancel the dentist" without a date used to fail, and JARVIS then pointed to a card that
 # was never shown (CHANGELOG section 44). Like update_event, delete_event now finds the
 # only upcoming one-off event by its title; the card shows its date before anything happens.
@@ -634,7 +643,7 @@ def test_bad_changes_come_back_as_errors(kwargs, error):
 def test_changing_one_occurrence_needs_its_date():
     jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly", repeat_days="tue")
     assert jcal.update_event("piano", new_start_time="17:00").startswith(
-        "Error: give the date of the occurrence to change")
+        "Error: 'Piano lesson' repeats weekly on Tue. Ask the user whether they mean one date")
 
 
 def test_a_new_length_in_minutes_sets_the_end():
@@ -712,7 +721,7 @@ def test_with_two_dentists_the_date_in_new_date_picks_the_right_one():
 def test_without_a_safe_guess_the_error_explains_the_two_dates():
     jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly", repeat_days="tue")
     result = jcal.update_event("piano", new_date=day(3), new_start_time="17:00")   # no piano on day 3
-    assert result.startswith("Error: give the date of the occurrence to change")
+    assert result.startswith("Error: 'Piano lesson' repeats weekly on Tue. Ask the user whether they mean one date")
     assert "CURRENT date" in result
 
 
