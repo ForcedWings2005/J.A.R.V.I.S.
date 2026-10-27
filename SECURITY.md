@@ -108,7 +108,8 @@ The biggest real risk is losing the Mac, which takes every backup with it. Built
   files, restore checks. Restore drill with the real paper key: passed on 2026-10-18
   (CHANGELOG section 33). The first copies are in iCloud Drive.
 
-Later: Time Machine on an external drive, for the rest of the Mac as well.
+Time Machine was considered for the rest of the Mac and is not planned (my decision,
+2026-10-27). JARVIS's own data is covered by the encrypted copies above.
 
 ### Notes and memory (Phase 5, item 4)
 

@@ -217,7 +217,14 @@ def add_event(title: str, date: str, start_time: str, end_time: str = "",
         return "Error: use date YYYY-MM-DD and start_time HH:MM (24-hour)."
 
     if day_list:
-        # Slide forward to the first listed weekday that is still in the future
+        if when.weekday() not in day_list:
+            # The model's date can be a day off either way ("every other Friday" given as a
+            # Saturday). Move to the nearest weekday the user named, trying 1 day back, 1 day
+            # on, 2 back and so on, so a tie picks the earlier day. Only sliding forward
+            # started such a series a week late, on the other Fridays (CHANGELOG section 46).
+            shifts = [n for n in (-1, 1, -2, 2, -3, 3) if (when.weekday() + n) % 7 in day_list]
+            when += timedelta(days=shifts[0])
+        # Then slide forward to the first listed weekday that is still in the future
         while when.weekday() not in day_list or when < datetime.now():
             when += timedelta(days=1)
         date = when.strftime("%Y-%m-%d")
