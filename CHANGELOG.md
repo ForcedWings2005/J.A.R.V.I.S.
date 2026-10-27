@@ -928,7 +928,7 @@ During section 47, one eval reply looped for 39 minutes, and nothing said so: th
   - like CI, only `requirements-dev.txt`: installed, 477 tests pass, ruff passes;
   - like the Mac, both files: installed, `pip freeze` identical to the venv's, 477 tests pass, and `mlx_whisper`, `kokoro_onnx` and the server import.
 - **A mistake, without harm**: the Mac-like check imported `server`, which runs the daily backup at import. `JARVIS_DB` was `:memory:`, which is not a file, so the backup printed "nothing to back up" and stopped; today's real backup is unchanged (still 03:08). It should have been checked before running, not after.
-- **Not checked**: CI itself on Linux until this is pushed (the CI-like check ran on the Mac).
+- **CI on Linux**: green after the push, so the fingerprints of the Linux files are right too.
 
 ---
 
@@ -950,7 +950,7 @@ During section 47, one eval reply looped for 39 minutes, and nothing said so: th
 | Fortnightly start week (section 46) | Done: evals 167/168, `repeat_fortnightly` 10/10; not yet tried in the real app |
 | Delete asks, corrected steps, reply cap (section 47) | Done: evals 166/168, cap checked live; the ticker change not yet seen on the page |
 | Speed in the evals (section 48) | Done: checked with a real run (median 2.7 s, first word 2.2 s) |
-| Requirements split and locked with hashes (section 49) | Done: fresh installs with `--require-hashes` checked on the Mac; CI on Linux not yet |
+| Requirements split and locked with hashes (section 49) | Done: fresh installs with `--require-hashes` checked on the Mac, and by CI on Linux |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
