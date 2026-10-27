@@ -32,6 +32,7 @@ import jcal  # noqa: E402
 import tools  # noqa: E402
 from evals.cases import CASES, NOW  # noqa: E402
 from evals.check import check  # noqa: E402
+from evals import speed  # noqa: E402
 
 RESULTS = Path(__file__).resolve().parent / "results"
 
@@ -52,6 +53,7 @@ jcal.datetime = FakeDateTime
 
 # Every tool call the model makes in the current run, recorded and then run for real
 calls = []
+tokens = [0]            # tokens the model wrote in the current run, all rounds together
 THINK = [None]          # set from --think in main()
 
 
@@ -61,6 +63,10 @@ class RecordingAssistant(brain.Assistant):
         calls.append({"tool": call.function.name, "args": dict(call.function.arguments),
                       "result": result})
         return result
+
+    def _log_usage(self, last_chunk, round_no):
+        super()._log_usage(last_chunk, round_no)
+        tokens[0] += getattr(last_chunk, "eval_count", None) or 0
 
 
 def set_clock(hhmm: str) -> None:
@@ -103,12 +109,15 @@ def run_once(case, model: str) -> dict:
         for _ in assistant.chat_stream(message):
             pass
     calls.clear()
+    tokens[0] = 0
     set_clock(case.clock)
-    reply, error = "", None
+    reply, error, first_word = "", None, None
     start = time.perf_counter()
     with contextlib.redirect_stdout(io.StringIO()):  # brain prints every tool call
         for event in assistant.chat_stream(case.message):
             if event["type"] == "delta":
+                if first_word is None:               # what the user waits for (section 48)
+                    first_word = time.perf_counter() - start
                 reply += event["text"]
             elif event["type"] == "error":
                 error = event["text"]
@@ -117,7 +126,9 @@ def run_once(case, model: str) -> dict:
     if error:
         failures.insert(0, f"stream error: {error}")
     return {"passed": not failures, "failures": failures, "reply": reply,
-            "calls": list(calls), "seconds": round(seconds, 2)}
+            "calls": list(calls), "seconds": round(seconds, 2),
+            "first_word": None if first_word is None else round(first_word, 2),
+            "tokens": tokens[0]}
 
 
 def model_id(name: str) -> str:
@@ -143,6 +154,9 @@ def main() -> int:
     ap.add_argument("--think", choices=["default", "on", "off"], default="default",
                     help="gemma4's hidden reasoning before it answers")
     args = ap.parse_args()
+    # Print each line at once, even into a file: a stuck run used to show nothing at all
+    # until the end (CHANGELOG section 48)
+    sys.stdout.reconfigure(line_buffering=True)
 
     cases = [c for c in CASES if args.filter in c.name]
     if not cases:
@@ -166,7 +180,9 @@ def main() -> int:
         avg = sum(r["seconds"] for r in runs) / len(runs)
         label = "PASS " if passed == len(runs) else "FAIL " if passed == 0 else "FLAKY"
         first = next((r["failures"][0] for r in runs if r["failures"]), "")
-        print(f"{label} {passed}/{len(runs)}  {case.name:<24} {avg:5.1f}s  {first}")
+        slow = sum(speed.is_slow(r) for r in runs)
+        flag = f"  SLOW {slow}/{len(runs)}" if slow else ""
+        print(f"{label} {passed}/{len(runs)}  {case.name:<24} {avg:5.1f}s{flag}  {first}")
         if args.verbose:
             for r in runs:
                 if not r["passed"]:
@@ -181,14 +197,22 @@ def main() -> int:
     print(f"\n{total_passed}/{total} runs passed ({100 * total_passed / total:.0f}%), "
           f"{full}/{len(cases)} cases passed every run, {elapsed / 60:.1f} min")
 
+    # Speed: warnings only, timings depend on what else the Mac is doing (evals/speed.py)
+    for line in speed.summary(results):
+        print(line)
     RESULTS.mkdir(exist_ok=True)
+    previous = speed.previous_run(RESULTS, args.model)
+    if previous:
+        slower = speed.slower_cases(results, previous)
+        print(f"compared with {previous['_file']}: "
+              + ("slower: " + ", ".join(slower) if slower else "no case got slower"))
     stamp = datetime.today().strftime("%Y-%m-%d_%H%M%S")
     out = RESULTS / f"{stamp}_{args.model.replace(':', '-')}.json"
     out.write_text(json.dumps({
         "date": stamp, "model": args.model, "model_id": mid, "prompt_hash": phash,
         "think": THINK[0],
         "runs_per_case": args.runs, "passed": total_passed, "total": total,
-        "filter": args.filter, "results": results,
+        "filter": args.filter, "minutes": round(elapsed / 60, 1), "results": results,
     }, indent=2))
     print(f"saved {out.relative_to(Path.cwd()) if out.is_relative_to(Path.cwd()) else out}")
     return 0

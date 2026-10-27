@@ -161,3 +161,61 @@ def test_case_refers_to_real_tools_and_arguments(case):
         assert 0 <= h < 24 and 0 <= m < 60
     assert times[1:] == sorted(times[1:]) and all(t <= case.clock for t in times[1:]), \
         "earlier turns must be in time order, before the scored message"
+
+
+# --- speed (CHANGELOG section 48) ---------------------------------------------
+
+from evals import speed  # noqa: E402
+
+
+def run(seconds, first_word=1.0, tokens=200):
+    return {"seconds": seconds, "first_word": first_word, "tokens": tokens}
+
+
+def result(case, *runs):
+    return {"case": case, "runs": list(runs)}
+
+
+def test_a_run_over_30_seconds_is_slow():
+    assert speed.is_slow(run(31)) and not speed.is_slow(run(30))
+
+
+def test_the_summary_gives_medians_and_the_slowest_runs():
+    results = [result("greeting", run(2, 1.0, 100), run(4, 1.5, 150)),
+               result("delete", run(90, 85.0, 4096), run(6, 2.0, 300))]
+    lines = speed.summary(results)
+    assert lines[0] == "median run 5.0s, first word 1.8s"
+    assert lines[1].startswith("slowest: delete 90.0s (4096 tokens), delete 6.0s (300 tokens)")
+
+
+def test_old_results_without_the_new_figures_still_summarise():
+    lines = speed.summary([result("greeting", {"seconds": 2.0})])
+    assert lines[0] == "median run 2.0s"
+    assert "greeting 2.0s" in lines[1]
+
+
+def test_a_case_is_slower_only_when_both_limits_are_passed():
+    before = {"results": [result("a", run(4)), result("b", run(10)), result("c", run(1))]}
+    now = [result("a", run(7)),          # 1.75x and +3 s: slower
+           result("b", run(14)),         # +4 s but only 1.4x: not
+           result("c", run(2.5))]        # 2.5x but only +1.5 s: not
+    assert speed.slower_cases(now, before) == ["a 4.0s -> 7.0s"]
+
+
+def test_cases_the_last_run_did_not_have_are_skipped():
+    assert speed.slower_cases([result("new", run(50))], {"results": []}) == []
+
+
+def test_the_last_full_run_of_the_same_model_is_found(tmp_path):
+    import json
+
+    def save(name, model, filter_=""):
+        (tmp_path / name).write_text(json.dumps({"model": model, "filter": filter_, "results": []}))
+
+    save("2030-01-01_090000_m.json", "gemma4:26b")
+    save("2030-01-02_090000_m.json", "gemma4:26b")             # the one
+    save("2030-01-03_090000_m.json", "gemma4:26b", "delete")   # only some cases
+    save("2030-01-04_090000_m.json", "qwen3.5:latest")         # another model
+    found = speed.previous_run(tmp_path, "gemma4:26b")
+    assert found["_file"] == "2030-01-02_090000_m.json"
+    assert speed.previous_run(tmp_path, "mistral:latest") is None

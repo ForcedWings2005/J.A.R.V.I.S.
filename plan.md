@@ -180,8 +180,8 @@ Not before Phases 3 and 4. In this order:
   Machine for the rest of the Mac is not planned (owner's decision, 2026-10-27).*
 - **Split up `index.html`.** *Done: CHANGELOG section 40.* The styles are in
   `static/css/jarvis.css` and the scripts in `static/js/`, with no build step.
-- **Check model latency.** Measure the time to the first spoken word. Try Ollama's
-  `keep_alive` setting so the model stays loaded between requests.
+- **Check model latency.** *Done: `keep_alive` keeps the model loaded (an hour), and the
+  evals measure every run's time to the first word and flag slow runs (CHANGELOG section 48).*
 - **Changelog status table:** mark "Streaming replies into speech" as tested, since every
   chat now goes through it.
 
