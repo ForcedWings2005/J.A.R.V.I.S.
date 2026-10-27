@@ -158,17 +158,18 @@ Not before Phases 3 and 4. In this order:
 - **JARVIS can claim a card that was never shown.** When `delete_event` returned an error
   (no date given), the reply still said "confirm on screen" (CHANGELOG section 40).
   *Mostly done: CHANGELOG section 44 ("cancel the dentist" finds the event, and the prompt
-  rule about cards is now conditional). Still seen once in 3 runs for a repeating event
-  without a date (section 46), so reduced, not gone.* (The clash wording, "cannot move", turned out to be
+  rule about cards is now conditional). Still seen about once in 3 runs for a repeating
+  event without a date (sections 46 and 47), so reduced, not gone.* (The clash wording, "cannot move", turned out to be
   true: a clash shows no card.)
 - **Check the weekday of fortnightly events too.** *Done: CHANGELOG section 44.*
 - **The first week of a fortnightly event.** *Done: CHANGELOG section 46 (the nearest
   named weekday is used, back or forward).*
-- **Fortnightly events take two calls.** The model first calls `add_event` without
-  `repeat_days`, is refused, then calls again correctly (every run in CHANGELOG section 46).
-  It always gets there, but the extra round costs a few seconds. The `repeat_days`
-  description still says "for a weekly repeat"; changing it needs a full eval before and
-  after, since a description change once broke an unrelated case (section 39).
+- **Fortnightly events take two calls.** The model often first calls `add_event` without
+  `repeat_days`, is refused, then calls again correctly. *Tried in CHANGELOG section 47:
+  saying in the description that `repeat_days` is required for fortnightly repeats fixed it,
+  but made `task_complete` claim "marked as done" without the tool (7/10 against 10/10), as
+  in section 39, so it was dropped. The refusal now shows as "corrected" in the ticker.*
+  Leave it unless a description change can be shown not to hurt other cases.
 - **Whisper may contact the internet when it loads.** *Done: CHANGELOG section 45. It did
   (huggingface.co, on the first transcription after each start); it is offline now.*
 - **Split the requirements.** `requirements.txt` is a `pip freeze` dump (it includes `torch`).

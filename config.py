@@ -39,6 +39,11 @@ MODEL_THINK = True
 # Loading gemma4:26b takes about 3 s on the first message after a pause (measured
 # 2026-10-21); it is 18 GB on disk.
 MODEL_KEEP_ALIVE = "1h"
+# The most tokens one model round may write, thinking included. Real rounds have written 184
+# at the median and 1,751 at most (the log, 2026-10-27). Once, in an eval, the model looped
+# and wrote 121,120 in 39 minutes, blocking everything behind it (CHANGELOG section 47). At
+# about 50 tokens a second, this stops such a loop after about 80 seconds.
+MODEL_MAX_TOKENS = 4096
 # The conversation is trimmed when the model was given more than HISTORY_MAX_TOKENS
 # (gemma4:26b's window is 262144), down to about HISTORY_KEEP_TOKENS, oldest exchanges
 # first. Each trim makes Ollama re-read everything once, so it cuts a lot, rarely.

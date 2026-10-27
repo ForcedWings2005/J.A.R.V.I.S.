@@ -217,6 +217,25 @@ def describe_step(call, result: str) -> dict:
     return {"text": text, "status": status}
 
 
+def _step_key(call) -> tuple:
+    """The tool and the event, task or note a call was about, to match a retry to its error."""
+    a = call.function.arguments or {}
+    about = a.get("title") or a.get("text") or a.get("about") or ""
+    return call.function.name, str(about).strip().lower()
+
+
+def _mark_corrected(steps: list, keys: list, key: tuple) -> None:
+    """A call the code refused, then made again successfully in the same reply, is not a failure.
+
+    It showed as a red "!" in the ticker although it worked in the end (CHANGELOG section 47).
+    Only the same tool about the same thing counts: a failed "meeting" stays red when "dentist"
+    then works. The page redraws every step when the reply is done, so the change shows then.
+    """
+    for earlier, earlier_key in zip(steps, keys, strict=True):
+        if earlier["status"] == "error" and earlier_key == key:
+            earlier["status"] = "corrected"
+
+
 class Assistant:
     """One conversation with JARVIS: its history, a pending confirmation, and the model.
 
@@ -226,12 +245,14 @@ class Assistant:
 
     def __init__(self, chat=None, model: str = config.MODEL, max_rounds: int = config.MAX_ROUNDS,
                  think=config.MODEL_THINK, keep_alive=config.MODEL_KEEP_ALIVE,
+                 max_reply_tokens: int = config.MODEL_MAX_TOKENS,
                  max_tokens: int = config.HISTORY_MAX_TOKENS,
                  keep_tokens: int = config.HISTORY_KEEP_TOKENS):
         self.chat = chat or ollama.chat
         self.model = model
         self.think = think
         self.keep_alive = keep_alive
+        self.max_reply_tokens = max_reply_tokens
         self.max_tokens = max_tokens
         self.keep_tokens = keep_tokens
         self.max_rounds = max_rounds
@@ -352,6 +373,7 @@ class Assistant:
             try:
                 self.confirm = None
                 steps = []
+                step_keys = []      # (tool, what it was about) for each step, see _mark_corrected
                 self.messages[0]["content"] = build_system_prompt()
                 self.messages.append({"role": "user", "content": time_stamp() + user_text})
                 wrote_text = False
@@ -368,7 +390,8 @@ class Assistant:
                         chunk = None
                         for chunk in self.chat(model=self.model, messages=self.messages,
                                                tools=tools.SCHEMAS, stream=True,
-                                               think=self.think, keep_alive=self.keep_alive):
+                                               think=self.think, keep_alive=self.keep_alive,
+                                               options={"num_predict": self.max_reply_tokens}):
                             piece = chunk.message.content or ""
                             if piece:
                                 content += piece
@@ -380,6 +403,11 @@ class Assistant:
                                 calls.extend(chunk.message.tool_calls)
                             thought += len(getattr(chunk.message, "thinking", None) or "")
                         self._log_usage(chunk, round_no)
+                        if getattr(chunk, "done_reason", None) == "length":
+                            # A loop, cut off by MODEL_MAX_TOKENS: what came so far is kept
+                            log.warning("model round %d stopped at the %d-token limit "
+                                        "(config.MODEL_MAX_TOKENS)", round_no + 1,
+                                        self.max_reply_tokens)
                         if content or calls:
                             if attempt:
                                 log.info("model round %d: the retry worked", round_no + 1)
@@ -408,7 +436,11 @@ class Assistant:
                             log.info("tool %s(%s) -> %s [%.0f ms]", call.function.name,
                                      _short(call.function.arguments), _short(result), ms)
                         step = describe_step(call, result)
+                        key = _step_key(call)
+                        if step["status"] != "error":
+                            _mark_corrected(steps, step_keys, key)
                         steps.append(step)
+                        step_keys.append(key)
                         self.messages.append({
                             "role": "tool",
                             "tool_name": call.function.name,

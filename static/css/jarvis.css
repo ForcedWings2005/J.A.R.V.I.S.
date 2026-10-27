@@ -159,6 +159,9 @@ body.chatting .orbwrap { width:min(200px,100%,22vh); }
 .step.done::before { content:"\2713"; color:var(--accent); }
 .step.error { color:#ffb3b3; }
 .step.error::before { content:"!"; color:var(--red); }
+/* A refused call JARVIS then fixed himself in the same reply (brain._mark_corrected) */
+.step.corrected { color:var(--muted); }
+.step.corrected::before { content:"\21BB"; color:var(--muted); }
 .step.waiting { color:#f6d47a; }
 .step.waiting::before { content:"\2026"; color:var(--amber); }
 

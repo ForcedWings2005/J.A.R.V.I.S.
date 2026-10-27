@@ -881,6 +881,22 @@ In section 44's final eval, "every other Friday at 3pm" was saved starting on Fr
 - **Time Machine** was dropped from the plan (the owner's decision); SECURITY.md says so.
 - **Not checked**: the real app.
 
+## 47. A first call that gets it right, an honest ticker, and a cap on runaway replies
+
+The owner noticed in the real app: adding an event "every two weeks" worked, but the activity line under the chat showed a red warning that `repeat_days` was needed; and "delete the meeting" showed a red warning about a date or "all", then a card anyway. The log showed why. Both times the code refused the model's first call (a fortnightly repeat without its weekday; a repeating event without a date), and the model then called again with what was missing. It worked in the end, but the red lines looked like failures. In the delete case the model also chose "all occurrences" by itself, because the error offered "or use scope 'all'"; the card made that clear, but the user had not said "all".
+
+- **The delete error asks instead of offering "all"** (`_locate` in `jcal.py`): for a repeating event without a date it now says "'Meeting' repeats every 2 weeks on Thu. Ask the user whether they mean one date or the whole series." When the title matches one event that does not repeat, `_locate` now finds it itself. In the final eval JARVIS asked "just this one, or the entire series?" instead of choosing.
+- **The ticker shows a fixed refusal as "corrected"** (`_mark_corrected` in `brain.py`): when a call is refused and the same tool then succeeds for the same event, task or note in the same reply, the refused step turns grey with a ↻ instead of a red "!". A failure for a different title stays red. The page redraws every step when a reply ends, so no script changed; one CSS rule in `jarvis.css`.
+- **A cap on runaway replies** (`config.MODEL_MAX_TOKENS = 4096`, passed to Ollama as `num_predict` with every request): during this work one eval reply looped for **39 minutes and 121,120 tokens** before it was stopped by hand, and nothing in JARVIS would have stopped it in the real app either. Real rounds in the log have written 184 tokens at the median and 1,751 at most, so 4096 leaves room and, at about 50 tokens a second, stops a loop after about 80 seconds. Reaching the cap is logged. Checked live with a cap of 50: Ollama stopped at 50 tokens (thinking included), the warning was logged, the existing retry ran, and JARVIS answered "Sorry, I could not finish that." after 6.5 s.
+- **Tried and dropped: a clearer `repeat_days` description** ("Required for a weekly or fortnightly repeat"). It did fix the first call (one call, not two, in every fortnightly run), but made the to-do list less honest: "I bought the milk" got "I've marked the task to buy milk as completed" without `complete_task` being called. Ten runs each: **`task_complete` 7/10 with the new description, 10/10 with the old**, the same harm a description change did in section 39. A false "done" is worse than an extra round, so the description is unchanged and the prompt is the same as before.
+- **Tests**: 6 new (the delete error, a refused-then-fixed step, an unfixed error, an error for another title, the cap sent with every request, reaching the cap logged), and two existing tests now expect the new error wording. 471 tests.
+- **Evals** (gemma4:26b `001e5dafc3c7`, 3 runs per case unless noted):
+  - Before (section 46, prompt `851b5394ed77`): 167/168.
+  - With the new description, prompt `5ff9110f5c5f`: 165/168. Then 10 runs each: `task_complete` 7/10 against 10/10, `tonight_dinner` 10/10 against 8/10 (`tonight_dinner` is noisy on both).
+  - **Final, prompt `851b5394ed77` (unchanged): 166/168.** `task_complete` 3/3. Misses: `tonight_dinner` 2/3 (noisy, above); "Cancel piano." 2/3: JARVIS asked "this one or the series?" but also said "you'll need to confirm that on your screen". The card habit of section 44 is reduced, not gone: about one run in three.
+- **Seen, not changed**: once, "I bought the milk" became `complete_task("the milk")`, which did not match "Buy milk"; JARVIS said so honestly.
+- **Not checked**: the grey "corrected" step on the page (only its class and CSS rule), and the real app.
+
 ---
 
 ## Status
@@ -899,6 +915,7 @@ In section 44's final eval, "every other Friday at 3pm" was saved starting on Fr
 | Card claims, fortnightly weekdays (section 44) | Done: evals 167/168 (prompt `851b5394ed77`); not yet tried in the real app |
 | Whisper offline (section 45) | Done: a real transcription contacts no host; not yet tried with the microphone in the app |
 | Fortnightly start week (section 46) | Done: evals 167/168, `repeat_fortnightly` 10/10; not yet tried in the real app |
+| Delete asks, corrected steps, reply cap (section 47) | Done: evals 166/168, cap checked live; the ticker change not yet seen on the page |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
