@@ -153,8 +153,11 @@ python -m evals         # full suite, 56 cases x 3 runs, about 11 minutes, with 
 
 ## Dependencies and configuration
 
-- `requirements.txt` is a `pip freeze` of the Mac's venv; `requirements-dev.txt` is what CI
-  needs. Pin versions to what is installed. Avoid new dependencies; ask first if one seems needed.
+- Direct dependencies live in `requirements.in` (JARVIS) and `requirements-dev.in` (the checks).
+  `requirements.txt` and `requirements-dev.txt` are generated from them by `pip-compile` with
+  hashes (commands in README, Dependencies); never edit them by hand. CI installs
+  `requirements-dev.txt` with `--require-hashes`. Avoid new dependencies; ask first if one
+  seems needed.
 - Settings belong in `config.py`, not as constants scattered through modules.
 - Ollama: model `config.MODEL` (`gemma4:26b`), called through the `ollama` client's default
   address. The pinned model ID is in README; if behaviour changes, check `ollama list` first.

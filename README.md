@@ -26,8 +26,11 @@ code, not left to the model.
 cd ~/Developer/jarvis
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install --require-hashes -r requirements.txt -r requirements-dev.txt
 ```
+
+`--require-hashes` makes pip check every downloaded file against the fingerprint recorded
+for it, and refuse anything that differs (see Dependencies below).
 
 You also need:
 
@@ -155,6 +158,24 @@ not leave this Mac).
 - **When copying to iCloud Drive, use Copy and Paste, not drag:** dragging into iCloud
   Drive moves the files out of `backups/encrypted/`. Copy only that folder, never the plain
   backups, `jarvis.db` or `logs/`.
+
+## Dependencies
+
+What JARVIS uses directly is listed in `requirements.in` (about 8 packages), and what the
+checks need in `requirements-dev.in`. The two `.txt` files are generated from them by
+`pip-compile` (from `pip-tools`): every package that gets installed, its exact version, why
+it is there (`# via ...`), and a fingerprint (hash) of every file. Never edit the `.txt`
+files by hand. To add a package, put it in the right `.in` file (ask first: CLAUDE.md), or to
+upgrade one, then regenerate both files in this order and install again:
+
+```bash
+pip-compile --generate-hashes --allow-unsafe --strip-extras --output-file=requirements.txt requirements.in
+pip-compile --generate-hashes --allow-unsafe --strip-extras --output-file=requirements-dev.txt requirements-dev.in
+pip install --require-hashes -r requirements.txt -r requirements-dev.txt
+```
+
+To upgrade one package, add `--upgrade-package <name>` to the first command. Without it,
+`pip-compile` keeps every version that is already in the file, so nothing changes by itself.
 
 ## Pinned model
 

@@ -14,7 +14,8 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install tools
-        run: pip install -r requirements-dev.txt
+        # Every file is checked against its fingerprint in the lock file (CHANGELOG section 49)
+        run: pip install --require-hashes -r requirements-dev.txt
       - name: Lint
         run: ruff check .
       - name: Test

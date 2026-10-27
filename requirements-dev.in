@@ -1,0 +1,14 @@
+# What the checks need: the tests, ruff, the pre-commit hook, and the tool that builds the
+# lock files. CI installs only requirements-dev.txt, which is generated from this file.
+# The versions are kept the same as in requirements.txt:
+-c requirements.txt
+pytest
+ruff
+pre-commit         # runs ruff and pytest before every commit
+pip-tools          # pip-compile, which writes the .txt files from the .in files
+# The parts of JARVIS the tests import (they never load Whisper, Kokoro or a model)
+fastapi
+python-multipart
+ollama
+cryptography
+httpx2             # the test client (fastapi's TestClient) needs it
