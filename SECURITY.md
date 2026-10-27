@@ -69,6 +69,7 @@ Each of these is in the code or the system and has been checked.
 | Every SQL value goes through `?` parameters | SQL injection. |
 | Calculator parses with `ast`, never `eval` | Running arbitrary code through arithmetic. |
 | Pinned dependency versions | A bad new release being installed without my knowing. |
+| Whisper loads offline (`HF_HUB_OFFLINE=1`, set in `config.py`, pinned by a test) | Whisper telling huggingface.co each time it starts, and the speech model changing without my knowing (a supply-chain risk): it changes only when I run the download in README. Checked: a real transcription contacts no host (CHANGELOG section 45). |
 | Daily backups, integrity-checked, 7 kept | Software mistakes and corruption. Not hardware loss (same disk). |
 | `jarvis.db`, `backups/`, `logs/`, `evals/results/`, `.env` are in `.gitignore` | Personal data being pushed to GitHub. |
 

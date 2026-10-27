@@ -854,6 +854,18 @@ The owner liked Liquid Glass's shapes but found it "mostly grey". Apple's glass 
   - The one miss, `repeat_fortnightly`: the model gave 2030-01-12 (a Saturday) for "every other Friday". The weekday was kept right (Friday, where the old code saved Saturdays), but code slides *forward* from the model's date, so the series started on the 18th instead of the 11th: a different set of Fridays. Not caused by the prompt change; left as a follow-up in `plan.md`.
 - **Not checked**: the real app.
 
+## 45. Whisper stays offline
+
+The server's output showed "Fetching 4 files ... 0.00B" whenever Whisper loaded: nothing was downloaded, but the question was whether it still asked the internet (plan.md, upkeep).
+
+- **The check**: `mlx_whisper` passes the model name to the Hugging Face library's `snapshot_download`, which asks huggingface.co whether the model changed before using the copy on the Mac. A throwaway probe recorded every host Python looked up: normally `huggingface.co`, with `HF_HUB_OFFLINE=1` none, and the same model folder either way (snapshot `a4aaeec0`, 1.5 GB, 4 files). It happened once per server run, on the first transcription, since Whisper then stays loaded. Kokoro uses only its files in `models/` and never this library.
+- **What it sent**: the model's name and library versions, never audio (transcription is always on the Mac). What it revealed: that this Mac was starting Whisper, and when. The less obvious risk: if the model's owner changed the files online, JARVIS would have downloaded the new version by itself at the next start, without my knowing. That is a small *supply-chain* risk: what runs on the Mac changing because someone else changed something.
+- **The fix**: `config.py` sets `HF_HUB_OFFLINE=1` with `setdefault`, so the owner can still turn it off on purpose. The library reads the switch when it is first imported, which is only when Whisper first loads; checked: nothing the server imports before that loads it.
+- **Updating the model** is now a deliberate step: the download command in README (it sets `HF_HUB_OFFLINE=0` for that one command). On a new Mac, or if the cache is ever deleted, the microphone fails until it is run.
+- **Tests**: 2 new (importing `config` turns offline mode on; the owner's own value is kept), run in a fresh Python because `config` is already imported in the test run. 461 tests.
+- **Checked end to end**: a made-up sentence spoken by macOS's `say` was transcribed by the real Whisper, imported in the server's order: "at a team review every other Friday at 3pm" (the synthetic voice's "add a" heard as "at a"), with the variable not set beforehand, and no host contacted.
+- **Not checked**: the microphone in the real app.
+
 ---
 
 ## Status
@@ -870,6 +882,7 @@ The owner liked Liquid Glass's shapes but found it "mostly grey". Apple's glass 
 | Motion layer (section 42) | Done; checked in a demo and by the owner in Safari, including the orb with the microphone and voice |
 | Glass look (section 43) | Done; checked in a demo and by the owner in Safari |
 | Card claims, fortnightly weekdays (section 44) | Done: evals 167/168 (prompt `851b5394ed77`); not yet tried in the real app |
+| Whisper offline (section 45) | Done: a real transcription contacts no host; not yet tried with the microphone in the app |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |

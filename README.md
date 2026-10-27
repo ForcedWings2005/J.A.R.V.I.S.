@@ -35,6 +35,13 @@ You also need:
 - `ffmpeg` (`brew install ffmpeg`)
 - The Kokoro files `kokoro-v1.0.onnx` and `voices-v1.0.bin` in `models/`
   (they are too large for git)
+- The Whisper model (about 1.5 GB). JARVIS loads it offline and never checks for updates
+  (CHANGELOG section 45), so download it once yourself. Run the same command later to
+  update it on purpose:
+
+  ```bash
+  HF_HUB_OFFLINE=0 python -c "from huggingface_hub import snapshot_download; snapshot_download('mlx-community/whisper-large-v3-turbo')"
+  ```
 
 ## Run
 
