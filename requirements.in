@@ -1,0 +1,10 @@
+# What JARVIS itself uses. requirements.txt is generated from this file, with every
+# version and a fingerprint (hash) of every file: never edit it by hand (README, Dependencies).
+fastapi            # the web server
+uvicorn            # runs the server
+python-multipart   # lets the server read a voice upload (/transcribe)
+ollama             # talks to the local language model
+cryptography       # encrypted backups
+numpy              # handles speech audio
+kokoro-onnx        # JARVIS's voice (text to speech)
+mlx-whisper        # speech to text

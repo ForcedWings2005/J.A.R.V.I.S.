@@ -49,7 +49,7 @@ A threat actor is anyone or anything that could cause harm, including accidents.
   Reachable only from this Mac, but including from other browser tabs.
 - **Files on disk**: `jarvis.db`, `backups/`, `logs/`. Readable by anything running as me.
 - **The model**: anything it reads can try to steer it.
-- **Dependencies**: 72 packages in `requirements.txt`, about 10 chosen directly.
+- **Dependencies**: 80 packages, 8 chosen directly for JARVIS (`requirements.in`) and a few for the checks (`requirements-dev.in`).
 - **Off-disk backups** (planned, see section 5): a new copy of the data outside this Mac.
 
 ## 4. Controls in place today
@@ -68,7 +68,7 @@ Each of these is in the code or the system and has been checked.
 | Input limits (upload size, text length, date ranges, calculator) | Requests that use up memory or time. |
 | Every SQL value goes through `?` parameters | SQL injection. |
 | Calculator parses with `ast`, never `eval` | Running arbitrary code through arithmetic. |
-| Pinned dependency versions | A bad new release being installed without my knowing. |
+| Pinned dependency versions, and a fingerprint (hash) of every file, checked on install (`--require-hashes`, also in CI) | A bad new release being installed without my knowing, and a file being swapped on PyPI or on the way. CHANGELOG section 49. |
 | Whisper loads offline (`HF_HUB_OFFLINE=1`, set in `config.py`, pinned by a test) | Whisper telling huggingface.co each time it starts, and the speech model changing without my knowing (a supply-chain risk): it changes only when I run the download in README. Checked: a real transcription contacts no host (CHANGELOG section 45). |
 | Daily backups, integrity-checked, 7 kept | Software mistakes and corruption. Not hardware loss (same disk). |
 | `jarvis.db`, `backups/`, `logs/`, `evals/results/`, `.env` are in `.gitignore` | Personal data being pushed to GitHub. |
@@ -158,8 +158,10 @@ In rough order of importance.
    open in the browser could make JARVIS run Whisper. Every POST now checks `Origin`.
 4. **Files are readable by group and others** (`-rw-r--r--`). Low risk while I am the only
    user, but `chmod 600` on the files and `700` on the folders is free.
-5. **Dependencies are pinned by version, not by hash.** A version on PyPI could in theory
-   be replaced; hash checking (`pip install --require-hashes`) would catch that.
+5. **Closed (CHANGELOG section 49):** dependencies were pinned by version, not by hash.
+   Every file now has its fingerprint in the lock files and is checked on install. What
+   this does not cover: a harmful *new* version, which gets new fingerprints when I choose
+   to upgrade. So an upgrade is a decision (`--upgrade-package`), never automatic.
 6. **No login and no HTTPS.** Acceptable only while the server stays on `127.0.0.1`.
 
 ## 7. Accepted risks
