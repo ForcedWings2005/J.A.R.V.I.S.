@@ -21,6 +21,11 @@ import notes  # noqa: F401, E402
 
 log = logging.getLogger("jarvis.brain")
 
+# Added to an error from a tool that only asks (tools.ASKS_FIRST). Such a tool can fail before
+# any card appears, and JARVIS still said "confirm on screen" (CHANGELOG section 44). A fact,
+# not an order: orders in tool results were read out word for word (section 38).
+NO_CARD = " No card was shown and nothing was changed."
+
 
 def _short(text, limit: int = 300) -> str:
     text = str(text).replace("\n", " ")
@@ -240,16 +245,18 @@ class Assistant:
         try:
             result = func(**call.function.arguments)
         except TypeError as e:
-            return f"Error: bad arguments ({e})."
+            result = f"Error: bad arguments ({e})."
         except Exception as e:  # a broken tool must not abort the whole turn
             log.exception("tool %s crashed", call.function.name)
-            return f"Error: the {call.function.name} tool failed ({e})."
+            result = f"Error: the {call.function.name} tool failed ({e})."
         if isinstance(result, tools.NeedsConfirmation):
             # Only one request can wait at a time; a new one replaces it
             pid = uuid.uuid4().hex[:8]
             self.pending = (pid, result, time.monotonic())
             self.confirm = {"id": pid, "text": result.card}
             return result.reply
+        if call.function.name in tools.ASKS_FIRST and str(result).startswith("Error:"):
+            return result + NO_CARD
         return result
 
     def _log_usage(self, last_chunk, round_no: int) -> None:

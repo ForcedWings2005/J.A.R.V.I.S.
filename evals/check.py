@@ -24,6 +24,7 @@ class Case:
     includes_any: list = field(default_factory=list)  # reply must contain one of these
     excludes: list = field(default_factory=list)    # reply must contain none of these
     asks: bool = False                              # reply must ask for something (see ASKING)
+    no_card_claims: bool = False                    # may point to a card only if one was shown
     clock: str = "09:00"                            # time of day on NOW's date
     # Earlier messages in the same conversation, as ("HH:MM", message) pairs. They run
     # through the real model first, at their own times, and only the last one is scored.
@@ -32,6 +33,10 @@ class Case:
     tasks: list = field(default_factory=list)       # open tasks beforehand
     notes: list = field(default_factory=list)       # saved notes beforehand
 
+
+# Words that point the user to a confirmation card: honest only when a tool showed one
+CARD_WORDS = ["on screen", "on the screen", "on your screen", "the card", "tap confirm",
+              "click confirm", "press confirm", "confirm button"]
 
 # JARVIS often asks politely without a question mark: "I will require a specific time."
 ASKING = ["?", "require", "need", "clarify", "let me know", "please tell", "please specify",
@@ -153,4 +158,9 @@ def check(case: Case, calls: list, reply: str) -> list:
             failures.append(f"reply contains {s!r}")
     if case.asks and not any(s in text for s in ASKING):
         failures.append("reply does not ask for anything")
+    shown = any(str(c["result"]).startswith("Confirmation required") for c in calls)
+    if case.no_card_claims and not shown:
+        for s in CARD_WORDS:
+            if s in text:
+                failures.append(f"reply points to a card that was never shown ({s!r})")
     return failures

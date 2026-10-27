@@ -207,6 +207,45 @@ def test_a_crashing_tool_becomes_an_error_result(monkeypatch):
     assert result == "Error: the boom tool failed (disk on fire)."
 
 
+# A tool that only asks for confirmation can fail before any card appears. JARVIS then
+# still said "you'll need to confirm on screen" (CHANGELOG sections 40 and 44), so its
+# errors now say that no card was shown.
+
+@pytest.mark.parametrize("name, args", [
+    ("delete_event", {"title": "dentist"}),                        # no date given
+    ("update_event", {"title": "dentist", "date": "2030-01-08", "new_start_time": "16:00"}),
+    ("remember", {"text": ""}),
+    ("forget", {"about": "sushi"}),
+])
+def test_an_error_from_a_tool_that_asks_first_says_no_card_was_shown(name, args):
+    assert name in tools.ASKS_FIRST
+    a = brain.Assistant(chat=FakeModel())
+    result = a.run_tool(call(name, **args))
+    assert result.startswith("Error:") and result.endswith(brain.NO_CARD)
+    assert a.pending is None and a.confirm is None
+
+
+def test_a_crash_in_a_tool_that_asks_first_says_no_card_was_shown(monkeypatch):
+    def boom(title, date="", scope="this"):
+        raise RuntimeError("disk on fire")
+
+    monkeypatch.setitem(tools.FUNCTIONS, "delete_event", boom)
+    result = brain.Assistant(chat=FakeModel()).run_tool(call("delete_event", title="x"))
+    assert result == "Error: the delete_event tool failed (disk on fire)." + brain.NO_CARD
+
+
+def test_other_tools_errors_are_unchanged():
+    result = brain.Assistant(chat=FakeModel()).run_tool(call("complete_task", title="unicorn"))
+    assert result == "Error: no open task matching 'unicorn'."
+
+
+def test_a_request_that_shows_a_card_gets_no_note():
+    jcal.add_event("Dentist", "2030-01-08", "15:00")
+    result = brain.Assistant(chat=FakeModel()).run_tool(
+        call("delete_event", title="dentist", date="2030-01-08"))
+    assert result.startswith("Confirmation required") and brain.NO_CARD not in result
+
+
 # --- delete confirmation -----------------------------------------------------
 
 def _delete_turn(a_model_reply="Please confirm on screen, sir."):

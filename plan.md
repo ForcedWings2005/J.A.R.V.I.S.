@@ -156,11 +156,11 @@ Not before Phases 3 and 4. In this order:
 ## Ongoing upkeep (small, any time)
 
 - **JARVIS can claim a card that was never shown.** When `delete_event` returned an error
-  (no date given), the reply still said "confirm on screen" (CHANGELOG section 40). Same
-  family as the clash wording, where he says he "cannot move" an event while a card waits.
-- **Check the weekday of fortnightly events too.** A weekly event must now name its weekday
-  (CHANGELOG section 39). Fortnightly ("biweekly") still follows the model's date, with the
-  same risk of landing on the wrong day; it would need repeat_days to work with biweekly.
+  (no date given), the reply still said "confirm on screen" (CHANGELOG section 40).
+  *In progress: CHANGELOG section 44. "Cancel the dentist" now finds the event and shows a
+  real card; the habit itself still shows for repeating events.* (The clash wording, "cannot
+  move", turned out to be true: a clash shows no card.)
+- **Check the weekday of fortnightly events too.** *Done: CHANGELOG section 44.*
 - **Whisper may contact the internet when it loads.** The server's output shows
   "Fetching 4 files ... 0.00B" each time: nothing is downloaded, but the Hugging Face
   library usually asks its servers whether the files changed. Not personal data, but it

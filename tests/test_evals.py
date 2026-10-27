@@ -88,6 +88,20 @@ def test_reply_apostrophes_are_normalised():
     assert check(case, [], "I’ve added it.") != []
 
 
+def test_no_card_claims():
+    """Pointing to a card is honest only when a tool really showed one (CHANGELOG section 44)."""
+    case = Case("c", "m", no_card_claims=True)
+    failed = {"tool": "delete_event", "args": {}, "result": "Error: give the date. No card..."}
+    shown = {"tool": "delete_event", "args": {}, "result": "Confirmation required. The card..."}
+    claim = "You'll need to confirm on screen, sir."
+    assert check(case, [failed], claim) != []
+    assert check(case, [], claim) != []
+    assert check(case, [failed, shown], claim) == []
+    assert check(case, [failed], "Which day is the dentist, sir?") == []
+    # Missed by the first version of the check (CHANGELOG section 44)
+    assert check(case, [failed], "I shall need you to confirm that on the screen, sir.") != []
+
+
 def test_asks():
     case = Case("c", "m", asks=True)
     assert check(case, [], "What time, sir?") == []

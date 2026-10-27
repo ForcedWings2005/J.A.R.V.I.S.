@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 
 from database import conn as db, lock
-from tools import NeedsConfirmation, tool
+from tools import ASKS_FIRST, NeedsConfirmation, tool
 
 REPEATS = ("none", "daily", "weekdays", "weekly", "biweekly", "monthly")
 DAYS = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
@@ -29,7 +29,8 @@ def _parse_days(s: str):
 
 def _rep_label(rule: str, rd) -> str:
     if rd:
-        return "weekly on " + ", ".join(DAY_NAMES[int(x)] for x in rd.split(","))
+        every = "every 2 weeks on " if rule == "biweekly" else "weekly on "
+        return every + ", ".join(DAY_NAMES[int(x)] for x in rd.split(","))
     return REPEAT_WORDS.get(rule, rule)
 
 
@@ -53,6 +54,12 @@ def _matches(rule: str, base, d, days=None) -> bool:
     if rule == "none":
         return d == base
     if days:
+        if rule == "biweekly":
+            # Count whole calendar weeks (Monday to Sunday) from the first one, and keep
+            # every other week, so "Tuesday and Thursday" stay together in the same week
+            first_monday = base - timedelta(days=base.weekday())
+            if (d - first_monday).days // 7 % 2:
+                return False
         return d.weekday() in days
     if rule == "daily":
         return True
@@ -190,14 +197,19 @@ def add_event(title: str, date: str, start_time: str, end_time: str = "",
         day_list = _parse_days(repeat_days)
         if not day_list:
             return "Error: repeat_days must be weekday names such as 'wed,fri'."
-        if repeat not in ("none", "weekly"):
-            return "Error: repeat_days only works with a weekly repeat."
-        repeat = "weekly"
+        if repeat not in ("none", "weekly", "biweekly"):
+            return "Error: repeat_days only works with a weekly or fortnightly repeat."
+        if repeat == "none":
+            repeat = "weekly"
     elif repeat == "weekly":
         # The weekday must come from the user's words, and the code works out the date from
         # it: the model once gave a Sunday date for "every Monday" (CHANGELOG section 39).
         return ("Error: a weekly event needs repeat_days: the weekday or weekdays the user "
                 "said, such as 'mon' or 'tue,thu'. The first date is worked out from them.")
+    elif repeat == "biweekly":
+        # The same for every other week (CHANGELOG section 44)
+        return ("Error: a fortnightly event needs repeat_days: the weekday or weekdays the "
+                "user said, such as 'fri'. The first date is worked out from them.")
 
     try:
         when = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %H:%M")
@@ -291,6 +303,12 @@ def _locate(title: str, date: str, scope: str, verb: str):
         return "Error: scope must be 'this' or 'all'."
     if not date:
         if scope != "all":
+            # Say what is really wrong: no such event, several, or one that repeats. The
+            # old message mentioned a "repeating series" even for a one-off event, and
+            # JARVIS then asked "just this one or the whole series?" (CHANGELOG section 44)
+            only = _find_series(title)
+            if isinstance(only, str):
+                return only
             msg = (f"Error: give the date of the occurrence to {verb}, "
                    f"or use scope 'all' to {verb} a whole repeating series.")
             if verb == "change":
@@ -310,6 +328,18 @@ def _locate(title: str, date: str, scope: str, verb: str):
         names = "; ".join(f"{m['time']} {m['title']}" for m in matches)
         return f"Error: several events match ({names}). Ask the user which one."
     return matches[0], date, scope
+
+
+def _only_one_off(title: str) -> str:
+    """The date of the one upcoming event with this title, if it does not repeat; else "".
+
+    Lets "cancel the dentist" or "move the dentist" work without a date. The card shows
+    the date that was found, so the user sees which event it is before anything happens.
+    """
+    only = _find_series(title)
+    if isinstance(only, dict) and only["repeat"] == "none":
+        return only["date"]
+    return ""
 
 
 def find_for_delete(title: str, date: str = "", scope: str = "this"):
@@ -369,12 +399,18 @@ def apply_delete(action: dict) -> None:
         db.commit()
 
 
+# Deleting and changing only ask: the card does it (see tools.ASKS_FIRST)
+ASKS_FIRST.update({"delete_event", "update_event"})
+
+
 @tool("Request deletion of the calendar event whose title matches. This only asks the user to confirm on screen; nothing is deleted until they click Confirm. For a repeating event, scope 'this' removes only that date's occurrence, and scope 'all' removes the whole series. Use 'all' only if the user says every occurrence or the whole series. With scope 'all' the date can be left out, so never ask the user for a date just to delete a whole series.",
       title={"type": "string"},
       date={"type": "string", "description": "YYYY-MM-DD, the occurrence to delete. Optional when scope is 'all'."},
       scope={"type": "string", "enum": ["this", "all"]})
 def delete_event(title: str, date: str = "", scope: str = "this"):
     """Never deletes anything itself: returns a request the user must confirm."""
+    if not date and (scope or "this").lower().strip() != "all":
+        date = _only_one_off(title)
     found = find_for_delete(title, date, scope)
     if isinstance(found, str):
         return found
@@ -550,9 +586,9 @@ def _date_for_change(title: str, new_date: str):
     Returns (date, new_date); date stays "" if neither applies. Whatever is worked out
     here is shown on the confirmation card before anything changes.
     """
-    only = _find_series(title)
-    if isinstance(only, dict) and only["repeat"] == "none":
-        return only["date"], new_date
+    only = _only_one_off(title)
+    if only:
+        return only, new_date
     if new_date:
         try:
             d = _d(new_date)
