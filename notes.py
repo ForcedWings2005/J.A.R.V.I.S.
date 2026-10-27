@@ -11,7 +11,7 @@ from datetime import date
 
 import config
 from database import conn as db, lock
-from tools import PRIVATE, NeedsConfirmation, tool
+from tools import ASKS_FIRST, PRIVATE, NeedsConfirmation, tool
 
 # Words that mean the note is about a secret. A safety net, not a guarantee: a note can
 # describe a secret without any of these words.
@@ -53,6 +53,8 @@ def _terms(words: str) -> list[str]:
 
 # The log records only the length of these tools' words and results (SECURITY.md)
 PRIVATE.update({"remember", "recall", "forget"})
+# Saving and forgetting only ask: the card does it (see tools.ASKS_FIRST)
+ASKS_FIRST.update({"remember", "forget"})
 
 
 def _is_saved(text: str) -> bool:

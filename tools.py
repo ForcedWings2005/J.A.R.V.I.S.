@@ -16,6 +16,7 @@ from typing import Callable
 FUNCTIONS: dict = {}    # name -> function
 SCHEMAS: list = []      # what the model is shown, in registration order
 PRIVATE: set = set()    # tools whose arguments and results the log records only as lengths
+ASKS_FIRST: set = set() # tools that never act themselves: they return NeedsConfirmation
 
 
 @dataclass

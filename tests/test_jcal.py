@@ -135,8 +135,48 @@ def test_weekly_events_saved_before_this_rule_still_repeat():
 
 
 def test_biweekly_repeat_skips_every_other_week():
-    jcal.add_event("Review", day(1), "18:00", repeat="biweekly")
+    jcal.add_event("Review", day(1), "18:00", repeat="biweekly", repeat_days="tue")
     assert dates(0, 30) == [day(1), day(15), day(29)]
+
+
+# A fortnightly event must name its weekday too (CHANGELOG section 44), for the same reason
+# as a weekly one: without it, it repeats on whatever weekday the model's date falls on.
+
+def test_biweekly_without_repeat_days_is_refused_and_nothing_is_saved():
+    msg = jcal.add_event("Review", day(4), "15:00", repeat="biweekly")
+    assert msg.startswith("Error:") and "repeat_days" in msg
+    assert occurrences(0, 30) == []
+
+
+def test_every_other_friday_from_a_monday_date_lands_on_fridays():
+    msg = jcal.add_event("Review", day(0), "15:00", repeat="biweekly", repeat_days="fri")
+    assert f"starting {day(4)} (a Friday)" in msg and "every 2 weeks on Fri" in msg
+    assert dates(0, 30) == [day(4), day(18)]
+
+
+def test_every_other_tuesday_and_thursday_keeps_each_pair_in_one_week():
+    jcal.add_event("Lab", day(1), "10:00", repeat="biweekly", repeat_days="tue,thu")
+    assert dates(0, 20) == [day(1), day(3), day(15), day(17)]
+
+
+def test_fortnights_are_counted_in_calendar_weeks():
+    """Starting on the Thursday: that week's Thursday, then the pair two weeks later."""
+    jcal.add_event("Lab", day(3), "10:00", repeat="biweekly", repeat_days="tue,thu")
+    assert dates(0, 20) == [day(3), day(15), day(17)]
+
+
+def test_a_fortnightly_event_does_not_clash_with_its_weeks_off():
+    jcal.add_event("Dinner", day(11), "15:00")                     # the Friday in between
+    msg = jcal.add_event("Review", day(4), "15:00", repeat="biweekly", repeat_days="fri")
+    assert msg.startswith("Added")
+
+
+def test_fortnightly_events_saved_before_this_rule_still_repeat():
+    with jcal.lock:
+        jcal.db.execute("INSERT INTO events (title, date, time, end_time, repeat_rule) "
+                        "VALUES ('Old review', ?, '18:00', '19:00', 'biweekly')", (day(1),))
+        jcal.db.commit()
+    assert [e["date"] for e in occurrences(0, 30, "Old review")] == [day(1), day(15), day(29)]
 
 
 def test_daily_repeat_fills_every_day():
@@ -292,6 +332,31 @@ def test_delete_whole_series_without_a_date():
 def test_delete_one_occurrence_needs_a_date():
     jcal.add_event("Piano lesson", day(1), "16:00", repeat="weekly", repeat_days="tue")
     assert jcal.find_for_delete("piano", scope="this").startswith("Error")
+
+
+# "Cancel the dentist" without a date used to fail, and JARVIS then pointed to a card that
+# was never shown (CHANGELOG section 44). Like update_event, delete_event now finds the
+# only upcoming one-off event by its title; the card shows its date before anything happens.
+
+def test_delete_without_a_date_finds_the_only_upcoming_event():
+    jcal.add_event("Dentist", day(1), "15:00")
+    req = jcal.delete_event("dentist appointment")
+    assert isinstance(req, NeedsConfirmation)
+    assert req.card == f"Delete 'Dentist' on {day(1)} at 15:00?"
+    assert "Dentist" in jcal.get_events(day(1))                    # nothing deleted yet
+
+
+def test_delete_without_a_date_with_two_dentists_asks_which_one():
+    jcal.add_event("Dentist", day(1), "15:00")
+    jcal.add_event("Dentist", day(5), "11:00")
+    result = jcal.delete_event("dentist")
+    assert result.startswith("Error: several events match") and "series" not in result
+
+
+def test_without_a_date_a_missing_event_is_reported_as_missing():
+    """The old error suggested a 'whole repeating series' for events that do not repeat."""
+    result = jcal.delete_event("dentist")
+    assert result == "Error: no upcoming event matching 'dentist'."
 
 
 def test_delete_without_a_date_ignores_events_that_are_over(clock):
@@ -465,6 +530,13 @@ def test_changing_the_whole_series_without_a_date():
     assert req.card.startswith("Change ALL occurrences of 'Piano lesson'")
     assert req.apply() == "Done. Every 'Piano lesson' is now from 17:00 to 18:00."
     assert {t for d in (1, 8, 15) for t in times_on(d)} == {("17:00", "18:00", "Piano lesson")}
+
+
+def test_moving_the_time_of_a_fortnightly_series_keeps_its_weeks():
+    jcal.add_event("Review", day(4), "15:00", repeat="biweekly", repeat_days="fri")
+    change("review", scope="all", new_start_time="16:00").apply()
+    assert [(e["date"], e["time"]) for e in occurrences(0, 30, "Review")] == \
+        [(day(4), "16:00"), (day(18), "16:00")]
 
 
 def test_a_whole_series_cannot_move_to_other_days():

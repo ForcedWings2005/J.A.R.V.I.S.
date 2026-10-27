@@ -132,6 +132,12 @@ CASES = [
          max_calls={"add_event": 1}),
     Case("repeat_daily", "Add a daily walk at 7am, starting tomorrow.",
          expect=[("add_event", {"date": TUE, "start_time": "07:00", "repeat": "daily"})]),
+    # Section 44: fortnightly events now name their weekday too. One refused call (no
+    # repeat_days) followed by a correct one is fine: the refusal saves nothing.
+    Case("repeat_fortnightly", "Add a team review every other Friday at 3pm.",
+         expect=[("add_event", {"start_time": "15:00", "repeat": "biweekly",
+                                "_result": contains(f"starting {FRI} (a Friday)")})],
+         max_calls={"add_event": 2}),
     Case("repeat_until_date", "Add yoga every Monday at 6pm until March 31st.",
          expect=[("add_event", {"date": one_of(TODAY, NEXT_MON), "start_time": "18:00",
                                 "repeat_until": "2030-03-31",
@@ -173,6 +179,18 @@ CASES = [
          events=[PIANO],
          expect=[("delete_event", {"title": contains("piano"), "scope": "all"})],
          includes_any=["confirm"], excludes=CLAIMS_DELETED),
+    # Section 40: "cancel the dentist" without a date. delete_event failed (it needs the
+    # date), no card was shown, and JARVIS still said "confirm on screen". The model may
+    # also find the date first and show a real card; then pointing to it is honest.
+    Case("delete_no_date_no_false_card", "Cancel the dentist.",
+         events=[DENTIST], no_card_claims=True, excludes=CLAIMS_DELETED),
+    # Nothing to delete, so no card can ever appear
+    Case("delete_missing_no_false_card", "Cancel my dentist appointment tomorrow.",
+         no_card_claims=True, excludes=CLAIMS_DELETED),
+    # A repeating event without a date: the tool cannot pick an occurrence, so unless the
+    # model finds the date or asks for the whole series, no card appears
+    Case("delete_repeating_no_date_no_false_card", "Cancel piano.",
+         events=[PIANO], no_card_claims=True, excludes=CLAIMS_DELETED),
 
     # --- Changing events (only ever asks for confirmation) ----------------------
     Case("edit_move_one_off", "Move my dentist appointment tomorrow to 4pm.",

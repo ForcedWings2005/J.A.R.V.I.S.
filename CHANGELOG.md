@@ -688,7 +688,7 @@ The owner found JARVIS "a bot reading prompts". Measured causes: the personality
   - Long description, prompt `2ccc2082f19d`: 154/156, 15.8 min.
   - Long description, thinking off: 144/156, 4.1 min.
   - **Light personality, prompt `da6dd655f792`: 156/156, 11.3 min.** The yoga case started on a Monday in all 3 runs. Replies read: all accurate, the cards always mentioned.
-- Noticed, not changed: for a clash, every version says it "cannot move" the event, although a card is waiting and the move can still be confirmed. Some replies put a blank line before the joke, which only shows in the chat.
+- Noticed, not changed: for a clash, every version says it "cannot move" the event, although a card is waiting and the move can still be confirmed. *(Corrected in section 44: this was wrong. A clash is an error and shows no card, so "cannot move" is true.)* Some replies put a blank line before the joke, which only shows in the chat.
 - **In the real app, light personality** (2026-10-22, the owner: "the response times were good"). From the log, timings only: first word 3.2 to 9.6 s (the 9.6 s includes loading the model), 234 to 568 tokens written per reply, against 13 to 30 s and 901 to 1,886 tokens with the long version.
 
 ## 39. A weekly event must name its weekday
@@ -823,6 +823,34 @@ The owner liked Liquid Glass's shapes but found it "mostly grey". Apple's glass 
 - **Checked by the owner in Safari** (where they use JARVIS): looks good.
 - **Not checked**: real data.
 
+## 44. Small fixes: a card that was never shown, fortnightly weekdays
+
+**A card that was never shown.** Asked to "cancel the dentist" without a date, `delete_event` failed (it needed the date), so no card appeared, but JARVIS said "I'll need you to confirm on screen" (found in section 40). A new eval case reproduced it on the old code in 2 of 5 runs.
+
+- **Why**: the system prompt says delete_event "only asks for confirmation… say you need their confirmation on screen", and the model says that line whatever the tool returned. The error itself also misled: it mentioned "a whole repeating series" for a one-off appointment, so JARVIS asked "just this one or the entire series?".
+- **First attempt, not enough on its own**:
+  - an error from any of the four tools that only ask (`delete_event`, `update_event`, `remember`, `forget`, now listed in `tools.ASKS_FIRST`) gets a fact added in `run_tool`: "No card was shown and nothing was changed."
+  - JARVIS received it and still said "confirm on screen" in some runs. Kept, because it is true and harmless, but a fact in a tool result loses to an instruction in the prompt.
+- **The fix in code (B)**:
+  - `delete_event` now finds the only upcoming one-off event by its title when no date is given, as `update_event` already did (shared helper `_only_one_off`). "Cancel the dentist" now shows a real card with the date on it. Nothing is deleted without Confirm, as before.
+  - Without a date, the errors now say what is really wrong: no such event, several (ask which one), or one that repeats (only then is the series mentioned).
+- **The clash wording was not a bug**: section 38 said JARVIS claims he "cannot move" an event "although a card is waiting". A clash is an error and shows no card, so the wording is true; section 38 now says so.
+
+**Fortnightly events on the wrong weekday.** As for weekly events in section 39: `add_event` refuses a fortnightly repeat without `repeat_days` (the weekday the user said), and code works out the first date. "Every other Tuesday and Thursday" counts calendar weeks (Monday to Sunday), so each pair stays in one week, and the label is "every 2 weeks on Tue, Thu". Fortnightly events saved before keep repeating as they did (a test checks it). No database change: the column already existed. The tool descriptions were not changed (section 39 showed that a description change can break unrelated cases); the error message tells the model what to send. A new eval case reproduced the bug on the old code: "every other Friday" was saved starting on a Saturday in 1 of 5 runs.
+
+**Eval checker**: a case can now say `no_card_claims=True`: the reply may point to a card ("on screen", "the card", "tap confirm"...) only if a tool really showed one. Its first version missed "on the screen"; a test now covers it.
+
+**Tidying**: Known limits no longer says events cannot be edited (they can since section 28) or that there are placeholder panels (there are none); Possible next steps now follows `plan.md`.
+
+- **Tests**: 22 new (the fortnightly rules, the no-card note, the date-free delete and its errors, the checker), 1 existing setup now names its weekday. 459 tests.
+- **Eval cases**: 4 new (`repeat_fortnightly`, `delete_no_date_no_false_card`, `delete_missing_no_false_card`, `delete_repeating_no_date_no_false_card`), 56 in all.
+- **Evals** (gemma4:26b `001e5dafc3c7`, prompt `da6dd655f792` throughout, 3 runs per case):
+  - Before, the 52 old cases: 152/156. Misses seen in earlier runs: `ask_am_pm`, `ask_until_month`, `edit_move_to_another_day`, `note_offered_for_a_preference` (said "I shall remember" while the card waited).
+  - The new cases on the old code, 5 runs each: `delete_no_date_no_false_card` 3/5, `repeat_fortnightly` 4/5, `delete_missing_no_false_card` 5/5 (kept as a guard).
+  - With the note only: 163/165, and the note did not fix the case (1/3 once the checker also caught "on the screen").
+  - **With B: 167/168.** `delete_no_date_no_false_card` 3/3, `repeat_fortnightly` 3/3. The one miss: "Cancel piano." (a repeating event, so the tool rightly asked for a date) was answered "I require your confirmation on screen" in 1 of 3 runs. The habit remains; the next step is the prompt rule.
+- **Not checked**: the real app.
+
 ---
 
 ## Status
@@ -838,6 +866,7 @@ The owner liked Liquid Glass's shapes but found it "mostly grey". Apple's glass 
 | Cinematic HUD look (section 41) | Replaced by the glass look (section 43) |
 | Motion layer (section 42) | Done; checked in a demo and by the owner in Safari, including the orb with the microphone and voice |
 | Glass look (section 43) | Done; checked in a demo and by the owner in Safari |
+| Card claims, fortnightly weekdays (section 44) | Fortnightly done; card claims partly fixed (date-free delete), prompt rule next; evals 167/168 |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
@@ -858,22 +887,19 @@ The owner liked Liquid Glass's shapes but found it "mostly grey". Apple's glass 
 
 - Speech is made one sentence at a time, so there can be a short pause between sentences.
 - Whisper can invent words from near-silence.
-- Sports, news, weather and notes panels are placeholders ("Coming soon").
 - Pending confirmations and conversation history are lost when the server restarts.
 - No login yet. This is safe only while the server stays on `127.0.0.1`.
-- Events can only be added or deleted, not edited or moved.
 - A monthly repeat on the 29th, 30th or 31st skips months that lack that day.
 - For repeating events, the conflict check only looks 90 days ahead.
 - Deleting one occurrence of a repeating event hides that date but leaves the series itself unchanged.
 
 ## Possible next steps
 
-1. Phase 2: an evaluation suite for the model (turn `compare.py` into real cases), and tests for `brain.py`.
-2. Phase 3: one shared database module, versioned migrations, one tool registry, history trimming, logging and a `config.py`.
-3. Edit and move events (change time, title or length without deleting and re-adding).
-4. Reminders and timers.
-5. Real data for weather, news and sports panels.
-6. Notes and memory tool.
-7. Login and HTTPS before using it from a phone (Tailscale).
-8. Google Calendar in place of the local database.
-9. Morning briefing view and a phone layout.
+The full roadmap, with the reasons and the order, is in `plan.md`. In short:
+
+1. Reminders (Phase 5, item 2).
+2. A morning briefing: today's events, overdue tasks and reminders in one reply.
+3. Weather, then news and sports, as read-only tools. These are the first to read outside text, so prompt-injection evals come first (SECURITY.md).
+4. Sound effects for the dashboard.
+5. Phase 6, using JARVIS from a phone: a login, Tailscale with HTTPS, a phone layout.
+6. Upkeep: stop Whisper checking Hugging Face's servers when it loads, split the requirements, Time Machine for the rest of the Mac, and measuring the model's response time.
