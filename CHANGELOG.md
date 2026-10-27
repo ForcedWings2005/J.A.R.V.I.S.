@@ -849,6 +849,9 @@ The owner liked Liquid Glass's shapes but found it "mostly grey". Apple's glass 
   - The new cases on the old code, 5 runs each: `delete_no_date_no_false_card` 3/5, `repeat_fortnightly` 4/5, `delete_missing_no_false_card` 5/5 (kept as a guard).
   - With the note only: 163/165, and the note did not fix the case (1/3 once the checker also caught "on the screen").
   - **With B: 167/168.** `delete_no_date_no_false_card` 3/3, `repeat_fortnightly` 3/3. The one miss: "Cancel piano." (a repeating event, so the tool rightly asked for a date) was answered "I require your confirmation on screen" in 1 of 3 runs. The habit remains; the next step is the prompt rule.
+- **The prompt rule (A)**: "say you need their confirmation on screen" was unconditional. It now reads: "When a tool result says 'Confirmation required', a card is on screen: say they need to confirm it there. If a tool returns an error, no card is shown, so never mention one." The notes rule got the same condition. Measured on its own, after B was committed.
+  - **With A, prompt `851b5394ed77`: 167/168.** All three no-card cases 3/3, including "Cancel piano.", and all 52 old cases 156/156.
+  - The one miss, `repeat_fortnightly`: the model gave 2030-01-12 (a Saturday) for "every other Friday". The weekday was kept right (Friday, where the old code saved Saturdays), but code slides *forward* from the model's date, so the series started on the 18th instead of the 11th: a different set of Fridays. Not caused by the prompt change; left as a follow-up in `plan.md`.
 - **Not checked**: the real app.
 
 ---
@@ -866,7 +869,7 @@ The owner liked Liquid Glass's shapes but found it "mostly grey". Apple's glass 
 | Cinematic HUD look (section 41) | Replaced by the glass look (section 43) |
 | Motion layer (section 42) | Done; checked in a demo and by the owner in Safari, including the orb with the microphone and voice |
 | Glass look (section 43) | Done; checked in a demo and by the owner in Safari |
-| Card claims, fortnightly weekdays (section 44) | Fortnightly done; card claims partly fixed (date-free delete), prompt rule next; evals 167/168 |
+| Card claims, fortnightly weekdays (section 44) | Done: evals 167/168 (prompt `851b5394ed77`); not yet tried in the real app |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |

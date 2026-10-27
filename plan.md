@@ -157,10 +157,15 @@ Not before Phases 3 and 4. In this order:
 
 - **JARVIS can claim a card that was never shown.** When `delete_event` returned an error
   (no date given), the reply still said "confirm on screen" (CHANGELOG section 40).
-  *In progress: CHANGELOG section 44. "Cancel the dentist" now finds the event and shows a
-  real card; the habit itself still shows for repeating events.* (The clash wording, "cannot
-  move", turned out to be true: a clash shows no card.)
+  *Done: CHANGELOG section 44 ("cancel the dentist" finds the event, and the prompt rule
+  about cards is now conditional).* (The clash wording, "cannot move", turned out to be
+  true: a clash shows no card.)
 - **Check the weekday of fortnightly events too.** *Done: CHANGELOG section 44.*
+- **The first week of a fortnightly event.** When the model's date is a day late (a Saturday
+  for "every other Friday"), code slides forward to the next Friday, a week later than meant,
+  so the series falls on the other set of Fridays (CHANGELOG section 44, 1 eval run in 3).
+  One idea: when the model's date is not on the weekday the user said, start from the
+  beginning of that week instead. It changes when weekly events start too, so measure first.
 - **Whisper may contact the internet when it loads.** The server's output shows
   "Fetching 4 files ... 0.00B" each time: nothing is downloaded, but the Hugging Face
   library usually asks its servers whether the files changed. Not personal data, but it
