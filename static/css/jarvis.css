@@ -70,7 +70,7 @@ header { grid-column:1 / 4; display:flex; align-items:center; gap:22px; min-widt
 .dot.bad { background:var(--red); box-shadow:0 0 8px var(--red); }
 .clock { margin-left:auto; text-align:right; white-space:nowrap; }
 /* The spaces (static/js/spaces.js): one capsule per space, the current one lit */
-.spaces { display:flex; gap:6px; flex-wrap:wrap; }
+.spaces { display:flex; gap:6px; flex-shrink:0; }
 .space-chip { font-family:var(--font); font-size:12px; letter-spacing:.5px; color:var(--muted); padding:7px 12px; cursor:pointer;
   border-radius:999px; background-color:var(--glass); border:1px solid var(--line);
   -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); box-shadow:var(--rim); }
@@ -295,6 +295,18 @@ button.tgh { cursor:pointer; }
 .tev .tm { font-size:12px; color:var(--muted); }
 .nowline { position:absolute; left:0; right:0; height:2px; background:var(--amber); box-shadow:0 0 8px var(--amber); z-index:2; }
 
+/* ---------- spaces other than Home: the space on the left, JARVIS docked on the right ----------
+   Nothing is moved in the page: the same .center (orb, conversation, card, command bar) is only
+   placed in another grid cell, so chat, voice and a waiting card carry on (static/js/spaces.js) */
+.space { display:flex; flex-direction:column; gap:16px; min-width:0; min-height:0; overflow:auto; }
+.space[hidden] { display:none; }
+body:not([data-space="home"]) { grid-template-columns:minmax(0,1fr) minmax(300px,360px); grid-template-rows:auto minmax(0,1fr); }
+body:not([data-space="home"]) header { grid-column:1 / -1; }
+body:not([data-space="home"]) .col, body:not([data-space="home"]) .timeline { display:none; }
+body:not([data-space="home"]) .space { grid-column:1; grid-row:2; }
+body:not([data-space="home"]) .center { grid-column:2; grid-row:2; justify-content:flex-start; }
+body:not([data-space="home"]) .orbwrap { width:min(180px,100%,22vh); }
+
 /* ---------- narrow screens: one column that scrolls ---------- */
 @media (max-width:900px) {
   body { grid-template-columns:1fr; grid-template-rows:none; height:auto; min-height:100vh; overflow:auto; padding:14px; }
@@ -302,4 +314,7 @@ button.tgh { cursor:pointer; }
   .clock { margin-left:0; }
   .timeline { display:none; }
   .center { order:-1; }
+  /* in a space too: JARVIS first (order -1), then the space */
+  body:not([data-space="home"]) { grid-template-columns:1fr; grid-template-rows:none; }
+  body:not([data-space="home"]) .space, body:not([data-space="home"]) .center { grid-column:1; grid-row:auto; }
 }
