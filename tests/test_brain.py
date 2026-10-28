@@ -128,6 +128,33 @@ def test_several_tools_in_one_round():
     assert len(tasks.tasks_list()) == 2
 
 
+def test_opening_a_space_streams_a_space_event_after_its_step():
+    model = FakeModel(use(call("open_space", name="work")), say("Work it is, sir."))
+    events, reply = run(brain.Assistant(chat=model), "Let's get some work done")
+    types = [e["type"] for e in events]
+    assert types.index("space") == types.index("step") + 1
+    assert next(e for e in events if e["type"] == "space") == {"type": "space", "name": "work"}
+    assert next(e["step"] for e in events if e["type"] == "step") == \
+        {"text": "Showed the Work space", "status": "done"}
+    assert model.seen[1][-1]["content"] == "Showing the Work space."
+    assert reply == "Work it is, sir."
+
+
+def test_an_unknown_space_streams_no_space_event():
+    model = FakeModel(use(call("open_space", name="gym")), say("There is no gym, sir."))
+    events, _ = run(brain.Assistant(chat=model), "Open the gym")
+    assert "space" not in [e["type"] for e in events]
+    assert model.seen[1][-1]["content"].endswith("Spaces: home, work.")   # no NO_CARD note
+
+
+def test_a_space_is_shown_only_on_its_own_turn():
+    model = FakeModel(use(call("open_space", name="work")), say("Done."), say("Hello."))
+    a = brain.Assistant(chat=model)
+    run(a, "Work time")
+    events, _ = run(a, "Hello")
+    assert "space" not in [e["type"] for e in events]
+
+
 def test_tool_errors_are_marked_as_errors():
     model = FakeModel(use(call("complete_task", title="nothing")), say("No such task."))
     events, _ = run(brain.Assistant(chat=model), "Done with nothing")

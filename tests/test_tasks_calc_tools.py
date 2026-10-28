@@ -97,7 +97,7 @@ def test_every_tool_is_registered_in_order():
     names = [s["function"]["name"] for s in tools.SCHEMAS]
     assert names == ["get_events", "add_event", "delete_event", "update_event", "add_task",
                      "list_tasks", "complete_task", "calculate", "remember", "recall",
-                     "forget"]
+                     "forget", "open_space"]
     assert set(names) == set(tools.FUNCTIONS)
 
 
