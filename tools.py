@@ -28,6 +28,13 @@ class NeedsConfirmation:
     private: bool = False       # if True, the log never records the card's text
 
 
+@dataclass
+class ShowSpace:
+    """Returned by a tool that only changes what is on screen, so no click is needed."""
+    name: str                   # one of config.SPACES
+    reply: str                  # the tool result the model sees
+
+
 def tool(description: str, **properties):
     def register(func):
         params = inspect.signature(func).parameters

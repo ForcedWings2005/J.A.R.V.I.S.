@@ -52,6 +52,10 @@ HISTORY_KEEP_TOKENS = 30_000
 # A delete card left unanswered this long can no longer be confirmed (ask again instead).
 CONFIRM_TIMEOUT_SECONDS = 300
 
+# Spaces (docs/specs/2026-10-27-spaces-and-work.md): the names the open_space tool and /chat
+# accept. The page registers the same names in static/js/spaces.js and space-<name>.js.
+SPACES = ("home", "work")
+
 # Work space (docs/specs/2026-10-27-spaces-and-work.md, CHANGELOG section 51): free time is
 # counted within this working day, gaps shorter than this are left out, and a deadline's bar
 # starts to fill this many days before it is due. Agreed with the owner.

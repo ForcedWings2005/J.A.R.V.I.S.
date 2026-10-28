@@ -2,7 +2,7 @@
 import ollama
 
 
-def call(name, **args):
+def call(name, /, **args):       # "/": a tool argument may itself be called name (open_space)
     return ollama.Message.ToolCall(
         function=ollama.Message.ToolCall.Function(name=name, arguments=args)
     )

@@ -1,7 +1,8 @@
 """The assistant: talks to the model, runs the tools it asks for, keeps the conversation.
 
-The tools themselves live in jcal.py (calendar), tasks.py (to-do list) and calc.py
-(calculator), registered with tools.py. Importing them below is what registers them.
+The tools themselves live in jcal.py (calendar), tasks.py (to-do list), calc.py
+(calculator), notes.py (notes) and spaces.py (which space is on screen), registered with
+tools.py. Importing them below is what registers them.
 """
 import logging
 import threading
@@ -18,6 +19,7 @@ import jcal  # noqa: F401, E402
 import tasks  # noqa: F401, E402
 import calc  # noqa: F401, E402
 import notes  # noqa: F401, E402
+import spaces  # noqa: F401, E402  (last, so the tools above keep their order)
 
 log = logging.getLogger("jarvis.brain")
 
@@ -196,6 +198,7 @@ _STEP_WORDS = {
     "remember": lambda a: "A note to save",
     "recall": lambda a: "Looked through your notes",
     "forget": lambda a: "A note to forget",
+    "open_space": lambda a: f"Showed the {str(a.get('name', '')).strip().title()} space",
 }
 
 
@@ -259,6 +262,7 @@ class Assistant:
         self.messages = [{"role": "system", "content": build_system_prompt()}]
         self.pending = None         # (id, NeedsConfirmation, made at) waiting for the buttons
         self.confirm = None         # the card to show for the current turn, if any
+        self.show_space = None      # a space the last tool asked the page to show, if any
         self.last_prompt_tokens = None  # tokens the model read on its last call (from Ollama)
         self.lock = threading.Lock()
 
@@ -278,6 +282,10 @@ class Assistant:
             pid = uuid.uuid4().hex[:8]
             self.pending = (pid, result, time.monotonic())
             self.confirm = {"id": pid, "text": result.card}
+            return result.reply
+        if isinstance(result, tools.ShowSpace):
+            # Only the view changes, so no card: the page switches on the `space` event
+            self.show_space = result.name
             return result.reply
         if call.function.name in tools.ASKS_FIRST and str(result).startswith("Error:"):
             return result + NO_CARD
@@ -366,12 +374,13 @@ class Assistant:
     def chat_stream(self, user_text: str):
         """Generator: yields small dicts as the reply is produced.
 
-        delta (a piece of text), step (a tool ran), break (a tool round ended),
-        done (steps and any confirmation card), error.
+        delta (a piece of text), step (a tool ran), space (show this space, straight after
+        its step), break (a tool round ended), done (steps and any confirmation card), error.
         """
         with self.lock:
             try:
                 self.confirm = None
+                self.show_space = None
                 steps = []
                 step_keys = []      # (tool, what it was about) for each step, see _mark_corrected
                 self.messages[0]["content"] = build_system_prompt()
@@ -447,6 +456,9 @@ class Assistant:
                             "content": result,
                         })
                         yield {"type": "step", "step": step}
+                        if self.show_space:
+                            yield {"type": "space", "name": self.show_space}
+                            self.show_space = None
                     yield {"type": "break"}
 
                 if not wrote_text:
