@@ -144,6 +144,17 @@ def test_case_names_are_unique():
     assert len(names) == len(set(names))
 
 
+def test_time_sensitive_cases_also_run_from_work():
+    """Messages sent from Work carry '· Work' in their stamp, and the stamp's wording has
+    moved results before (CHANGELOG section 52), so these are measured from Work too."""
+    by_name = {c.name: c for c in CASES}
+    for name in ["ask_am_pm", "events_tomorrow", "multi_current_time", "task_due",
+                 "delete_missing_no_false_card"]:
+        work = by_name[name + "_in_work"]
+        assert work.space == "work"
+        assert work.message == by_name[name].message and work.expect == by_name[name].expect
+
+
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c.name)
 def test_case_refers_to_real_tools_and_arguments(case):
     for tool, spec in case.expect:

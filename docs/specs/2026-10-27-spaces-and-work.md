@@ -134,9 +134,9 @@ The page sends the current space with every message (`{"message": ..., "space": 
 unknown value is refused (422), like any other bad body. The server adds it to the time stamp:
 `[Monday 2030-01-07 09:01 · Work] `. On Home nothing is added, so Home's messages are exactly
 as today. The space is never put in the system prompt, which must stay the same all day
-(CHANGELOG section 27). The prompt gained one fixed sentence, while building stage 3, saying
-what a space in the stamp means; placed beside the time-stamp instructions it hurt the AM/PM
-question, so it sits before the general-knowledge part (CHANGELOG section 52).
+(CHANGELOG section 27). A fixed sentence in the prompt explaining the space in the stamp was
+tried while building stage 3 and removed: wherever it sat, JARVIS asked "AM or PM?" less often,
+and he handles the stamp without it (CHANGELOG section 52).
 
 ### `GET /day`
 

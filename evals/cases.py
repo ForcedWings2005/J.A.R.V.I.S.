@@ -7,6 +7,7 @@ Every case runs as if it were Monday 2030-01-07 (09:00 unless the case sets
     Mon 01-07 (today)  Tue 01-08  Wed 01-09  Thu 01-10  Fri 01-11
     Sat 01-12  Sun 01-13  Mon 01-14
 """
+from dataclasses import replace
 from datetime import datetime
 
 from evals.check import Case, between, contains, days, not_, one_of
@@ -309,3 +310,9 @@ CASES = [
     Case("space_back_home", "Take me back to the home screen.", space="work",
          expect=[("open_space", {"name": "home"})], max_calls={"open_space": 1}),
 ]
+
+# The same requests sent from Work, whose stamp says '· Work': a sentence about the stamp
+# once cost the AM/PM question 2 runs in 10 (CHANGELOG section 52, final review)
+CASES += [replace(c, name=c.name + "_in_work", space="work") for c in CASES
+          if c.name in ("ask_am_pm", "events_tomorrow", "multi_current_time", "task_due",
+                        "delete_missing_no_false_card")]
