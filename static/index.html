@@ -39,7 +39,7 @@
 
 <div class="col">
   <div class="panel" id="upnext-panel"><div class="h"><span class="l">UP NEXT</span><span class="r" id="upnext-in"></span></div><div id="upnext"></div></div>
-  <div class="panel grow" tabindex="0"><div class="h"><span class="l">TO-DO</span><span class="r" id="tasks-count"></span><span class="hint">EXPAND +</span></div><div id="tasks"></div></div>
+  <div class="panel grow" tabindex="0"><div class="h"><span class="l">TO-DO</span><span class="r" id="tasks-count"></span><span class="hint">EXPAND +</span></div><div id="tasks" class="task-list"></div></div>
 </div>
 
 <div class="center">
@@ -71,7 +71,10 @@
 
 <!-- Spaces other than Home (static/js/spaces.js): shown one at a time, JARVIS docked beside -->
 <section class="space" id="space-work" data-space="work" aria-label="Work" hidden>
-  <div class="panel"><div class="h"><span class="l">WORK</span></div><div class="muted">Your day, deadlines and the calendar come here in the next stage.</div></div>
+  <div class="panel" id="work-day"><div class="h"><span class="l">YOUR DAY</span></div></div>
+  <div class="panel" id="work-deadlines-panel"><div class="h"><span class="l">DEADLINES</span></div><div id="work-deadlines"></div></div>
+  <div class="panel" id="work-tasks-panel"><div class="h"><span class="l">TO-DO</span></div><div id="work-tasks" class="task-list"></div></div>
+  <div class="panel" id="work-cal-panel"><div class="h"><span class="l">CALENDAR</span></div><div id="work-cal"></div></div>
 </section>
 
 <script src="/static/js/orb.js"></script>

@@ -18,18 +18,22 @@ function friendlyDue(isoDate, done) {
 async function loadTasks() {
   const res = await fetch('/tasks');
   const data = await res.json();
-  const box = document.getElementById('tasks');
   const open = data.tasks.filter(t => !t.done).length;
   document.getElementById('tasks-count').textContent = open + ' OPEN';
+  // The same list on Home and in the Work space: ticking one ticks both (spaces stage 2)
+  document.querySelectorAll('.task-list').forEach(box => drawTasks(box, data.tasks));
+}
+
+function drawTasks(box, taskList) {
   box.innerHTML = '';
-  if (data.tasks.length === 0) {
+  if (taskList.length === 0) {
     const none = document.createElement('div');
     none.className = 'muted';
     none.textContent = 'No tasks yet';
     box.appendChild(none);
     return;
   }
-  for (const t of data.tasks) {
+  for (const t of taskList) {
     const label = document.createElement('label');
     label.className = 'task' + (t.done ? ' done' : '');
     label.dataset.id = t.id;

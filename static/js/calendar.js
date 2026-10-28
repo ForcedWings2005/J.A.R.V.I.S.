@@ -6,8 +6,9 @@ const DOWS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const REPEAT_LABEL = { daily:'daily', weekdays:'weekdays', weekly:'weekly', biweekly:'every 2 weeks', monthly:'monthly' };
 
 const schedPanel = document.getElementById('sched-panel');
-const calBox = document.getElementById('cal');
-const cal = { open: false, view: 'year', anchor: new Date(), fresh: true };
+// One calendar, drawn into cal.box: Home's Schedule panel or the Work space. Only one space
+// shows at a time, so it never needs to be in both (spaces stage 2)
+const cal = { open: false, view: 'year', anchor: new Date(), fresh: true, box: null };
 let calToken = 0;
 let calBody = null;
 
@@ -239,14 +240,14 @@ async function renderCal() {
   const [from, to] = rangeFor(cal.view, cal.anchor);
   let evs;
   try { evs = await fetchEvents(from, to); }
-  catch (e) { calBox.textContent = 'Could not load the calendar.'; return; }
+  catch (e) { if (cal.box) cal.box.textContent = 'Could not load the calendar.'; return; }
   if (token !== calToken || !cal.open) return;     // a newer render or a close won
 
   const prevScroll = calBody ? calBody.scrollTop : 0;
-  calBox.innerHTML = '';
-  calBox.appendChild(buildToolbar());
+  cal.box.innerHTML = '';
+  cal.box.appendChild(buildToolbar());
   calBody = h('div', 'cbody');
-  calBox.appendChild(calBody);
+  cal.box.appendChild(calBody);
 
   const map = groupByDate(evs);
   if (cal.view === 'year') drawYear(calBody, map);
@@ -381,9 +382,11 @@ function drawTimeGrid(box, days, map) {
   box.appendChild(wrap);
 }
 
-function openCal() {
+function openCal(box = document.getElementById('cal'), view = 'year') {
+  if (cal.box && cal.box !== box) cal.box.innerHTML = '';
+  cal.box = box;
   cal.open = true;
-  cal.view = 'year';
+  cal.view = view;
   cal.anchor = new Date();
   cal.fresh = true;
   renderCal();
@@ -391,6 +394,7 @@ function openCal() {
 function closeCal() {
   cal.open = false;
   calBody = null;
-  calBox.innerHTML = '';
+  if (cal.box) cal.box.innerHTML = '';
+  cal.box = null;
 }
 
