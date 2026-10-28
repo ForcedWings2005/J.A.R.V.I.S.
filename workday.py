@@ -76,4 +76,5 @@ def day_summary(now: datetime | None = None) -> dict:
         "next": next_event(events, now),
         "deadlines": deadlines(tasks.tasks_list(), today),
         "deadline_window_days": config.DEADLINE_WINDOW_DAYS,
+        "day_end": config.WORK_DAY_END,     # so the page can say "after 5:30 PM"
     }
