@@ -7,6 +7,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
+from typing import Literal
 
 import ollama
 from fastapi import FastAPI, HTTPException, UploadFile, File, Response
@@ -91,6 +92,9 @@ assistant = brain.Assistant()
 
 class ChatRequest(BaseModel):
     message: str
+    # The space on screen, for the time stamp (brain.time_stamp). Anything not in
+    # config.SPACES is refused with 422; no space at all is Home, as before spaces.
+    space: Literal[config.SPACES] = "home"
 
 
 class ConfirmRequest(BaseModel):
@@ -133,7 +137,7 @@ async def check_page_files_again(request, call_next):
 @app.post("/chat")
 def chat_endpoint(req: ChatRequest):
     def lines():
-        for event in assistant.chat_stream(req.message):
+        for event in assistant.chat_stream(req.message, req.space):
             yield json.dumps(event) + "\n"
     return StreamingResponse(
         lines(),
