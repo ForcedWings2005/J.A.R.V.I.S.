@@ -26,6 +26,7 @@ class Case:
     asks: bool = False                              # reply must ask for something (see ASKING)
     no_card_claims: bool = False                    # may point to a card only if one was shown
     clock: str = "09:00"                            # time of day on NOW's date
+    space: str = "home"                             # the space on screen when it is sent
     # Earlier messages in the same conversation, as ("HH:MM", message) pairs. They run
     # through the real model first, at their own times, and only the last one is scored.
     before: list = field(default_factory=list)

@@ -7,6 +7,7 @@ import inspect
 import pytest
 
 import brain  # noqa: F401  importing it registers every tool
+import config
 import tools
 from evals.cases import CASES
 from evals.check import Case, between, check, contains, days, not_, one_of
@@ -155,6 +156,7 @@ def test_case_refers_to_real_tools_and_arguments(case):
             assert arg in func_args, f"{tool} function has no {arg}"
     for tool in [*case.forbid, *case.max_calls]:
         assert tool in tools.FUNCTIONS
+    assert case.space in config.SPACES
     times = [case.clock] + [t for t, _ in case.before]
     for hhmm in times:
         h, m = map(int, hhmm.split(":"))

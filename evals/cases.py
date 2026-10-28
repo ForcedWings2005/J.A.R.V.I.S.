@@ -289,4 +289,23 @@ CASES = [
          notes=["Favourite food is sushi", "Prefers window seats on trains"],
          expect=[("forget", {"about": contains("sushi")})],
          includes_any=["confirm"], excludes=CLAIMS_FORGOTTEN),
+
+    # --- Spaces: open_space switches the screen (spec docs/specs/2026-10-27-spaces-and-work.md).
+    # Open-ended wording should switch; work only mentioned should not. One call is enough: in
+    # the stage 3 demo, "Time to study" called it twice, 5 seconds slower (CHANGELOG section 52).
+    Case("space_lets_work", "Let's get some work done.",
+         # not no_card_claims: "The Work space is now on your screen" is true (first full eval)
+         expect=[("open_space", {"name": "work"})], max_calls={"open_space": 1},
+         excludes=["the card", "confirm"]),
+    Case("space_study", "Time to study.",
+         expect=[("open_space", {"name": "work"})], max_calls={"open_space": 1}),
+    Case("space_switch_and_answer", "Let's get some work done. What's due this week?",
+         tasks=["Submit essay"],
+         expect=[("open_space", {"name": "work"}), ("list_tasks", {})],
+         max_calls={"open_space": 1}, includes=["essay"]),
+    Case("space_long_day_no_switch", "I had a long day at work.", forbid=["open_space"]),
+    Case("space_calendar_no_switch", "What's on my calendar today?",
+         expect=[("get_events", {"date": TODAY})], forbid=["open_space"]),
+    Case("space_back_home", "Take me back to the home screen.", space="work",
+         expect=[("open_space", {"name": "home"})], max_calls={"open_space": 1}),
 ]
