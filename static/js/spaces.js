@@ -57,9 +57,14 @@ function spaceFromAddress() {
 
 registerSpace({ name: 'home', title: 'HOME', key: '1', section: null });
 
-// Number keys, unless you are typing somewhere or using a shortcut such as Cmd+1
+// Number keys, unless you are typing somewhere or using a shortcut such as Cmd+1. The
+// command box has focus most of the time, so Escape leaves it: Esc, then 2 (the owner's
+// choice after the stage 1 review). A ticked checkbox is not typing.
+const typingIn = el => el instanceof Element &&
+  el.matches('input:not([type=checkbox]), textarea, select, [contenteditable]');
 document.addEventListener('keydown', e => {
-  if (e.metaKey || e.ctrlKey || e.altKey || e.target.matches('input, textarea')) return;
+  if (e.key === 'Escape' && typingIn(e.target)) { e.target.blur(); return; }
+  if (e.metaKey || e.ctrlKey || e.altKey || typingIn(e.target)) return;
   const s = spaces.find(x => x.key === e.key);
   if (!s) return;
   e.preventDefault();
