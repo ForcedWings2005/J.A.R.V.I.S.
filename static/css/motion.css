@@ -139,8 +139,8 @@ body.fx-radar .orbwrap::after { opacity:1; }
 /* Holographic tilt: set by motion.js from the mouse position */
 .panel.fx-tilt { transform:perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
 /* Ambient mode: after 3 idle minutes the panels dim and the orb takes the stage */
-.col, .timeline, .transcript, .bar, .readouts { transition:opacity .5s ease; }
-body.fx-ambient .col, body.fx-ambient .timeline, body.fx-ambient .transcript, body.fx-ambient .ticker,
+.col, .timeline, .space, .transcript, .bar, .readouts { transition:opacity .5s ease; }
+body.fx-ambient .col, body.fx-ambient .timeline, body.fx-ambient .space, body.fx-ambient .transcript, body.fx-ambient .ticker,
 body.fx-ambient .bar, body.fx-ambient #hint, body.fx-ambient .readouts { opacity:.12; transition:opacity 1.2s ease; }
 body.fx-ambient .orbwrap { width:min(460px,100%,52vh) !important; }
 

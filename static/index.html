@@ -6,6 +6,7 @@
 <title>JARVIS</title>
 <link rel="stylesheet" href="/static/css/jarvis.css">
 <link rel="stylesheet" href="/static/css/motion.css">
+<link rel="stylesheet" href="/static/css/space-work.css">
 </head>
 <body data-state="idle" data-space="home">
 <!-- Shown once per browser session, never with Reduce motion (app.js) -->
@@ -69,7 +70,9 @@
 </div>
 
 <!-- Spaces other than Home (static/js/spaces.js): shown one at a time, JARVIS docked beside -->
-<section class="space" id="space-work" data-space="work" aria-label="Work" hidden></section>
+<section class="space" id="space-work" data-space="work" aria-label="Work" hidden>
+  <div class="panel"><div class="h"><span class="l">WORK</span></div><div class="muted">Your day, deadlines and the calendar come here in the next stage.</div></div>
+</section>
 
 <script src="/static/js/orb.js"></script>
 <script src="/static/js/chat.js"></script>
