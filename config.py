@@ -52,6 +52,14 @@ HISTORY_KEEP_TOKENS = 30_000
 # A delete card left unanswered this long can no longer be confirmed (ask again instead).
 CONFIRM_TIMEOUT_SECONDS = 300
 
+# Work space (docs/specs/2026-10-27-spaces-and-work.md, CHANGELOG section 51): free time is
+# counted within this working day, gaps shorter than this are left out, and a deadline's bar
+# starts to fill this many days before it is due. Agreed with the owner.
+WORK_DAY_START = "08:00"
+WORK_DAY_END = "22:00"
+WORK_MIN_GAP_MINUTES = 30
+DEADLINE_WINDOW_DAYS = 14
+
 # Notes and memory (SECURITY.md section 5): trivial preferences, never secrets
 NOTE_MAX_CHARS = 300
 NOTES_RECALL_LIMIT = 5     # notes given to the model per recall

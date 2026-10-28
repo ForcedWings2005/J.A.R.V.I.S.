@@ -52,6 +52,17 @@ def test_home_page(client):
     assert r.status_code == 200 and "<html" in r.text.lower()
 
 
+def test_day_gives_the_work_summary(client):
+    """The Work space's strip and deadlines (workday.py, CHANGELOG section 51)."""
+    r = client.get("/day")
+    assert r.status_code == 200
+    assert set(r.json()) == {"free", "next", "deadlines", "deadline_window_days"}
+
+
+def test_day_is_read_only(client):
+    assert client.post("/day", json={}).status_code == 405
+
+
 def test_the_page_files_are_served(client):
     """The styles and scripts live in static/css and static/js (CHANGELOG section 40)."""
     css = client.get("/static/css/jarvis.css")

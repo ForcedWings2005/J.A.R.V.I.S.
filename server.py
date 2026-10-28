@@ -28,6 +28,7 @@ import jcal  # noqa: E402
 import notes  # noqa: E402
 import speech  # noqa: E402
 import tasks  # noqa: E402
+import workday  # noqa: E402
 
 log = logging.getLogger("jarvis.server")
 
@@ -171,6 +172,12 @@ def calendar_range(start: str, end: str):
 @app.get("/tasks")
 def list_tasks_endpoint():
     return {"tasks": tasks.tasks_list()}
+
+
+@app.get("/day")
+def day_endpoint():
+    """The Work space's free time, what's next and deadlines. Read-only."""
+    return workday.day_summary()
 
 
 def _ollama_ok() -> bool:
