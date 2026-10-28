@@ -106,7 +106,7 @@ def run_once(case, model: str) -> dict:
     # Earlier turns of a multi-turn case: real model, each at its own time, not scored
     for hhmm, message in case.before:
         set_clock(hhmm)
-        for _ in assistant.chat_stream(message):
+        for _ in assistant.chat_stream(message, case.space):
             pass
     calls.clear()
     tokens[0] = 0
@@ -114,7 +114,7 @@ def run_once(case, model: str) -> dict:
     reply, error, first_word = "", None, None
     start = time.perf_counter()
     with contextlib.redirect_stdout(io.StringIO()):  # brain prints every tool call
-        for event in assistant.chat_stream(case.message):
+        for event in assistant.chat_stream(case.message, case.space):
             if event["type"] == "delta":
                 if first_word is None:               # what the user waits for (section 48)
                     first_word = time.perf_counter() - start
