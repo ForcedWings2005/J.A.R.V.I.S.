@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/static/css/jarvis.css">
 <link rel="stylesheet" href="/static/css/motion.css">
 </head>
-<body data-state="idle">
+<body data-state="idle" data-space="home">
 <!-- Shown once per browser session, never with Reduce motion (app.js) -->
 <div class="boot" id="boot" hidden>
   <div class="boot-lines">
@@ -30,6 +30,7 @@
     <div class="chip">REDUCE MOTION <button id="motion" role="switch" aria-checked="false" aria-label="Reduce motion"></button></div>
     <button class="chip action" id="newchat" title="Forget this conversation and start again">NEW CONVERSATION</button>
   </div>
+  <nav class="spaces" id="spaces" aria-label="Spaces"></nav>
   <div class="clock"><div class="t" id="clock-time">--:--</div><div class="d" id="clock-date">&nbsp;</div></div>
 </header>
 
@@ -67,6 +68,9 @@
   <div class="panel" tabindex="0"><div class="h"><span class="l">MEMORY</span><span class="r" id="notes-count"></span><span class="hint">EXPAND +</span></div><div id="notes"></div></div>
 </div>
 
+<!-- Spaces other than Home (static/js/spaces.js): shown one at a time, JARVIS docked beside -->
+<section class="space" id="space-work" data-space="work" aria-label="Work" hidden></section>
+
 <script src="/static/js/orb.js"></script>
 <script src="/static/js/chat.js"></script>
 <script src="/static/js/tasks.js"></script>
@@ -74,6 +78,8 @@
 <script src="/static/js/voice.js"></script>
 <script src="/static/js/calendar.js"></script>
 <script src="/static/js/app.js"></script>
+<script src="/static/js/spaces.js"></script>
+<script src="/static/js/space-work.js"></script>
 <script src="/static/js/motion.js"></script>
 </body>
 </html>
