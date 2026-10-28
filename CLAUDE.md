@@ -19,7 +19,8 @@ static/index.html ──HTTP, 127.0.0.1 only──> server.py (FastAPI)
                                               │          ├─ jcal.py   get_events, add_event, delete_event, update_event
                                               │          ├─ tasks.py  add_task, list_tasks, complete_task
                                               │          ├─ calc.py   calculate
-                                              │          └─ notes.py  remember, recall, forget
+                                              │          ├─ notes.py  remember, recall, forget
+                                              │          └─ spaces.py open_space (only changes the view)
                                               ├─ speech.py (Kokoro, loaded on first use) + speech_text.py
                                               ├─ workday.py (GET /day: free time, what's next, deadlines; reads jcal and tasks)
                                               ├─ mlx_whisper (imported on first /transcribe)
@@ -34,14 +35,15 @@ is checked in code, never left to the model.** The model chooses tools; code val
 |---|---|
 | `config.py` | Every setting: model name, paths (built from the project folder), limits, voice. `JARVIS_DB` env var overrides the database path. |
 | `database.py` | The shared `conn` and `lock`, and `MIGRATIONS` (schema version in `PRAGMA user_version`). |
-| `tools.py` | The `@tool` registry (`FUNCTIONS`, `SCHEMAS`) and `NeedsConfirmation`. |
+| `tools.py` | The `@tool` registry (`FUNCTIONS`, `SCHEMAS`), `NeedsConfirmation`, and `ShowSpace` (a tool result that changes only the view, so no card). |
 | `brain.py` | `build_system_prompt()` and `Assistant`: the conversation, the tool loop (capped at `MAX_ROUNDS`), the pending confirmation. |
 | `jcal.py` | Calendar logic: durations, repeats (stored as one row, expanded on read), exceptions, conflicts, finished/upcoming labels. |
 | `tasks.py`, `calc.py` | To-do list; safe arithmetic (parses the expression with `ast`, never `eval`). |
 | `workday.py` | The Work space's figures, worked out in code: free time today, what's next, deadline states (settings `WORK_*` and `DEADLINE_WINDOW_DAYS` in `config.py`). |
+| `spaces.py` | The `open_space` tool: checks the name against `config.SPACES` and returns `ShowSpace`; the page switches on the `space` event. |
 | `notes.py` | Notes and memory (FTS5 search). Trivial preferences only; secrets refused; saving and forgetting go through the confirmation card. |
 | `static/` | The dashboard: `index.html` (structure), `css/jarvis.css`, `css/motion.css`, `js/*.js` (plain scripts loaded in order and sharing globals: orb, chat, tasks, notes, voice, calendar, app, spaces, space-work, motion; no build step). Spaces: `<body data-space>` says which is shown and CSS lays it out; each space calls `registerSpace` (`spaces.js`), and its own files are `space-<name>.js` and `css/space-<name>.css` (design: `docs/specs/2026-10-27-spaces-and-work.md`). `jarvis.css` is the glass look (tint, blur and rim in `--glass`, `--blur`, `--rim`). `motion.js` only wraps existing functions to add animations; its classes start with `fx-`. Served by `/` and `/static`. |
-| `server.py` | Endpoints `/`, `/static` (the page's files), `/chat` (NDJSON stream), `/confirm`, `/calendar`, `/tasks`, `/tasks/{id}`, `/notes`, `/day` and `/info` (read-only; `/day` gives the Work space's summary from `workday.py`; `/info` gives the model, whether Ollama answers with a 1 s timeout, and the last backup time), `/transcribe`, `/speak`; logging setup at start-up. |
+| `server.py` | Endpoints `/`, `/static` (the page's files), `/chat` (NDJSON stream; takes the space on screen, checked against `config.SPACES`), `/confirm`, `/calendar`, `/tasks`, `/tasks/{id}`, `/notes`, `/day` and `/info` (read-only; `/day` gives the Work space's summary from `workday.py`; `/info` gives the model, whether Ollama answers with a 1 s timeout, and the last backup time), `/transcribe`, `/speak`; logging setup at start-up. |
 | `speech.py`, `speech_text.py` | Kokoro synthesis; text clean-up before speaking (numbers, pronunciations). |
 | `backup_db.py` | Daily SQLite backup via the backup API, integrity-checked, 7 kept; the nightly run (`main()`) then makes an encrypted copy, 30 kept. |
 | `backup_crypto.py`, `backup_keys.py`, `restore_backup.py` | Encrypted backups: lock/unlock and the file format; making the key pair (owner only); restoring (owner only). |
@@ -52,9 +54,11 @@ is checked in code, never left to the model.** The model chooses tools; code val
 ### How a chat turn works
 `/chat` → `Assistant.chat_stream()` rebuilds the system prompt (today's date only, so it stays
 identical all day and Ollama can reuse its work), appends the user message with a
-`[Monday 2030-01-07 09:01]` time stamp, and streams the model's reply. If the model asks for tools, `run_tool()` runs
+`[Monday 2030-01-07 09:01]` time stamp (outside Home it names the space on screen:
+`[Monday 2030-01-07 09:01 · Work]`), and streams the model's reply. If the model asks for tools, `run_tool()` runs
 each one, appends the result as a `tool` message, and the model is called again, up to
-`MAX_ROUNDS` tool rounds. Events streamed to the page: `delta`, `step`, `break`, `done`, `error`.
+`MAX_ROUNDS` tool rounds. Events streamed to the page: `delta`, `step`, `space` (after
+`open_space`'s step: show this space), `break`, `done`, `error`.
 
 ### Destructive actions: the confirmation path
 `delete_event` never deletes, `update_event` never changes anything, and `remember` and
@@ -79,7 +83,7 @@ Any new tool that deletes, overwrites or sends something must use this same path
 - Every database access holds `database.lock` (imported as `lock`).
 - A new tool: write the function with `@tool(description, arg=schema, ...)` in the module that
   owns it. Arguments without a default become required. The import order in `brain.py`
-  (`jcal`, `tasks`, `calc`, `notes`) is the order the model sees the tools; changing it changes
+  (`jcal`, `tasks`, `calc`, `notes`, `spaces`) is the order the model sees the tools; changing it changes
   the prompt. A tool that handles private text adds its name to `tools.PRIVATE` (the log then
   records only lengths) and sets `private=True` on its `NeedsConfirmation`.
 - Replies are spoken aloud: the system prompt asks for plain speech, no markdown.
@@ -136,7 +140,7 @@ Run from the project folder with the venv active (`source .venv/bin/activate`):
 ruff check .            # lint
 python -m pytest -q     # all tests, under a second; never touches jarvis.db or a model
 python -m evals --runs 1 -k <name>   # quick live check of some model cases (needs Ollama)
-python -m evals         # full suite, 56 cases x 3 runs, about 11 minutes, with speed
+python -m evals         # full suite, 62 cases x 3 runs, about 11 minutes, with speed
 ```
 
 - The pre-commit hook (installed) runs ruff and pytest on every commit with Python files.

@@ -990,6 +990,28 @@ Stage 2 of the spaces design (`docs/specs/2026-10-27-spaces-and-work.md`), carri
   - one task with an unpadded due date such as "2030-1-9" (which `add_task` accepts and stores as given) made `/day` fail, so both Work panels said "Couldn't load your day". Deadlines now read the date as `add_task` checks it and report it in full form.
 - **Not checked**: Safari, and the real data.
 
+## 52. Spaces, stage 3: switching by voice
+
+Stage 3 of the spaces design (`docs/specs/2026-10-27-spaces-and-work.md`), carried out from `docs/plans/2026-10-28-spaces-stage-3.md`. You can now ask JARVIS to open a space, in any words, and he knows which space is on screen when you talk to him.
+
+- **A new tool, `open_space`** (new `spaces.py`). The model calls it when you mean it: "let's get some work done", "time to study", "take me back home". The code checks the name against `config.SPACES = ("home", "work")`; anything else is an error to the model ("Error: no space called 'gym'. Spaces: home, work.") and nothing moves. It changes only the view, so it shows no card: it returns `tools.ShowSpace`, and the reply streams a new `space` event straight after the tool's line in the ticker ("Showed the Work space"). The page switches with the same `switchSpace` a click uses, waiting if a panel is still opening.
+- **JARVIS knows where you are.** The page sends the space on screen with every message. The server accepts only the names in `config.SPACES` (anything else is refused with 422; a message without one counts as Home, so an old cached page still works) and adds it to the time stamp: `[Monday 2030-01-07 09:01 · Work]`. On Home nothing is added. The system prompt does not change during the day; it gained one fixed sentence saying what a space in the stamp means.
+- **Measured: the new sentence's place mattered.** Placed next to the instructions about the time stamp, it made JARVIS book "Thursday at 8" as 08:00 instead of asking AM or PM (8/10 against 10/10 before). Without it, 10/10; moved to just before the general-knowledge part, 10/10, and it stayed there.
+- **Evals** (3 runs each): before 165/168 (prompt `851b5394ed77`); after 183/186 with six new cases (prompt `69840cda3191`); the 56 old cases 166/168. The new cases switch on "let's get some work done", "time to study" and "take me back to the home screen", switch and answer "what's due this week?", and do not switch on "I had a long day at work" or "what's on my calendar today?". Not every run passed:
+  - "Let's get some work done. What's due this week?" (2/3): once JARVIS looked only at the calendar and said nothing was due, missing the essay on the to-do list. A real miss, left as it is for now.
+  - two old cases missed once each; 10-run comparisons with `main` showed run-to-run variation (`edit_move_to_another_day` 9/10 on `main`, 10/10 now; `ask_until_month` 9/10 on `main`, 8/10 now, and faster).
+  - one check was too strict: "The Work space is now on your screen" counted as pointing at a card. It is true, so that case now checks only for "the card" and "confirm".
+- **Found while checking**: "Time to study" once called `open_space` twice, in two rounds, about 5 seconds slower; harmless, since the second switch does nothing. The switching cases now allow one call, so the evals measure it (no repeat in the final run).
+- **Tests**: 12 new (the tool: a known space, a loosely written name, an unknown one, the schema listing the spaces and not asking first; the `space` event right after its step, none for an unknown space, none on a later turn; the stamp naming the space but not Home; the system prompt unchanged by the space; `/chat` passing the space on, no space meaning Home, an unknown space refused), plus the case check. The test helper `call()` now accepts a tool argument called `name`. 514 tests.
+- **Checked in a demo** (made-up data, port 8017, the real model):
+  - from Home, "Let's get some work done": Work opens, the address becomes `#work`, the ticker says "Showed the Work space", the message carried `"space":"home"`;
+  - in Work, the same request again: JARVIS did not switch (he read the stamp) and gave a sensible reply; "Take me back to the home screen": Home;
+  - a switch arriving while Home's Schedule panel was still opening: it happened once the animation ended, with Work's calendar in week view and Home's panel closed;
+  - a delete card left waiting, then "Let's get some work done": the card stayed in the dock and Confirm still worked;
+  - phone width: the switch works, no sideways scrolling; no console errors.
+- **Noticed, not changed**: on a phone, the conversation in the dock has no height limit, so after a few exchanges Work's panels start far down the page (about 1,700 px). That is stage 1's layout.
+- **Not checked**: Safari, the microphone (spoken rather than typed requests), and the real data.
+
 ---
 
 ## Status
@@ -1013,6 +1035,7 @@ Stage 2 of the spaces design (`docs/specs/2026-10-27-spaces-and-work.md`), carri
 | Requirements split and locked with hashes (section 49) | Done: fresh installs with `--require-hashes` checked on the Mac, and by CI on Linux |
 | Spaces, stage 1 (section 50) | Done in a demo; not yet checked in Safari. Stages 2 to 4 to come |
 | Spaces, stage 2: the Work panels (section 51) | Done in a demo; not yet checked in Safari. Stages 3 (voice) and 4 (transition) to come |
+| Spaces, stage 3: switching by voice (section 52) | Done: evals 183/186 (prompt `69840cda3191`), checked in a demo with the real model; not yet checked in Safari or with the microphone. Stage 4 (transition) to come |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
