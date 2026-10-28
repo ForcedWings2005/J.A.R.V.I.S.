@@ -58,8 +58,9 @@ Ollama answers (green or red dot) and when the last backup was made; press / to 
 the command box.
 
 The header's space names (**1 HOME · 2 WORK**) switch between spaces: Home is the dashboard,
-and Work (being built, CHANGELOG section 50) has its own panels, with JARVIS docked on the
-right. Click a name, press `1` or `2`, or open `127.0.0.1:8000/#work`; Back returns to the
+and Work has your day worked out (free time, what's next, the nearest deadline), deadlines with
+countdown bars, the to-do list and the calendar in week view, with JARVIS docked on the right
+(CHANGELOG sections 50 and 51). Click a name, press `1` or `2`, or open `127.0.0.1:8000/#work`; Back returns to the
 previous space. The command box usually has the cursor, and keys typed there stay text: press
 Esc first to leave it, then `1` or `2`.
 
