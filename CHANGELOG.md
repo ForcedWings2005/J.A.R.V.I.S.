@@ -14,6 +14,7 @@ jarvis/
 ├── brain.py            The assistant: model calls, tool loop, confirmations, system prompt
 ├── tools.py            The tool registry (@tool) and NeedsConfirmation
 ├── tasks.py            To-do list tools
+├── workday.py          The Work space's figures: free time, what's next, deadlines (section 51)
 ├── calc.py             The calculate tool (safe, no eval)
 ├── notes.py            Notes and memory: remember, recall, forget (FTS5 search)
 ├── config.py           Settings: model, paths, limits, voice
@@ -961,6 +962,31 @@ The owner wants JARVIS's dashboard to stay uncluttered as features grow: a welco
 - **Tests**: no Python changed; ruff passes and 477 tests pass. The existing test that every file the page loads exists now covers the new files. The page's scripts have no test runner (adding one would be a new dependency), so they are checked in the browser as above.
 - **Not checked**: Safari, and the real data.
 
+## 51. Spaces, stage 2: the Work panels
+
+Stage 2 of the spaces design (`docs/specs/2026-10-27-spaces-and-work.md`), carried out from `docs/plans/2026-10-27-spaces-stage-2.md`. The Work space now has its four panels, with JARVIS docked beside them.
+
+- **"Your day, worked out"**, a strip across the top: the free time left today ("Free 1 PM – 3 PM and after 5:30 PM"), what's next ("Dentist at 3 PM, in 2 h") and the nearest deadline ("Essay due tomorrow"). Times are shown 12-hour, like the rest of the dashboard.
+- **Deadlines**: open tasks with a due date, soonest first. A bar fills over the last 14 days before each one; overdue in red and full, due today in amber, the first marked NEXT UP.
+- **To-do**: the same list as on Home, drawn in both places; ticking one ticks both.
+- **The calendar, always open**, in week view. There is still one calendar: it now draws into whichever place is showing (Home's Schedule panel in year view, or Work in week view), since only one space shows at a time.
+- **Worked out by code, never by the model**: new `workday.py` (free gaps between now, today's events with repeats expanded and the end of the working day; what's next; each deadline's state), served by a new read-only `GET /day`. Settings in `config.py`: `WORK_DAY_START = "08:00"`, `WORK_DAY_END = "22:00"`, `WORK_MIN_GAP_MINUTES = 30`, `DEADLINE_WINDOW_DAYS = 14`. `/day` also returns the 14 days and the day's end, so the page never repeats a setting.
+- **It keeps itself current**: after anything changes the to-do list or the calendar, and every minute while Work is shown. If `/day` fails, the strip and Deadlines say "Couldn't load your day" and the rest of Work keeps working.
+- **Found while checking**:
+  - an event after 22:00 (a 23:00 study session in the demo) made the free time run on to 23:00. Each event is now clipped to the working day too; a test reproduced it first. I had earlier noted that case as fine without testing it, and was wrong.
+  - on a phone, the calendar panel grew to 1,382 px tall; it is now 560 px with the week scrolling inside.
+- **Tests**: 17 new (free time in its edge cases: overlapping events, a gap of exactly 30 minutes, before 08:00, after 22:00, an event running past 22:00, an event after 22:00, events already over; what's next; deadline states; the summary from the real calendar and to-do list, including a weekly event; `/day`, read-only). 494 tests.
+- **Checked in a demo** (made-up data, port 8016, built-in browser), each first seen failing:
+  - the calendar in Work in week view, Home's place empty; going Home, Schedule opens in year view and Work's place is empty; back in Work, week view again;
+  - all four views in Work by real clicks;
+  - ticking a task in Work ticks it on Home (count 4 to 3 and back), and a ticked task leaves Deadlines and comes back when unticked;
+  - an overdue task first, red and full; a task due in 20 days with an empty bar; today's in amber;
+  - an empty day ("No free time left today", "Nothing else on today", "No deadlines"); `/day` failing and then recovering;
+  - phone width: one column under JARVIS, no sideways scrolling;
+  - Home looks as before; its Schedule and To-do panels open as before; no console errors.
+- **A mistake in a check, no harm**: after ticking a task the list re-sorts, so a second click at the same place ticked a different demo task; both were put back.
+- **Not checked**: Safari, and the real data.
+
 ---
 
 ## Status
@@ -983,6 +1009,7 @@ The owner wants JARVIS's dashboard to stay uncluttered as features grow: a welco
 | Speed in the evals (section 48) | Done: checked with a real run (median 2.7 s, first word 2.2 s) |
 | Requirements split and locked with hashes (section 49) | Done: fresh installs with `--require-hashes` checked on the Mac, and by CI on Linux |
 | Spaces, stage 1 (section 50) | Done in a demo; not yet checked in Safari. Stages 2 to 4 to come |
+| Spaces, stage 2: the Work panels (section 51) | Done in a demo; not yet checked in Safari. Stages 3 (voice) and 4 (transition) to come |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
