@@ -140,7 +140,7 @@ Run from the project folder with the venv active (`source .venv/bin/activate`):
 ruff check .            # lint
 python -m pytest -q     # all tests, under a second; never touches jarvis.db or a model
 python -m evals --runs 1 -k <name>   # quick live check of some model cases (needs Ollama)
-python -m evals         # full suite, 67 cases x 3 runs, about 12 minutes, with speed
+python -m evals         # full suite, 68 cases x 3 runs, about 12 minutes, with speed
 ```
 
 - The pre-commit hook (installed) runs ruff and pytest on every commit with Python files.

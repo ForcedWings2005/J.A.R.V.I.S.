@@ -247,6 +247,10 @@ CASES = [
     Case("task_list", "What's on my to-do list?",
          tasks=["Buy milk", "Call the bank"],
          expect=[("list_tasks", {})], includes=["milk", "bank"]),
+    # Deadlines are to-do tasks with a due date. With open_space added, this went to the
+    # calendar 5 times in 10 (main 1 in 10) and missed the essay (CHANGELOG section 52)
+    Case("task_due_this_week", "What's due this week?", tasks=["Submit essay"],
+         expect=[("list_tasks", {})], includes=["essay"]),
     Case("task_complete", "I bought the milk.",
          tasks=["Buy milk"],
          expect=[("complete_task", {"title": contains("milk")})]),

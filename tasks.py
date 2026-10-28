@@ -49,7 +49,7 @@ def add_task(title: str, due: str = "") -> str:
     return f"Added task '{title}'" + (f", due {due}." if due else ".")
 
 
-@tool("List the open items on the to-do list.")
+@tool("List the open items on the to-do list, with their due dates.")
 def list_tasks() -> str:
     open_tasks = [t for t in tasks_list() if not t["done"]]
     if not open_tasks:
