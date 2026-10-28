@@ -33,7 +33,8 @@ def free_gaps(events: list, now: datetime, day_start: str = config.WORK_DAY_STAR
     end = _mins(day_end)
     out = []
     for start, stop in sorted(_span(ev) for ev in events) + [(end, end)]:
-        start, stop = max(start, begin), min(stop, end)
+        # Clip to the working day: an event after day_end must not stretch the free time
+        start, stop = min(max(start, begin), end), min(stop, end)
         if start - begin >= min_gap:
             out.append({"start": _hhmm(begin), "end": _hhmm(start)})
         begin = max(begin, stop)           # overlapping events just push the start along
