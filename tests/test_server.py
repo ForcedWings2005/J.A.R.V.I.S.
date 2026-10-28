@@ -56,7 +56,8 @@ def test_day_gives_the_work_summary(client):
     """The Work space's strip and deadlines (workday.py, CHANGELOG section 51)."""
     r = client.get("/day")
     assert r.status_code == 200
-    assert set(r.json()) == {"free", "next", "deadlines", "deadline_window_days"}
+    assert set(r.json()) == {"free", "next", "deadlines", "deadline_window_days", "day_end"}
+    assert r.json()["day_end"] == "22:00"      # so the page can say "after 5:30 PM"
 
 
 def test_day_is_read_only(client):
