@@ -49,6 +49,13 @@ function switchSpace(name, opts = {}) {
   return true;
 }
 
+// When JARVIS opens a space (the `space` event, chat.js). A panel's opening animation makes
+// switchSpace refuse, so wait for it to finish, as followAddress does, instead of dropping it
+function switchSpaceWhenFree(name) {
+  if (typeof seq !== 'undefined' && seq) { setTimeout(() => switchSpaceWhenFree(name), 100); return; }
+  switchSpace(name);
+}
+
 // '#work' -> 'work'; nothing, or a name that is not a space, means Home
 function spaceFromAddress() {
   const name = location.hash.slice(1).toLowerCase();

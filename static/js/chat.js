@@ -106,7 +106,9 @@ async function send(spoken) {
     const res = await fetch('/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text })
+      // The space on screen goes into the message's time stamp (spaces.js, loaded later,
+      // has set currentSpace by the time anything is sent)
+      body: JSON.stringify({ message: text, space: currentSpace })
     });
     if (!res.ok || !res.body) throw new Error('Server error ' + res.status);
 
@@ -132,6 +134,8 @@ async function send(spoken) {
         } else if (msg.type === 'step') {
           steps.push(msg.step);
           showSteps(steps);
+        } else if (msg.type === 'space') {
+          switchSpaceWhenFree(msg.name);           // JARVIS opened a space (open_space)
         } else if (msg.type === 'break') {
           feed(true);
           if (full) full += ' ';
