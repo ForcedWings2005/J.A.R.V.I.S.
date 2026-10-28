@@ -21,6 +21,7 @@ static/index.html ──HTTP, 127.0.0.1 only──> server.py (FastAPI)
                                               │          ├─ calc.py   calculate
                                               │          └─ notes.py  remember, recall, forget
                                               ├─ speech.py (Kokoro, loaded on first use) + speech_text.py
+                                              ├─ workday.py (GET /day: free time, what's next, deadlines; reads jcal and tasks)
                                               ├─ mlx_whisper (imported on first /transcribe)
                                               └─ backup_db.py (runs at import, before the database opens)
             jcal.py, tasks.py, notes.py ──> database.py (one connection + one lock) ──> jarvis.db

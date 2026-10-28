@@ -101,6 +101,15 @@ def test_deadline_states():
         ("Late", -2, "overdue"), ("Today", 0, "today"), ("Soon", 2, "soon")]
 
 
+def test_an_unpadded_due_date_is_understood():
+    """add_task accepts '2030-1-9' (strptime) and stores it as given; it broke /day (review)."""
+    ts = [{"id": 1, "title": "Later", "due": "2030-01-10", "done": False},
+          {"id": 2, "title": "Odd", "due": "2030-1-9", "done": False}]
+    out = workday.deadlines(ts, date(2030, 1, 7))
+    assert [(d["title"], d["due"], d["days_left"]) for d in out] == [
+        ("Odd", "2030-01-09", 2), ("Later", "2030-01-10", 3)]
+
+
 # ---------- the whole summary, from the real calendar and to-do list ----------
 
 def test_day_summary_reads_the_calendar_and_the_tasks():

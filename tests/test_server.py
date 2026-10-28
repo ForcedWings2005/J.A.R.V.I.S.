@@ -60,6 +60,17 @@ def test_day_gives_the_work_summary(client):
     assert r.json()["day_end"] == "22:00"      # so the page can say "after 5:30 PM"
 
 
+def test_day_with_made_up_data(client):
+    """The spec asks for /day with data in it; one task's date is unpadded (review)."""
+    jcal.add_event("Dentist", "2030-01-07", "15:00", "16:00")
+    tasks.add_task("Essay", "2030-1-9")
+    r = client.get("/day")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["next"]["title"] == "Dentist"
+    assert body["deadlines"][0]["due"] == "2030-01-09" and body["deadlines"][0]["days_left"] == 2
+
+
 def test_day_is_read_only(client):
     assert client.post("/day", json={}).status_code == 405
 
