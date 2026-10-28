@@ -1,3 +1,21 @@
-/* The Work space (static/js/space-work.js). Its panels come in stage 2 of
-   docs/specs/2026-10-27-spaces-and-work.md; for now one panel says so. */
-#space-work .panel { flex:0 0 auto; cursor:default; }
+/* The Work space (static/js/space-work.js): your day across the top; Deadlines and To-do on
+   the left; the calendar filling the rest. JARVIS's dock is beside it (jarvis.css). */
+#space-work {
+  display:grid; gap:16px; overflow:hidden;
+  grid-template-columns:minmax(260px, 320px) minmax(0, 1fr);
+  grid-template-rows:auto minmax(0, 1fr) minmax(0, 1fr);
+}
+#space-work[hidden] { display:none; }
+#space-work .panel { cursor:default; }
+#work-day { grid-column:1 / -1; }
+#work-deadlines-panel { grid-column:1; grid-row:2; }
+#work-tasks-panel { grid-column:1; grid-row:3; }
+#work-cal-panel { grid-column:2; grid-row:2 / 4; display:flex; flex-direction:column; overflow:hidden; }
+#work-cal { display:flex; flex-direction:column; flex:1; min-height:0; }
+
+/* Narrow screens: one column, the calendar last */
+@media (max-width:900px) {
+  #space-work { grid-template-columns:1fr; grid-template-rows:none; overflow:visible; }
+  #work-day, #work-deadlines-panel, #work-tasks-panel, #work-cal-panel { grid-column:1; grid-row:auto; }
+  #work-cal-panel { min-height:520px; }
+}
