@@ -147,9 +147,14 @@ does not apply (as for the other reads). It returns, for now:
   "next": {"title": "Dentist", "time": "15:00", "in_minutes": 120},
   "deadlines": [
     {"id": 3, "title": "Submit essay", "due": "2030-01-09", "days_left": 2, "state": "soon"}
-  ]
+  ],
+  "deadline_window_days": 14,
+  "day_end": "22:00"
 }
 ```
+
+(The last two were added while building stage 2, so the page reads the settings from
+`config.py` instead of repeating them; CHANGELOG section 51.)
 
 `next` is `null` when nothing else is on today. `deadlines` lists every open task that has a
 due date; `state` is `overdue`, `today` or `soon` (any later day). The countdown bar starts to

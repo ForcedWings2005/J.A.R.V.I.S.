@@ -59,10 +59,13 @@ def deadlines(task_list: list, today: date) -> list:
     for t in task_list:
         if t["done"] or not t["due"]:
             continue
-        left = (date.fromisoformat(t["due"]) - today).days
+        # Read the date as add_task checks it: strptime also accepts '2030-1-9', which
+        # add_task stores as given (review of stage 2). Sort and report it in full form.
+        due = datetime.strptime(t["due"], "%Y-%m-%d").date()
+        left = (due - today).days
         state = "overdue" if left < 0 else "today" if left == 0 else "soon"
-        out.append({"id": t["id"], "title": t["title"], "due": t["due"], "days_left": left,
-                    "state": state})
+        out.append({"id": t["id"], "title": t["title"], "due": due.isoformat(),
+                    "days_left": left, "state": state})
     return sorted(out, key=lambda d: (d["due"], d["id"]))
 
 

@@ -975,8 +975,8 @@ Stage 2 of the spaces design (`docs/specs/2026-10-27-spaces-and-work.md`), carri
 - **Found while checking**:
   - an event after 22:00 (a 23:00 study session in the demo) made the free time run on to 23:00. Each event is now clipped to the working day too; a test reproduced it first. I had earlier noted that case as fine without testing it, and was wrong.
   - on a phone, the calendar panel grew to 1,382 px tall; it is now 560 px with the week scrolling inside.
-- **Tests**: 17 new (free time in its edge cases: overlapping events, a gap of exactly 30 minutes, before 08:00, after 22:00, an event running past 22:00, an event after 22:00, events already over; what's next; deadline states; the summary from the real calendar and to-do list, including a weekly event; `/day`, read-only). 494 tests.
-- **Checked in a demo** (made-up data, port 8016, built-in browser), each first seen failing:
+- **Tests**: 19 new (free time in its edge cases: overlapping events, a gap of exactly 30 minutes, before 08:00, after 22:00, an event running past 22:00, an event after 22:00, events already over; what's next; deadline states, including an unpadded date; the summary from the real calendar and to-do list, including a weekly event; `/day` with made-up data, and read-only). 496 tests.
+- **Checked in a demo** (made-up data, port 8016, built-in browser). The checks that the calendar and the to-do list appear in Work, and that the strip and Deadlines draw, were seen failing before the code existed; the others were run after it:
   - the calendar in Work in week view, Home's place empty; going Home, Schedule opens in year view and Work's place is empty; back in Work, week view again;
   - all four views in Work by real clicks;
   - ticking a task in Work ticks it on Home (count 4 to 3 and back), and a ticked task leaves Deadlines and comes back when unticked;
@@ -985,6 +985,9 @@ Stage 2 of the spaces design (`docs/specs/2026-10-27-spaces-and-work.md`), carri
   - phone width: one column under JARVIS, no sideways scrolling;
   - Home looks as before; its Schedule and To-do panels open as before; no console errors.
 - **A mistake in a check, no harm**: after ticking a task the list re-sorts, so a second click at the same place ticked a different demo task; both were put back.
+- **Found by the final review** (a fresh reviewer of the whole branch), both fixed with a check or test seen failing first:
+  - switching to Work while Home's Schedule panel was open (by key, click or the Back button) left Work's calendar blank: Home's panel closes with an animation, and its late close also closed the calendar that had just moved to Work. Closing now names which place it closes. Checked: blank before, drawn after, also with Reduce motion; the other paths unchanged.
+  - one task with an unpadded due date such as "2030-1-9" (which `add_task` accepts and stores as given) made `/day` fail, so both Work panels said "Couldn't load your day". Deadlines now read the date as `add_task` checks it and report it in full form.
 - **Not checked**: Safari, and the real data.
 
 ---

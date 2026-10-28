@@ -391,7 +391,11 @@ function openCal(box = document.getElementById('cal'), view = 'year') {
   cal.fresh = true;
   renderCal();
 }
-function closeCal() {
+// Closes the calendar only if it is still in `box`. Home's Schedule panel closes with an
+// animation, so its close can arrive after the calendar has moved to Work: it must then
+// leave Work's calendar alone (review of stage 2)
+function closeCal(box = cal.box) {
+  if (!box || box !== cal.box) return;
   cal.open = false;
   calBody = null;
   if (cal.box) cal.box.innerHTML = '';

@@ -10,7 +10,7 @@ function focusPanel(p) {
 }
 function closeFocus() {
   if (!focused) return;
-  if (focused === schedPanel) closeCal();   // NEW
+  if (focused === schedPanel) closeCal(document.getElementById('cal'));   // only Home's calendar
   focused.classList.remove('focused');
   document.body.classList.remove('has-focus');
   focused.querySelector('.hint').textContent = 'EXPAND +';
