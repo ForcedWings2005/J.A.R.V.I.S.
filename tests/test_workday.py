@@ -67,6 +67,11 @@ def test_an_event_past_the_end_of_the_day():
     assert workday.free_gaps([ev("21:00", "23:00")], at("20:00")) == gaps(("20:00", "21:00"))
 
 
+def test_an_event_after_the_end_of_the_day():
+    """Found in the stage 2 demo: a 23:00 event made the free time run on to 23:00."""
+    assert workday.free_gaps([ev("23:00", "23:45")], at("20:00")) == gaps(("20:00", "22:00"))
+
+
 def test_events_already_over_are_ignored():
     assert workday.free_gaps([ev("08:00", "09:00")], at("10:00")) == gaps(("10:00", "22:00"))
 
