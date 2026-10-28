@@ -60,6 +60,8 @@ def build_system_prompt() -> str:
         "Each user message starts with the date and time it was sent, in square "
         "brackets; the stamp on the latest message is the current time. Use it for "
         "anything that depends on the time of day, and never mention the stamps. "
+        "When a stamp also names a space, such as '· Work', that is the part of the dashboard "
+        "on the user's screen. "
         "Resolve relative dates like 'tomorrow' using today's date. "
         f"Upcoming dates for reference: {upcoming}. "
         "Always take dates from this list instead of counting days yourself. "
@@ -153,9 +155,14 @@ def build_system_prompt() -> str:
     )
 
 
-def time_stamp() -> str:
-    """'[Monday 2030-01-07 09:01] ': put in front of each user message in the history."""
-    return datetime.now().strftime("[%A %Y-%m-%d %H:%M] ")
+def time_stamp(space: str = "home") -> str:
+    """'[Monday 2030-01-07 09:01] ': put in front of each user message in the history.
+
+    Outside Home it names the space on screen, '[Monday 2030-01-07 09:01 · Work] ', so JARVIS
+    knows where the user is without the system prompt changing (CHANGELOG section 27).
+    """
+    where = "" if space == "home" else f" · {space.title()}"
+    return datetime.now().strftime("[%A %Y-%m-%d %H:%M") + where + "] "
 
 
 def _role(message) -> str:
@@ -371,7 +378,7 @@ class Assistant:
             self.messages.append({"role": "assistant", "content": text})
             return text
 
-    def chat_stream(self, user_text: str):
+    def chat_stream(self, user_text: str, space: str = "home"):
         """Generator: yields small dicts as the reply is produced.
 
         delta (a piece of text), step (a tool ran), space (show this space, straight after
@@ -384,7 +391,7 @@ class Assistant:
                 steps = []
                 step_keys = []      # (tool, what it was about) for each step, see _mark_corrected
                 self.messages[0]["content"] = build_system_prompt()
-                self.messages.append({"role": "user", "content": time_stamp() + user_text})
+                self.messages.append({"role": "user", "content": time_stamp(space) + user_text})
                 wrote_text = False
                 started, first_text = time.perf_counter(), None
                 log.info("user: %s", _short(user_text))

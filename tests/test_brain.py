@@ -80,6 +80,24 @@ def test_each_user_message_is_stamped_with_the_time_it_was_sent(brain_clock):
                      "[Monday 2030-01-07 19:30] Good evening"]
 
 
+def test_the_stamp_names_the_space_except_home(brain_clock):
+    a = brain.Assistant(chat=FakeModel(say("A."), say("B.")))
+    list(a.chat_stream("In work", space="work"))
+    list(a.chat_stream("At home"))
+    users = [m["content"] for m in a.messages if isinstance(m, dict) and m["role"] == "user"]
+    assert users == ["[Monday 2030-01-07 09:00 · Work] In work",
+                     "[Monday 2030-01-07 09:00] At home"]
+
+
+def test_the_system_prompt_does_not_change_with_the_space(brain_clock):
+    """The space is in the stamp only, so Ollama can still reuse its work (section 27)."""
+    model = FakeModel(say("A."), say("B."))
+    a = brain.Assistant(chat=model)
+    list(a.chat_stream("x", space="work"))
+    list(a.chat_stream("y"))
+    assert model.seen[0][0]["content"] == model.seen[1][0]["content"]
+
+
 def test_system_prompt_stays_the_same_all_day(brain_clock):
     """So Ollama can reuse its work on the earlier conversation (CHANGELOG section 27)."""
     morning = brain.build_system_prompt()

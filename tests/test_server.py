@@ -228,6 +228,24 @@ def test_chat_needs_a_message(client):
     assert client.post("/chat", json={}).status_code == 422
 
 
+def test_chat_passes_the_space_on(client, model):
+    fake = model(say("Yes, sir."))
+    client.post("/chat", json={"message": "hi", "space": "work"})
+    assert fake.seen[0][-1]["content"].endswith(" · Work] hi")
+
+
+def test_chat_without_a_space_is_home(client, model):
+    """An old cached page, or curl, sends no space: that is Home, not an error."""
+    fake = model(say("Yes, sir."))
+    assert chat(client, "hi")[-1]["type"] == "done"
+    assert "·" not in fake.seen[0][-1]["content"]
+
+
+def test_chat_refuses_an_unknown_space(client, model):
+    model()
+    assert client.post("/chat", json={"message": "hi", "space": "gym"}).status_code == 422
+
+
 # ---------- calendar ----------
 
 def test_calendar_range(client):
