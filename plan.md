@@ -108,6 +108,11 @@ reported.
 
 ## Phase 5: Features, in order of value
 
+*Before more features: **spaces** (a welcome screen and separate screens such as Work and
+Sports, JARVIS in every one), so the dashboard does not get cluttered. Design:
+`docs/specs/2026-10-27-spaces-and-work.md`; stage 1 done (CHANGELOG section 50), stages 2 to 4
+planned there. Sports then becomes the second space.*
+
 1. **Edit and move events** (`update_event`). *Done: CHANGELOG section 28.* This is the largest gap in the calendar today.
    It needs the same confirmation card as delete, and must handle "this occurrence" versus
    "the whole series". A "this occurrence" change can reuse the exceptions table: add an

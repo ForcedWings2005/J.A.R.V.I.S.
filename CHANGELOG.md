@@ -31,7 +31,12 @@ jarvis/
 │   ├── index.html      The dashboard page: only its structure
 │   ├── css/jarvis.css  Its styles: the glass look (section 43)
 │   ├── css/motion.css  The animations' styles (section 42)
-│   └── js/             Its scripts, loaded in order: orb, chat, tasks, notes, voice, calendar, app, motion
+│   ├── css/space-work.css  The Work space's styles (section 50)
+│   └── js/             Its scripts, loaded in order: orb, chat, tasks, notes, voice, calendar, app,
+│                       spaces (the spaces and switching), space-work (the Work space), motion
+├── docs/
+│   ├── specs/          Designs agreed before building (spaces and Work: section 50)
+│   └── plans/          Step-by-step plans that carry them out
 ├── models/
 │   ├── kokoro-v1.0.onnx
 │   └── voices-v1.0.bin
@@ -930,6 +935,30 @@ During section 47, one eval reply looped for 39 minutes, and nothing said so: th
 - **A mistake, without harm**: the Mac-like check imported `server`, which runs the daily backup at import. `JARVIS_DB` was `:memory:`, which is not a file, so the backup printed "nothing to back up" and stopped; today's real backup is unchanged (still 03:08). It should have been checked before running, not after.
 - **CI on Linux**: green after the push, so the fingerprints of the Linux files are right too.
 
+## 50. Spaces, stage 1: Home, an empty Work space, and switching
+
+The owner wants JARVIS's dashboard to stay uncluttered as features grow: a welcome screen (today's dashboard) and separate **spaces** for different activities, each with its own panels, JARVIS himself present in every one. The design was agreed step by step and written up as a spec (`docs/specs/2026-10-27-spaces-and-work.md`), with an implementation plan for this first stage (`docs/plans/2026-10-27-spaces-stage-1.md`). This stage builds the structure; Work's real panels come in stage 2, switching by voice in stage 3, the cinematic switch in stage 4.
+
+- **One page that swaps its middle**: `<body data-space="...">` says which space is shown, and layout rules do the rest. Home is exactly as before. In any other space, Home's columns and timeline are hidden, the space fills the left, and JARVIS (the same orb, conversation, card and command bar, not copies) is **docked on the right**, 360 px wide. Nothing is moved in the page, so the conversation, voice and a waiting card carry on across a switch.
+- **`static/js/spaces.js`**: the list of spaces. Each space registers itself (`registerSpace`), the way a tool uses `@tool`; `switchSpace(name)` does the switch. Work registers in `static/js/space-work.js`, with its styles in `static/css/space-work.css`, so adding Sports later will not touch Work.
+- **Ways to switch**: the space names in the header (**1 HOME · 2 WORK**, the current one lit), the number keys `1` and `2` (never while typing, never with Cmd, Ctrl or Alt), and the address (`127.0.0.1:8000/#work`), so reloading or the Back button keeps your place. An address naming no space (`#gym`) opens Home.
+- **Care taken**: leaving Home closes an expanded panel first; a key pressed while a panel's opening animation runs is ignored; a space whose own code fails is logged and never stops the switch or Home. On a phone-width screen it is one column with JARVIS first. Ambient mode dims a space as it dims Home.
+- **Found while checking**: the space names wrapped onto two lines beside the clock; they now stay on one line.
+- **Checked in a demo** (made-up data, port 8015, built-in browser), each check run first to see it fail and then to see it pass:
+  - the names, clicking, Back, and the keys;
+  - typing "12" in the command box stays in the box and does not switch (real key presses);
+  - pressing `2` in Work, or clicking WORK there, adds nothing to the history;
+  - switching while the calendar is expanded closes it cleanly (no dimming left), and Home is normal on return;
+  - a key during an opening animation is ignored, and the panel opens as usual;
+  - a deliberately broken test space logs one error and Home still works;
+  - reloading on `#work` opens Work; `#gym` opens Home with a clean address;
+  - at 1440x900 the dock is 360 px on the right, Home's columns and timeline hidden; Home looks as before;
+  - a confirmation card made on Home is shown in the dock after switching, and its buttons can be clicked; conversation lines show in the dock;
+  - at phone width (375 px), JARVIS above Work, no sideways scrolling;
+  - Reduce motion with switching; ambient mode dims Work; no console errors apart from the broken test space's own.
+- **Tests**: no Python changed; ruff passes and 477 tests pass. The existing test that every file the page loads exists now covers the new files. The page's scripts have no test runner (adding one would be a new dependency), so they are checked in the browser as above.
+- **Not checked**: Safari, and the real data.
+
 ---
 
 ## Status
@@ -951,6 +980,7 @@ During section 47, one eval reply looped for 39 minutes, and nothing said so: th
 | Delete asks, corrected steps, reply cap (section 47) | Done: evals 166/168, cap checked live; the ticker change not yet seen on the page |
 | Speed in the evals (section 48) | Done: checked with a real run (median 2.7 s, first word 2.2 s) |
 | Requirements split and locked with hashes (section 49) | Done: fresh installs with `--require-hashes` checked on the Mac, and by CI on Linux |
+| Spaces, stage 1 (section 50) | Done in a demo; not yet checked in Safari. Stages 2 to 4 to come |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |

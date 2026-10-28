@@ -57,6 +57,11 @@ Open http://127.0.0.1:8000 and hard refresh with Cmd+Shift+R. The header shows w
 Ollama answers (green or red dot) and when the last backup was made; press / to jump to
 the command box.
 
+The header's space names (**1 HOME · 2 WORK**) switch between spaces: Home is the dashboard,
+and Work (being built, CHANGELOG section 50) has its own panels, with JARVIS docked on the
+right. Click a name, press `1` or `2` (not while typing), or open `127.0.0.1:8000/#work`;
+Back returns to the previous space.
+
 Clicking a panel opens it with a short "access" animation; click anywhere or press
 Escape to skip it. After 3 minutes without the mouse or keyboard the panels dim and the
 orb takes the stage; move the mouse to bring them back. The REDUCE MOTION switch in the
