@@ -69,6 +69,13 @@ header { grid-column:1 / 4; display:flex; align-items:center; gap:22px; min-widt
 .dot.ok { background:var(--green); box-shadow:0 0 8px var(--green); }
 .dot.bad { background:var(--red); box-shadow:0 0 8px var(--red); }
 .clock { margin-left:auto; text-align:right; white-space:nowrap; }
+/* The spaces (static/js/spaces.js): one capsule per space, the current one lit */
+.spaces { display:flex; gap:6px; flex-wrap:wrap; }
+.space-chip { font-family:var(--font); font-size:12px; letter-spacing:.5px; color:var(--muted); padding:7px 12px; cursor:pointer;
+  border-radius:999px; background-color:var(--glass); border:1px solid var(--line);
+  -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); box-shadow:var(--rim); }
+.space-chip:hover { border-color:var(--line-strong); color:var(--text); }
+.space-chip.on { color:var(--accent); border-color:var(--accent); background-color:rgba(76,201,240,.18); text-shadow:0 0 8px var(--glow); }
 .clock .t { font-family:var(--display); font-weight:300; font-size:46px; line-height:.9; text-shadow:0 0 14px var(--glow); }
 .clock .d { font-size:11px; letter-spacing:1px; color:var(--muted); }
 
