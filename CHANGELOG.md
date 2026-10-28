@@ -944,7 +944,8 @@ The owner wants JARVIS's dashboard to stay uncluttered as features grow: a welco
 - **Ways to switch**: the space names in the header (**1 HOME · 2 WORK**, the current one lit), the number keys `1` and `2` (never while typing, never with Cmd, Ctrl or Alt), and the address (`127.0.0.1:8000/#work`), so reloading or the Back button keeps your place. An address naming no space (`#gym`) opens Home.
 - **Care taken**: leaving Home closes an expanded panel first; a key pressed while a panel's opening animation runs is ignored; a space whose own code fails is logged and never stops the switch or Home. On a phone-width screen it is one column with JARVIS first. Ambient mode dims a space as it dims Home.
 - **Found while checking**: the space names wrapped onto two lines beside the clock; they now stay on one line.
-- **Checked in a demo** (made-up data, port 8015, built-in browser), each check run first to see it fail and then to see it pass:
+- **Found by the final review** (a fresh reviewer of the whole branch): pressing Back while a panel's opening animation ran changed the address but not the view, because the switch was refused during the animation. A change from the address now waits for the animation and then follows it. Checked: the same steps failed before the fix (address Work, view Home) and pass after it.
+- **Checked in a demo** (made-up data, port 8015, built-in browser). The registry check and the dock check were seen failing before the code existed; the rest were run after it:
   - the names, clicking, Back, and the keys;
   - typing "12" in the command box stays in the box and does not switch (real key presses);
   - pressing `2` in Work, or clicking WORK there, adds nothing to the history;

@@ -66,8 +66,13 @@ document.addEventListener('keydown', e => {
   switchSpace(s.name);
 });
 
-// The Back button, and an address typed by hand
-const followAddress = () => switchSpace(spaceFromAddress(), { fromAddress: true });
+// The Back button, and an address typed by hand. switchSpace refuses while a panel's
+// animation runs; the address has already changed by then, so wait and follow it after,
+// or the view and the address would disagree (review of stage 1)
+function followAddress() {
+  if (typeof seq !== 'undefined' && seq) { setTimeout(followAddress, 100); return; }
+  switchSpace(spaceFromAddress(), { fromAddress: true });
+}
 window.addEventListener('popstate', followAddress);
 window.addEventListener('hashchange', followAddress);
 
