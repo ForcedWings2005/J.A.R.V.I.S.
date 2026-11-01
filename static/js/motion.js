@@ -344,6 +344,129 @@ document.addEventListener('click', e => {
   if (seq && !seq.closing) { e.stopPropagation(); e.preventDefault(); skipSequence(); }
 }, true);
 
+// ---------- Spaces: the access sequence for a whole space ----------
+// The same stages as a screen's. The real switch is still spaces.js's, called once in the
+// middle, so the sequence only adds what you see around it. Going back to Home reverses it.
+const switchSpacePlain = switchSpace;
+let pageStarting = true;                     // a page opened at /#work: the boot is its opening
+document.addEventListener('DOMContentLoaded', () => { pageStarting = false; });   // after spaces.js's
+
+const chip = name => spacesNav.querySelector('[data-space="' + name + '"]');
+
+function spaceAsk(space, what, otherwise) {  // a space's own code failing must never stop the switch
+  try { return space[what] ? space[what]() : otherwise; } catch (e) {
+    console.error(`space ${space.name}: ${what} failed`, e);
+    return otherwise;
+  }
+}
+
+async function spaceReady(space) {           // the bar waits for the space's content, up to 3 s
+  const start = performance.now();
+  while (!spaceAsk(space, 'ready', true) && performance.now() - start < 3000) await pause(30);
+}
+
+function swapSpace(name, opts) {             // spaces.js refuses while seq is set; this one is ours
+  const s = seq;
+  seq = null;
+  try { switchSpacePlain(name, opts); } finally { seq = s; }
+}
+
+async function changeSpace(name, opts) {
+  const s = seq = { skip: false };
+  const from = spaces.find(x => x.name === currentSpace), to = spaces.find(x => x.name === name);
+  const orb = document.querySelector('.orbwrap');
+  let frame = null, swapped = false;
+  const swap = () => {                                       // the real switch; the orb glides over
+    const was = orb.getBoundingClientRect();
+    orb.style.transition = 'none';                           // its width must change at once to measure it
+    swapSpace(name, opts);
+    if (to.section) to.section.classList.add('fx-hidden');   // before the browser can draw it
+    const now = orb.getBoundingClientRect();
+    orb.style.transition = '';
+    orb.animate([
+      { transformOrigin: '0 0', transform: `translate(${was.left - now.left}px, ${was.top - now.top}px) scale(${was.width / now.width})` },
+      { transformOrigin: '0 0', transform: 'none' },
+    ], { duration: 700, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    document.body.classList.remove('fx-leaving');
+    swapped = true;
+  };
+  const finish = () => {                                     // the reveal, and the end of a skip
+    if (frame) frame.remove();
+    if (!swapped) swap();
+    if (from.section) {
+      from.section.classList.remove('fx-hidden');
+      from.section.querySelectorAll('.panel').forEach(p => p.classList.remove('fx-off'));
+    }
+    seq = null;
+    if (!to.section) {                                       // Home's columns come back
+      document.querySelectorAll('.col, .timeline').forEach(n => once(n, 'fx-return', 500));
+      decodeTitles();
+      return;
+    }
+    to.section.classList.remove('fx-hidden');
+    to.section.querySelectorAll('.panel').forEach(p => {
+      once(p, 'fx-reveal', 900);
+      setTimeout(() => once(p, 'fx-glitch', 450), 420);
+      decode(p.querySelector('.h .l'), 700);
+    });
+    setTimeout(() => stagger(to.section, STAGGER_ITEMS + ', .deadline, .day-line'), 200);
+  };
+  if (focused) {                                             // the whole view is changing: no need to animate it shut
+    closeFocusPlain();
+    document.body.classList.remove('fx-receding');
+  }
+  once(chip(name), 'fx-charge', 300);
+  shockwave(chip(name).getBoundingClientRect());
+  // 1. Leave: Home's columns fall back, or a space switches off and shrinks into its name
+  if (from.section) {
+    const big = from.section.getBoundingClientRect();
+    from.section.querySelectorAll('.panel').forEach(p => p.classList.add('fx-off'));
+    await stageWait(s, 260);
+    if (s.skip) return finish();
+    from.section.classList.add('fx-hidden');
+    frame = makeFrame(false);
+    const back = frame.animate([{ ...box(big), opacity: 1 }, { ...box(chip(from.name).getBoundingClientRect()), opacity: 0.5 }],
+      { duration: 420, easing: 'cubic-bezier(.5,0,.75,0)', fill: 'forwards' });
+    await stageRace(s, Promise.race([back.finished.catch(() => {}), pause(800)]));
+    frame.remove();
+    frame = null;
+  } else {
+    document.body.classList.add('fx-leaving');
+    await stageWait(s, 300);
+  }
+  if (s.skip) return finish();
+  // 2. Swap, with the new space still hidden
+  swap();
+  if (!to.section) return finish();
+  // 3. Launch: an empty frame flies out of the space's name
+  const ready = spaceReady(to);
+  frame = makeFrame(true);
+  const fly = frame.animate([{ ...box(chip(name).getBoundingClientRect()), opacity: 0.4 }, { ...box(to.section.getBoundingClientRect()), opacity: 1 }],
+    { duration: 550, easing: 'cubic-bezier(.2,.9,.25,1.08)', fill: 'forwards' });
+  await stageRace(s, Promise.race([fly.finished.catch(() => {}), pause(900)]));
+  if (s.skip) return finish();
+  // 4. Access: a big title, a segmented bar, a real readout
+  frame.querySelector('.fx-title').textContent = 'ACCESSING ' + to.title;
+  frame.querySelector('.fx-line').textContent = spaceAsk(to, 'readout', '');
+  frame.classList.add('fx-loading');
+  decode(frame.querySelector('.fx-title'), 600);
+  await fillBar(s, frame, ready);
+  if (s.skip) return finish();
+  // 5. Access granted, then the reveal
+  frame.querySelector('.fx-title').dataset.text = 'ACCESS GRANTED';
+  frame.querySelector('.fx-title').textContent = 'ACCESS GRANTED';
+  frame.classList.add('fx-granted');
+  await stageWait(s, 320);
+  finish();
+}
+
+switchSpace = (name, opts = {}) => {
+  if (seq || name === currentSpace || !spaces.some(x => x.name === name)) return false;
+  if (calm() || pageStarting) return switchSpacePlain(name, opts);
+  changeSpace(name, opts);
+  return true;
+};
+
 // ---------- Feedback when something changes ----------
 const keysIn = sel => new Set([...document.querySelectorAll(sel)].map(n => n.dataset.key || n.dataset.id));
 

@@ -4,7 +4,9 @@
 // voice and a waiting card carry on. <body data-space="..."> says which one is shown; the
 // layout itself is in the CSS. Each space registers itself, the way a tool uses @tool.
 
-const spaces = [];              // { name, title, key, section, enter?, leave? }
+// ready and readout are for the opening animation (motion.js): is the content drawn yet, and
+// the line under the bar, from the real contents
+const spaces = [];              // { name, title, key, section, enter?, leave?, ready?, readout? }
 let currentSpace = 'home';
 const spacesNav = document.getElementById('spaces');
 
@@ -34,7 +36,7 @@ function runSafely(space, what) {
 function switchSpace(name, opts = {}) {
   const next = spaces.find(s => s.name === name);
   if (!next || name === currentSpace) return false;
-  if (typeof seq !== 'undefined' && seq) return false;   // a panel is still opening (motion.js)
+  if (typeof seq !== 'undefined' && seq) return false;   // a panel or a space is animating (motion.js)
   const old = spaces.find(s => s.name === currentSpace);
   if (currentSpace === 'home' && focused) closeFocus();  // with motion.js this animates closed
   if (old) runSafely(old, 'leave');

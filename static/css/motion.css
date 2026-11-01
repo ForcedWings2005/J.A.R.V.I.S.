@@ -29,10 +29,10 @@ header, .timeline, .center { transition:transform .45s ease, filter .45s ease, o
 body.fx-receding header, body.fx-receding .timeline, body.fx-receding .center, body.fx-receding .col > .panel:not(.focused) {
   transform:scale(.95); filter:blur(3px); opacity:.45; }
 /* A screen that is open but not shown yet keeps its place, invisibly */
-.panel.fx-hidden { visibility:hidden; }
+.panel.fx-hidden, .space.fx-hidden { visibility:hidden; }
 /* 1. Charge: the panel pulses, a shockwave bursts out of it */
 @keyframes fx-charge { 0% { filter:brightness(1); } 50% { filter:brightness(1.8); transform:scale(1.02); } 100% { filter:brightness(1); transform:scale(1); } }
-.panel.fx-charge { animation:fx-charge .25s ease; }
+.panel.fx-charge, .space-chip.fx-charge { animation:fx-charge .25s ease; }
 .fx-shock { position:fixed; z-index:22; border-radius:50%; border:2px solid var(--accent); pointer-events:none; box-shadow:0 0 30px var(--glow), inset 0 0 30px var(--glow); }
 /* 2-4. The empty pane of glass that flies out and holds the access readout */
 .fx-frame { position:fixed; z-index:21; pointer-events:none; border-radius:32px; border:1px solid rgba(120,215,255,.28); background:rgba(8,28,52,.42);
@@ -86,6 +86,13 @@ body.fx-receding header, body.fx-receding .timeline, body.fx-receding .center, b
 /* The content arrives item by item (--i is each item's position, set by motion.js) */
 @keyframes fx-arrive-seq { from { opacity:0; transform:translateX(-10px); } }
 .fx-seq { animation:fx-arrive-seq .35s ease both; animation-delay:calc(var(--i) * 35ms); }
+
+/* ---------- Spaces: the access sequence for a whole space ---------- */
+/* Home's columns fall back as a space opens, and come back when you return */
+@keyframes fx-depart { to { opacity:0; transform:scale(.95); filter:blur(3px); } }
+body.fx-leaving .col, body.fx-leaving .timeline { animation:fx-depart .3s ease forwards; }
+@keyframes fx-return { from { opacity:0; transform:scale(.95); filter:blur(3px); } }
+.col.fx-return, .timeline.fx-return { animation:fx-return .45s ease both; }
 
 /* ---------- Feedback when something changes ---------- */
 /* An event added: a glow ripple */

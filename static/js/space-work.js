@@ -6,6 +6,13 @@ registerSpace({
   name: 'work', title: 'WORK', key: '2', section: document.getElementById('space-work'),
   enter() { openCal(document.getElementById('work-cal'), 'week'); loadDay(); },
   leave() { closeCal(); },
+  // "Couldn't load your day" is also a .day-lines, so a failed /day still counts as drawn
+  ready: () => !!document.querySelector('#work-cal .cbody > *') && !!document.querySelector('#work-day .day-lines'),
+  readout() {
+    const open = [...document.querySelectorAll('#work-tasks .task:not(.done)')];
+    const dated = open.filter(t => t.querySelector('.due')).length;
+    return open.length + ' OPEN · ' + dated + (dated === 1 ? ' DEADLINE' : ' DEADLINES');
+  },
 });
 
 const dayBox = document.getElementById('work-day');
