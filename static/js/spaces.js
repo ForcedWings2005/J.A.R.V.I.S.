@@ -38,7 +38,7 @@ function switchSpace(name, opts = {}) {
   if (!next || name === currentSpace) return false;
   if (typeof seq !== 'undefined' && seq) return false;   // a panel or a space is animating (motion.js)
   const old = spaces.find(s => s.name === currentSpace);
-  if (currentSpace === 'home' && focused) closeFocus();  // with motion.js this animates closed
+  if (currentSpace === 'home' && focused) closeFocus();  // with the animation on, already closed
   if (old) runSafely(old, 'leave');
   currentSpace = name;
   document.body.dataset.space = name;
@@ -51,7 +51,7 @@ function switchSpace(name, opts = {}) {
   return true;
 }
 
-// When JARVIS opens a space (the `space` event, chat.js). A panel's opening animation makes
+// When JARVIS opens a space (the `space` event, chat.js). A running animation makes
 // switchSpace refuse, so wait for it to finish, as followAddress does, instead of dropping it
 function switchSpaceWhenFree(name) {
   if (typeof seq !== 'undefined' && seq) { setTimeout(() => switchSpaceWhenFree(name), 100); return; }
@@ -80,7 +80,7 @@ document.addEventListener('keydown', e => {
   switchSpace(s.name);
 });
 
-// The Back button, and an address typed by hand. switchSpace refuses while a panel's
+// The Back button, and an address typed by hand. switchSpace refuses while an
 // animation runs; the address has already changed by then, so wait and follow it after,
 // or the view and the address would disagree (review of stage 1)
 function followAddress() {
