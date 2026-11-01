@@ -1019,6 +1019,29 @@ Stage 3 of the spaces design (`docs/specs/2026-10-27-spaces-and-work.md`), carri
 - **Final review** (a fresh reviewer of the whole branch, kept to the project folder): no critical findings. Fixed: nothing measured messages sent from Work (the five Work cases above, which led to removing the sentence), and this section's account of the evals and the demo, which was partly wrong. Left for later: two `space` events during one animation could apply in the wrong order; chat would stop working if `spaces.js` failed to load; the space names live in both `config.py` and the page with no test that they match (a Sports space would need both); a reply saying "I can confirm" would fail `space_lets_work`; odd ticker wording for a bad space name; no test for a missing or non-text space name; the log does not record the space.
 - **Not checked**: Safari, the microphone (spoken rather than typed requests), Reduce motion with a voice switch, the demo with the final prompt, and the real data.
 
+## 53. Spaces, stage 4: the transition
+
+Changing space used to be instant. It now plays the access sequence from section 42 for the whole space, the last stage of `docs/specs/2026-10-27-spaces-and-work.md`. Plan: `docs/plans/2026-10-29-spaces-stage-4.md`.
+
+- **Going into Work**: the WORK name in the header pulses and sends out a shockwave, and Home's columns fall back. An empty pane of glass flies out of the name to fill the space, and shows "ACCESSING WORK", the bar and a line from the real contents ("4 OPEN · 2 DEADLINES"). Then "ACCESS GRANTED" in green, and Work's panels beam open with the glitch, their items arriving one by one. Meanwhile the orb glides from the middle into the dock.
+- **Going back to Home** reverses it: Work's panels switch off like an old TV, the pane shrinks back into the name, the orb glides back to the middle, and Home's columns return. There is no "ACCESSING HOME": it is the close, played backwards.
+- **A click or Escape skips it** at any stage, in either direction. **Reduce motion** makes it instant, and so does opening the page at `/#work`, because the boot sequence is already the page's opening.
+- **How it works**: as in section 42, `motion.js` wraps a function and the original still does the real work. `switchSpace` becomes "play the first half, call the real `switchSpace` from `spaces.js` once in the middle, play the rest". With `motion.js` turned off, switching works as before. Only the orb is animated in the dock, so the conversation, voice and a waiting card are never touched. The real switch refuses while `seq` is set, and this sequence is what sets it, so `swapSpace` clears `seq` for that one call and puts it back.
+- **Two new optional fields on `registerSpace`**: `ready` (is the space's content drawn yet? the bar waits for it, for up to 3 seconds) and `readout` (the line under the bar). Each space describes itself, so Sports gets the sequence without new logic in `motion.js`. If either fails, the switch still finishes (`spaceAsk`, for the same reason as `runSafely`).
+- **The owner's two choices**: the tilt stays, Work's panels included ("I like the lean"; stage 2's review had suggested removing it from Work). Phone width was left out: a phone version would more likely be the orb and the chat, perhaps able to pull up a panel, and that is a design for later.
+- **Checked in a demo** (made-up data, port 8016, 1440x900, the real model, no Python changed, so no eval is needed; ruff passes, 521 tests pass):
+  - each stage in order, with the state measured over time: Home's columns falling back, the swap, "ACCESSING WORK", "ACCESS GRANTED", the end state (space, `data-space`, the lit name and the address all agree);
+  - the orb's position measured through the glide, both ways: from (558, 299), 324 wide, to (1146, 105), 180 wide, in 700 ms;
+  - Escape and a real click skipping it in both directions; pressing 2, 1, 2 quickly: one change, everything agrees at the end;
+  - switching with Schedule open: the panel closed, Home's calendar emptied, Work's calendar in week view;
+  - a voice switch arriving during a panel's opening and during a space's sequence: it happened once, afterwards;
+  - animations that never report their end, as in a hidden tab: the safety time limits finished the sequence both ways;
+  - Reduce motion and opening `/#work`: instant, no frame;
+  - with the real model, "let's get some work done" (the sequence played while the reply streamed in) and "take me back home"; a message sent straight after a skip was answered in the dock;
+  - a real delete card left waiting through a switch to Home and back to Work: still shown, still amber, and Cancel left the event in place. No console errors.
+- **A note on testing**: one screenshot showed the orb off to the right while Home was fading, which would have been a bug. Measuring the orb's position over time showed it was never there: the browser pane was hidden, and the screenshot was a stale picture. So the sequence was checked mostly by measuring and by still pictures; **how smooth it looks has not been judged by eye**.
+- **Not checked**: Safari, how it looks in motion, the microphone, and the real data.
+
 ---
 
 ## Status
@@ -1042,7 +1065,8 @@ Stage 3 of the spaces design (`docs/specs/2026-10-27-spaces-and-work.md`), carri
 | Requirements split and locked with hashes (section 49) | Done: fresh installs with `--require-hashes` checked on the Mac, and by CI on Linux |
 | Spaces, stage 1 (section 50) | Done in a demo; not yet checked in Safari. Stages 2 to 4 to come |
 | Spaces, stage 2: the Work panels (section 51) | Done in a demo; not yet checked in Safari. Stages 3 (voice) and 4 (transition) to come |
-| Spaces, stage 3: switching by voice (section 52) | Done: evals 202/204 (prompt `578af8545a1c`), checked in a demo with the real model; not yet checked in Safari or with the microphone. Stage 4 (transition) to come |
+| Spaces, stage 3: switching by voice (section 52) | Done: evals 202/204 (prompt `578af8545a1c`), checked in a demo with the real model; not yet checked in Safari or with the microphone |
+| Spaces, stage 4: the transition (section 53) | Done in a demo, measured stage by stage and with the real model; not yet seen in motion or in Safari |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |

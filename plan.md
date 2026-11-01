@@ -110,8 +110,8 @@ reported.
 
 *Before more features: **spaces** (a welcome screen and separate screens such as Work and
 Sports, JARVIS in every one), so the dashboard does not get cluttered. Design:
-`docs/specs/2026-10-27-spaces-and-work.md`; stages 1 to 3 done (CHANGELOG sections 50 to 52,
-stage 3 being switching by voice), stage 4 (the transition) planned there. Sports then becomes the second space.*
+`docs/specs/2026-10-27-spaces-and-work.md`; version 1 done, stages 1 to 4 (CHANGELOG sections
+50 to 53). Sports becomes the second space next.*
 
 1. **Edit and move events** (`update_event`). *Done: CHANGELOG section 28.* This is the largest gap in the calendar today.
    It needs the same confirmation card as delete, and must handle "this occurrence" versus
@@ -156,7 +156,8 @@ Not before Phases 3 and 4. In this order:
    Tailscale changes JARVIS's address.*
 2. **A login** (a single user, with the session held in a cookie) on every endpoint.
 3. **Tailscale** for the network, with HTTPS from `tailscale serve`. Never port forwarding.
-4. **A phone layout** for the page.
+4. **A phone layout** for the page. The owner's thinking so far: more likely the orb and the
+   chat, perhaps able to pull up a panel, than the dashboard squeezed down.
 
 ## Ongoing upkeep (small, any time)
 

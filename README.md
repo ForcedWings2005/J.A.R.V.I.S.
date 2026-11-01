@@ -64,7 +64,8 @@ countdown bars, the to-do list and the calendar in week view, with JARVIS docked
 previous space. The command box usually has the cursor, and keys typed there stay text: press
 Esc first to leave it, then `1` or `2`. Or just ask JARVIS, in any words: "let's get some work
 done", "time to study", "take me back home" (CHANGELOG section 52). He knows which space is on
-screen when you talk to him.
+screen when you talk to him. Changing space plays a short "access" animation; click anywhere or
+press Escape to skip it, and Reduce motion makes it instant (CHANGELOG section 53).
 
 Clicking a panel opens it with a short "access" animation; click anywhere or press
 Escape to skip it. After 3 minutes without the mouse or keyboard the panels dim and the

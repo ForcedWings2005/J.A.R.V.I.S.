@@ -1,7 +1,7 @@
 # Spaces, and the Work space (version 1)
 
-Status: design, agreed with the owner in conversation on 2026-10-27. To be approved as
-written before the implementation plan.
+Status: version 1 built, stages 1 to 4 (CHANGELOG sections 50 to 53). Design agreed with the
+owner in conversation on 2026-10-27.
 
 ## Why
 
@@ -113,8 +113,9 @@ Four panels, with JARVIS docked on the right:
 | `static/js/chat.js` | changed | Sends the current space with each message; switches on a `space` event. |
 | `static/css/jarvis.css`, `static/css/motion.css`, `static/js/motion.js` | changed | The dock layout; the space transition. |
 
-Each space registers itself in `spaces.js` (its name, its title and what to do on entering
-and leaving), much as a tool registers with `@tool`. Adding Sports later means a new section,
+Each space registers itself in `spaces.js` (its name, its title, what to do on entering
+and leaving, and optionally `ready` and `readout` for the transition), much as a tool registers
+with `@tool`. Adding Sports later means a new section,
 a new script and a new stylesheet, without editing Work.
 
 ### Switching by voice, step by step
