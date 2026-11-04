@@ -1048,7 +1048,7 @@ Changing space used to be instant. It now plays the access sequence from section
 - **Final review** (a fresh reviewer of the whole branch, kept to the project folder, reading the code without running it): no critical or important findings. Fixed: this section's account, and comments in `spaces.js` that this work had made out of date. Left for later: nothing catches an unexpected error inside the sequence, which would leave the page ignoring clicks until a reload (no realistic cause found; `openScreen` has the same gap); a click on Confirm or Send during a sequence is lost, which fails safe but matters more here because JARVIS can start the sequence himself; the orb can jump if two skipped changes land within 700 ms; `motion.js` names Work's `.deadline` and `.day-line`, so Sports' items would not arrive one by one without a small change.
 - **Not checked**: Safari, how it looks in motion, a real hidden tab, the microphone, and the real data.
 
-## 54. The changelog and README brought up to date
+## 54. The docs brought up to date
 
 A check of everything here that describes the project as it is now, against the code (the numbered sections are a record of their day and were left as written). Documentation only; no code changed.
 
@@ -1057,6 +1057,8 @@ A check of everything here that describes the project as it is now, against the 
 - **Status**: stages 1 and 2 of spaces no longer say later stages are to come; the calendar test count is 112, not 51; fortnightly repeats have had their weekday checked since section 44; the calendar views were checked in all four views in section 51; and "Streaming replies into speech" is marked as in use, as `plan.md` asked: every reply goes through it, its stream is covered by `tests/test_brain.py`, and spoken replies were checked by the owner in Safari (section 42).
 - **Possible next steps** now follows `plan.md`: the Sports space comes first.
 - **README**: the diagram shows every tool module and `workday.py`; `python -m pytest` runs every test, not only the calendar's; the evals are 68 requests and take about 12 minutes (as CLAUDE.md says), not 56 and 10.
+- **`plan.md`**: "Where the project stands" still listed the five problems of 2026-10-12, all fixed by Phases 2 to 4; it now says where things stand today. Phases 2 and 3 are marked done (Phase 3 except coverage, which nothing reports), and the Sports space is noted under item 6.
+- **`CLAUDE.md` contradicted itself**: "commit after each step that works" and "commit only when asked". The owner chose: commit on a work branch without asking, never on `main`; push, merge and deleting branches still wait for the owner.
 - Checked: each count against the code (`pytest --co`: 521 tests, 112 in `test_jcal.py`; 68 cases in `evals/cases.py`) and each file against `git ls-files`. Every Known limit was checked against the code and still holds.
 
 ---

@@ -198,9 +198,11 @@ python -m evals         # full suite, 68 cases x 3 runs, about 12 minutes, with 
   dependencies. Note other problems you notice instead of fixing them unasked.
 - **Before** a change that touches security controls, the database schema, tool execution or
   anything destructive, explain the risk and the planned approach, and wait for agreement.
-- Work on a branch per phase or feature; commit after each step that works. Commit, push,
-  merge or delete branches only when asked. The usual flow: branch, commits, push, CI green,
-  fast-forward merge into `main`, delete the branch.
+- Work on a branch per phase or feature, and commit on it after each step that works,
+  without asking (the owner's choice, 2026-11-03: a branch commit is easy to undo and stays
+  on this Mac). Never commit on `main`. Push, merge or delete branches only when asked. The
+  usual flow: branch, commits, push, CI green, fast-forward merge into `main`, delete the
+  branch.
 - Write or update tests for every meaningful behaviour change and bug fix.
 - Explain important changes so the owner can learn from them: what changed, why, and how the
   new code works, in plain language. Point to the exact file and line.

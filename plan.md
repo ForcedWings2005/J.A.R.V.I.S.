@@ -7,31 +7,31 @@ Security decisions (what JARVIS holds, who could harm it, what stops them) are i
 
 ## Where the project stands
 
-The calendar logic is in good shape: it is checked in code, covered by 51 tests, and has
-already caught one real bug. The rest of the system is not at that level yet:
+*Updated 2026-11-03.* The first version of this section (2026-10-12) listed five problems:
+nothing measured the model, `brain.py` could not be tested, the conversation grew forever,
+tool schemas and functions lived in two places, and the server only worked from its own
+folder. Phases 2 to 4 fixed all five (CHANGELOG sections 21 to 27). Today:
 
-- **The model is the least reliable part, and nothing measures it.** Every incident so far
-  (wrong dates, "every Wednesday and Friday" saved as weekdays, a finished class described
-  as still ahead) came from the model, not from the code. When `gemma4:latest` changes, or the
-  prompt is edited, there is no way to tell whether JARVIS got better or worse.
-- **`brain.py` cannot be tested as it is.** The database connection, the conversation,
-  the pending confirmation and the Ollama call are all module-level globals. A test cannot
-  give it a fake model or a fixed clock.
-- **The conversation grows forever.** `messages` is never trimmed. Over a long session it
-  will become slow, and eventually it will overflow the model's context and the model will
-  start forgetting its own system prompt.
-- **The same knowledge lives in two places.** Tool schemas sit in one list and the functions
-  in another (`tools` and `available_functions`), and two modules each open the database
-  and create an `events` table. Nothing checks that the two copies match.
-- **The server only works when started from the project folder.** Paths like `jarvis.db`,
-  `models/` and `static/index.html` are relative.
+- **The code around the model is well tested**: 521 tests, under a second, run by CI on
+  every push. The evals measure the model: 68 cases, run before and after every prompt change.
+- **The model is still the least reliable part**, but its habits are now measured: it
+  sometimes mentions a card that was never shown (about 1 run in 3 for a repeating event
+  without a date), now and then assumes AM or PM instead of asking, and a change to one
+  tool's description can unsettle unrelated cases (CHANGELOG sections 39, 47 and 52).
+- **The dashboard's scripts have no automated tests.** They are checked in a demo in the
+  browser, then by the owner in Safari; the Safari checks for spaces (sections 50 to 53) are
+  still to do. A JavaScript test runner would be a new dependency.
+- **Nothing reads outside content yet.** The Sports space will be the first: data from the
+  internet, so the privacy rule changes (the owner has agreed a new wording, to be written
+  into `SECURITY.md` with the Sports design) and prompt injection becomes real
+  (`SECURITY.md`, section 8).
 
 The order below follows one rule: **measure before changing, and make it testable before
 adding features.** Each phase ends with something that can be checked.
 
 ---
 
-## Phase 2: Measure the model
+## Phase 2: Measure the model (done, CHANGELOG sections 21 and 22)
 
 Goal: one command that says how well JARVIS handles real requests, so any prompt or model
 change can be judged by numbers instead of by feel.
@@ -55,7 +55,7 @@ change can be judged by numbers instead of by feel.
 
 Done when: `python -m evals` prints a score, and the baseline is recorded.
 
-## Phase 3: Make `brain.py` testable, then test it
+## Phase 3: Make `brain.py` testable, then test it (done, CHANGELOG section 23)
 
 Goal: the code around the model is as well tested as the calendar.
 
@@ -63,7 +63,7 @@ Goal: the code around the model is as well tested as the calendar.
    models folder, the static folder, `MAX_ROUNDS`, and the history limit. All paths are built
    from the project folder (`Path(__file__).parent`), so the server can be started from
    anywhere. `JARVIS_DB` keeps working.
-2. **One database module** (`db.py`): one connection, one lock, used by `brain` and `jcal`.
+2. **One database module** (`db.py`; built as `database.py`): one connection, one lock, used by `brain` and `jcal`.
 3. **Versioned migrations.** Replace the "add a column if it is missing" code with numbered
    steps tracked in `PRAGMA user_version`. Adding a column later then becomes a numbered
    step that runs once and can be tested.
@@ -89,7 +89,8 @@ Goal: the code around the model is as well tested as the calendar.
    did, which is better evidence than asking JARVIS why (see section 16 of the changelog).
 
 Done when: CI runs tests for `brain` and `server` as well as `jcal`, and coverage is
-reported.
+reported. *Done, except coverage: CI runs every test, but nothing reports coverage (that
+would need a new tool, such as `pytest-cov`).*
 
 ## Phase 4: Conversation memory that holds up (done, CHANGELOG section 27)
 
@@ -133,7 +134,8 @@ Sports, JARVIS in every one), so the dashboard does not get cluttered. Design:
 5. **Morning briefing.** Today's events, overdue tasks and open reminders in one reply. Most
    of it can be put together in code, with the model only writing the sentences.
 6. **Weather, then news and sports**, as plain read-only tools with a timeout and a cached
-   result, so a slow API never blocks a reply.
+   result, so a slow API never blocks a reply. *Sports comes first, as its own space (see
+   the note above), and is being designed.*
 7. **Sound effects for the dashboard.** The animations are done (CHANGELOG section 42);
    the owner chose to leave sound for later. Quiet, short, and off with voice mode off.
 
@@ -195,5 +197,7 @@ Not before Phases 3 and 4. In this order:
 - **Switch to Google Calendar.** The local calendar is the tested core. Sync can come once
   editing events works and Phase 6 is done.
 - **Fine-tune or swap models.** Build the eval suite first, so any switch is measured.
+  *The suite exists, and the switch to `gemma4:26b` was measured with it (CHANGELOG
+  section 37).*
 - **Add a frontend framework.** The page works. Splitting it into modules gives most of the
   benefit for little risk.
