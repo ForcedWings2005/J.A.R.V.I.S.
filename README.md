@@ -7,12 +7,14 @@ unencrypted (only the encrypted backups, see below).
 ## How the pieces fit
 
 ```
-Browser (static/index.html)
+Browser (static/: the dashboard, its spaces and animations)
    |  HTTP, 127.0.0.1 only
 server.py (FastAPI)
    |-- brain.py   the assistant: calls the model, runs tools, keeps the conversation
-   |     |-- Ollama (gemma4)         the language model
-   |     `-- jcal.py                 calendar logic  -->  jarvis.db (SQLite)
+   |     |-- Ollama (gemma4:26b)     the language model
+   |     `-- the tools: jcal.py (calendar), tasks.py (to-do list), calc.py (calculator),
+   |                    notes.py (notes), spaces.py (changing space)  -->  jarvis.db (SQLite)
+   |-- workday.py the Work space's figures: free time, what's next, deadlines
    |-- speech.py  text to speech (Kokoro)
    `-- mlx-whisper                   speech to text
 ```
@@ -100,7 +102,7 @@ you remember about me?".
 ## Tests and checks
 
 ```bash
-python -m pytest        # calendar logic tests (never touches the real database)
+python -m pytest        # every test, under a second (never touches the real database or a model)
 ruff check .            # lint
 ```
 
@@ -109,10 +111,10 @@ Both also run automatically on GitHub for every push, and before every commit on
 
 ## Model evals
 
-The tests check the code. The evals check the model: 56 real requests ("add piano
+The tests check the code. The evals check the model: 68 real requests ("add piano
 every Tuesday at 4pm", "how are we looking tonight") run through the real assistant
 against a frozen clock and a throwaway database, and are scored on the tools it calls
-and what it says. Ollama must be running. A full run takes about 10 minutes.
+and what it says. Ollama must be running. A full run takes about 12 minutes.
 
 ```bash
 python -m evals                     # every case, 3 runs each

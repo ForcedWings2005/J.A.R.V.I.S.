@@ -188,7 +188,7 @@ Not before Phases 3 and 4. In this order:
 - **Check model latency.** *Done: `keep_alive` keeps the model loaded (an hour), and the
   evals measure every run's time to the first word and flag slow runs (CHANGELOG section 48).*
 - **Changelog status table:** mark "Streaming replies into speech" as tested, since every
-  chat now goes through it.
+  chat now goes through it. *Done: CHANGELOG section 54.*
 
 ## What I would not do yet
 

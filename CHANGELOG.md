@@ -3,7 +3,7 @@
 A local, private personal assistant with a web dashboard, calendar, to-do list and voice.
 Runs on a MacBook Pro (M3 Max, 64 GB). Everything runs on this machine.
 
-Written 2026-10-08, last updated 2026-10-12. Entries are in the order the work was done.
+Written 2026-10-08, last updated 2026-11-03. Entries are in the order the work was done.
 
 ---
 
@@ -12,8 +12,9 @@ Written 2026-10-08, last updated 2026-10-12. Entries are in the order the work w
 ```
 jarvis/
 ├── brain.py            The assistant: model calls, tool loop, confirmations, system prompt
-├── tools.py            The tool registry (@tool) and NeedsConfirmation
+├── tools.py            The tool registry (@tool), NeedsConfirmation and ShowSpace
 ├── tasks.py            To-do list tools
+├── spaces.py           The open_space tool: changes the space on screen (section 52)
 ├── workday.py          The Work space's figures: free time, what's next, deadlines (section 51)
 ├── calc.py             The calculate tool (safe, no eval)
 ├── notes.py            Notes and memory: remember, recall, forget (FTS5 search)
@@ -41,7 +42,7 @@ jarvis/
 ├── models/
 │   ├── kokoro-v1.0.onnx
 │   └── voices-v1.0.bin
-├── jarvis.db           SQLite database (events and tasks; not in git)
+├── jarvis.db           SQLite database (events, tasks and notes; not in git)
 ├── .gitignore          Files git should skip
 ├── requirements.in     What JARVIS uses directly (section 49)
 ├── requirements.txt    Generated from it: every package, version and file hash
@@ -60,17 +61,22 @@ jarvis/
 │   ├── test_speech_text.py  Tests for the text clean-up before speaking
 │   ├── test_evals.py   Tests for the eval suite's matching rules
 │   ├── test_notes.py   Tests for remember, recall and forget
+│   ├── test_workday.py Tests for the Work space's figures
+│   ├── test_spaces.py  Tests for open_space
 │   └── test_backup.py  Tests for backups: plain, encrypted, restore, keys
 ├── evals/              Model evaluation suite (python -m evals)
-│   ├── cases.py        The 30 cases
+│   ├── cases.py        The 68 cases
 │   ├── check.py        How a run is scored
+│   ├── speed.py        The speed figures (section 48)
 │   ├── __main__.py     The runner
 │   └── results/        One JSON file per run (not in git)
 ├── pytest.ini          Tells pytest where the tests are
 ├── ruff.toml           Lint settings
 ├── .pre-commit-config.yaml  Checks that run before every commit
 ├── .github/workflows/tests.yml  Runs lint and tests on GitHub for every push
-├── experiments/        Not part of the app: old scripts, crypto_lab.py, attack_page.html
+├── experiments/        Not part of the app: old scripts, crypto_lab.py, attack_page.html,
+│                       personality_compare.py (section 37)
+├── JARVIS dashboard concept.pdf  The dashboard's original concept (in git since the first commit)
 ├── README.md           Setup, run, tests, backups, pinned model
 ├── CLAUDE.md           Instructions for Claude Code when it works on this project
 ├── plan.md             The plan from Phase 2 onward
@@ -81,22 +87,21 @@ jarvis/
 ## Run it
 
 ```bash
-cd ~/Desktop/jarvis
+cd ~/Developer/jarvis
 source .venv/bin/activate
 python -m uvicorn server:app --reload
 ```
 
 Then open http://127.0.0.1:8000 and hard refresh with Cmd+Shift+R.
 
-Note: the project now lives in `~/Desktop/jarvis`. A virtual environment cannot be moved with its folder, so after moving the project it has to be rebuilt (`rm -rf .venv`, `python3 -m venv .venv`, activate, then `pip install ollama fastapi uvicorn mlx-whisper python-multipart kokoro-onnx`). Always start the server from inside the project folder, because the code uses relative paths such as `jarvis.db`, `static/index.html` and `models/`.
+Setting up from scratch (the venv, the packages with their hashes, the model files) is in README, Setup. A virtual environment cannot be moved with its folder: after moving the project, rebuild it (section 30). The paths are built from the project folder (`config.py`, section 23), so the server can be started from anywhere.
 
 Run the tests (from the project folder, venv active): `python -m pytest`. They never touch the real `jarvis.db`.
 
 ## Dependencies
 
-- Ollama with the `gemma4:latest` model (also pulled: `mistral:latest`, `qwen3.5:latest`)
-- Python packages: `ollama`, `fastapi`, `uvicorn`, `mlx-whisper`, `python-multipart`, `kokoro-onnx`
-- Development only: `pytest` (to run the tests)
+- Ollama with the `gemma4:26b` model (its pinned ID is in README; section 37)
+- Python packages: the 8 JARVIS uses directly are in `requirements.in` (`fastapi`, `uvicorn`, `python-multipart`, `ollama`, `cryptography`, `numpy`, `kokoro-onnx`, `mlx-whisper`); the checks add `pytest`, `ruff`, `pre-commit`, `pip-tools` and `httpx2` (`requirements-dev.in`). Both are locked with hashes in the `.txt` files (section 49)
 - System: `ffmpeg` (via Homebrew)
 - Downloaded models: Whisper `mlx-community/whisper-large-v3-turbo`, Kokoro `kokoro-v1.0.onnx` and `voices-v1.0.bin`
 
@@ -1043,6 +1048,17 @@ Changing space used to be instant. It now plays the access sequence from section
 - **Final review** (a fresh reviewer of the whole branch, kept to the project folder, reading the code without running it): no critical or important findings. Fixed: this section's account, and comments in `spaces.js` that this work had made out of date. Left for later: nothing catches an unexpected error inside the sequence, which would leave the page ignoring clicks until a reload (no realistic cause found; `openScreen` has the same gap); a click on Confirm or Send during a sequence is lost, which fails safe but matters more here because JARVIS can start the sequence himself; the orb can jump if two skipped changes land within 700 ms; `motion.js` names Work's `.deadline` and `.day-line`, so Sports' items would not arrive one by one without a small change.
 - **Not checked**: Safari, how it looks in motion, a real hidden tab, the microphone, and the real data.
 
+## 54. The changelog and README brought up to date
+
+A check of everything here that describes the project as it is now, against the code (the numbered sections are a record of their day and were left as written). Documentation only; no code changed.
+
+- **File layout**: added `spaces.py`, `ShowSpace` in `tools.py`, notes in `jarvis.db`, `tests/test_workday.py` and `tests/test_spaces.py`, `evals/speed.py`, `experiments/personality_compare.py` and the concept PDF; the evals have 68 cases, not 30.
+- **Run it and Dependencies** still described the project before section 23: the old `~/Desktop` folder, a hand-typed package list, the server needing to start from its own folder, and `gemma4:latest`. They now point to README and the requirements files.
+- **Status**: stages 1 and 2 of spaces no longer say later stages are to come; the calendar test count is 112, not 51; fortnightly repeats have had their weekday checked since section 44; the calendar views were checked in all four views in section 51; and "Streaming replies into speech" is marked as in use, as `plan.md` asked: every reply goes through it, its stream is covered by `tests/test_brain.py`, and spoken replies were checked by the owner in Safari (section 42).
+- **Possible next steps** now follows `plan.md`: the Sports space comes first.
+- **README**: the diagram shows every tool module and `workday.py`; `python -m pytest` runs every test, not only the calendar's; the evals are 68 requests and take about 12 minutes (as CLAUDE.md says), not 56 and 10.
+- Checked: each count against the code (`pytest --co`: 521 tests, 112 in `test_jcal.py`; 68 cases in `evals/cases.py`) and each file against `git ls-files`. Every Known limit was checked against the code and still holds.
+
 ---
 
 ## Status
@@ -1053,7 +1069,7 @@ Changing space used to be instant. It now plays the access sequence from section
 | HUD layout, orb, panel focus, reduce motion | Tested and working |
 | Host protection | Tested and working |
 | Personality (section 38) | Light version: evals 156/156, tried in the app, response times good |
-| Weekday check for weekly events (section 39) | Done in code, evals 154/156 (variation); fortnightly and monthly repeats not covered |
+| Weekday check for weekly events (section 39) | Done in code, evals 154/156 (variation); fortnightly repeats covered since sections 44 and 46; monthly repeats not covered |
 | Dashboard redesign (section 40) | Done in a demo with a made-up calendar; not yet tried with real data, voice or the microphone |
 | Cinematic HUD look (section 41) | Replaced by the glass look (section 43) |
 | Motion layer (section 42) | Done; checked in a demo and by the owner in Safari, including the orb with the microphone and voice |
@@ -1064,16 +1080,16 @@ Changing space used to be instant. It now plays the access sequence from section
 | Delete asks, corrected steps, reply cap (section 47) | Done: evals 166/168, cap checked live; the ticker change not yet seen on the page |
 | Speed in the evals (section 48) | Done: checked with a real run (median 2.7 s, first word 2.2 s) |
 | Requirements split and locked with hashes (section 49) | Done: fresh installs with `--require-hashes` checked on the Mac, and by CI on Linux |
-| Spaces, stage 1 (section 50) | Done in a demo; not yet checked in Safari. Stages 2 to 4 to come |
-| Spaces, stage 2: the Work panels (section 51) | Done in a demo; not yet checked in Safari. Stages 3 (voice) and 4 (transition) to come |
+| Spaces, stage 1 (section 50) | Done in a demo; not yet checked in Safari |
+| Spaces, stage 2: the Work panels (section 51) | Done in a demo; not yet checked in Safari |
 | Spaces, stage 3: switching by voice (section 52) | Done: evals 202/204 (prompt `578af8545a1c`), checked in a demo with the real model; not yet checked in Safari or with the microphone |
 | Spaces, stage 4: the transition (section 53) | Done in a demo, measured stage by stage and with the real model; not yet seen in motion or in Safari |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
-| Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; logic still being tested |
-| Event durations and repeating events | Logic tested (51 automated tests pass); real requests to JARVIS, such as "every Wednesday and Friday", not yet re-checked |
-| Streaming replies into speech | Written; not tested yet |
-| Automated tests for `jcal.py` | Tested and working: 51 of 51 pass |
+| Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; all four views checked in a demo, on Home and in Work (section 51) |
+| Event durations and repeating events | Logic tested (112 automated tests in `test_jcal.py`); real requests to JARVIS, such as "every Wednesday and Friday", not yet re-checked |
+| Streaming replies into speech | In use: every reply goes through it; the stream is covered by `test_brain.py`, and spoken replies were checked by the owner in Safari (section 42) |
+| Automated tests for `jcal.py` | Tested and working: 112 of 112 pass |
 | Phase 1 (backups, CI, ruff, pre-commit, cleanup, model pin) | Done: merged into `main`, ruff passes, CI green; nightly backup job in place (sections 19, 24) |
 | Time-of-day awareness when listing today's events | Logic tested; passes in the evals (section 21), not yet confirmed in a real conversation (section 16) |
 | Phase 3 (config, one database with migrations, tool registry, Assistant, endpoint tests, logging) | Done, merged into `main`; 191 tests; evals 87/90 with unchanged prompt (section 23) |
@@ -1098,8 +1114,9 @@ Changing space used to be instant. It now plays the access sequence from section
 
 The full roadmap, with the reasons and the order, is in `plan.md`. In short:
 
-1. Reminders (Phase 5, item 2).
-2. A morning briefing: today's events, overdue tasks and reminders in one reply.
-3. Weather, then news and sports, as read-only tools. These are the first to read outside text, so prompt-injection evals come first (SECURITY.md).
-4. Sound effects for the dashboard.
-5. Phase 6, using JARVIS from a phone: a login, Tailscale with HTTPS, a phone layout.
+1. The Sports space, the second space after Work (being designed).
+2. Reminders (Phase 5, item 2).
+3. A morning briefing: today's events, overdue tasks and reminders in one reply.
+4. Weather, then news and sports, as read-only tools. These are the first to read outside text, so prompt-injection evals come first (SECURITY.md).
+5. Sound effects for the dashboard.
+6. Phase 6, using JARVIS from a phone: a login, Tailscale with HTTPS, a phone layout.
