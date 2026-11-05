@@ -97,7 +97,19 @@
       <span id="wx-home-name" class="muted"></span>
     </div>
   </div>
-  <div id="wx-page"></div>
+  <div id="wx-page">
+    <div class="panel wx-top">
+      <div class="wx-place"><div id="wx-place"></div><div id="wx-local" class="muted"></div></div>
+      <div class="wx-actions"><button id="wx-sethome" class="btn ghost">SET AS HOME</button><button id="wx-back" class="btn ghost">BACK TO GLOBE</button></div>
+    </div>
+    <div class="panel" id="wx-now-panel"><div class="h"><span class="l">NOW</span></div><div id="wx-now"></div></div>
+    <div class="panel" id="wx-hours-panel"><div class="h"><span class="l">NEXT 24 HOURS</span></div><div id="wx-hours"></div></div>
+    <div class="panel" id="wx-days-panel"><div class="h"><span class="l">7 DAYS</span></div><div id="wx-days"></div></div>
+    <div class="panel" id="wx-details-panel"><div class="h"><span class="l">DETAILS</span></div><div id="wx-details"></div></div>
+    <div class="panel" id="wx-air-panel"><div class="h"><span class="l">AIR QUALITY</span></div><div id="wx-air"></div></div>
+    <!-- Open-Meteo's licence (CC BY 4.0) asks for this link next to its data -->
+    <div class="wx-credit muted"><a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Weather data by Open-Meteo.com</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a> · rounded and converted by JARVIS</div>
+  </div>
 </section>
 
 <script src="/static/js/orb.js"></script>

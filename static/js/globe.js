@@ -157,7 +157,18 @@ function makeGlobe(canvas) {
     }
     const from = {};
     for (const k of Object.keys(to)) from[k] = state[k];
-    return new Promise(done => { anim = { from, to, start: performance.now(), ms, done }; });
+    return new Promise(done => {
+      // A safety timeout, as motion.js has: a hidden tab gets no frames, and a spin or zoom
+      // must still finish, or the ping and the page would wait until the tab came back
+      const safety = setTimeout(() => {
+        if (anim !== mine) return;
+        Object.assign(state, to);
+        anim = null;
+        done(true);
+      }, ms + 250);
+      const mine = { from, to, start: performance.now(), ms, done: ok => { clearTimeout(safety); done(ok); } };
+      anim = mine;
+    });
   }
 
   const globe = {

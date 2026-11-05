@@ -5,7 +5,7 @@
 #space-weather[hidden] { display:none; }
 #space-weather .panel { cursor:default; }
 
-#wx-globe-view { position:relative; flex:1; min-height:0; }
+#wx-globe-view { position:absolute; inset:0; }
 #wx-globe { position:absolute; inset:0; width:100%; height:100%; display:block; }
 #space-weather[data-view="page"] #wx-globe-view { opacity:.18; pointer-events:none; transition:opacity .8s ease; }
 #space-weather[data-view="page"] .wx-search,
@@ -37,5 +37,74 @@
 .wx-ping .btn { padding:8px 14px; font-size:12px; }
 #wx-yes { border-color:var(--accent); color:var(--accent); }
 
+/* The weather page, over the dimmed globe */
 #wx-page { display:none; }
-#space-weather[data-view="page"] #wx-page { display:grid; }
+#space-weather[data-view="page"] #wx-page {
+  display:grid; position:absolute; inset:0; overflow:auto; gap:16px; align-content:start;
+  grid-template-columns:minmax(240px, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+.wx-top { grid-column:1 / -1; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.wx-place { flex:1; min-width:0; }
+#wx-place { font-size:20px; font-weight:600; color:var(--accent); }
+#wx-local { font-size:13px; margin-top:2px; }
+.wx-actions { display:flex; gap:8px; }
+.wx-actions .btn { padding:8px 14px; font-size:12px; }
+#wx-now-panel { grid-column:1; }
+#wx-hours-panel { grid-column:2 / 4; }
+#wx-days-panel { grid-column:1; }
+#wx-details-panel { grid-column:2; }
+#wx-air-panel { grid-column:3; }
+.wx-credit { grid-column:1 / -1; font-size:12px; text-align:center; padding-bottom:4px; }
+.wx-credit a { color:var(--muted); }
+.wx-credit a:hover { color:var(--accent); }
+
+/* Icons: lines in the accent colour, drawn by wxIcon() */
+.wx-icon { width:32px; height:32px; flex:none; fill:none; stroke:var(--accent); stroke-width:2;
+  stroke-linecap:round; stroke-linejoin:round; }
+.wx-icon .wx-cloud { fill:rgba(12,42,74,.9); }
+.wx-icon .wx-dot { fill:var(--accent); stroke:none; }
+.wx-icon .wx-bolt { stroke:var(--amber); }
+
+/* Now */
+.wx-now-main { display:flex; align-items:center; gap:14px; }
+.wx-now-main .wx-icon { width:64px; height:64px; }
+.wx-temp { display:flex; align-items:baseline; gap:10px; }
+.wx-f { font-size:44px; font-weight:600; line-height:1; }
+.wx-c { font-size:18px; color:var(--muted); }
+.wx-cond { font-size:16px; margin:8px 0 4px; text-transform:capitalize; }
+#wx-now .muted { font-size:13px; margin-top:2px; }
+
+/* Next 24 hours */
+.wx-chart { width:100%; height:auto; display:block; }
+.wx-line { fill:none; stroke:var(--accent); stroke-width:2; stroke-linejoin:round; }
+.wx-rainbar { fill:rgba(76,201,240,.35); }
+.wx-label { fill:var(--muted); font-size:11px; text-anchor:middle; font-family:var(--font); }
+.wx-tval { fill:var(--text); }
+.wx-rain { font-size:13px; margin-top:6px; }
+
+/* 7 days */
+.wx-day { display:grid; grid-template-columns:56px 28px 42px 36px minmax(0,1fr) 36px; gap:8px;
+  align-items:center; padding:6px 0; border-top:1px solid rgba(76,201,240,.12); font-size:14px; }
+.wx-day:first-child { border-top:none; }
+.wx-day .wx-icon { width:26px; height:26px; }
+.wx-dchance { font-size:12px; color:var(--accent); }
+.wx-dlow { text-align:right; }
+.wx-range { position:relative; height:5px; border-radius:999px; background:rgba(255,255,255,.10); }
+.wx-range i { position:absolute; top:0; bottom:0; border-radius:999px;
+  background:linear-gradient(to right, #7fd3ff, var(--amber)); }
+
+/* Details and air quality */
+.wx-row { display:flex; justify-content:space-between; gap:12px; padding:6px 0;
+  border-top:1px solid rgba(76,201,240,.12); font-size:14px; }
+.wx-row:first-child { border-top:none; }
+.wx-wind { display:flex; align-items:center; gap:6px; }
+.wx-arrow { width:16px; height:16px; fill:none; stroke:var(--accent); stroke-width:2; stroke-linecap:round; }
+.wx-aqi { display:flex; align-items:baseline; gap:10px; }
+.wx-aqi-n { font-size:32px; font-weight:600; }
+.wx-aqi-bar { height:6px; margin:8px 0 10px; border-radius:999px; background:rgba(255,255,255,.10); overflow:hidden; }
+.wx-aqi-bar i { display:block; height:100%; border-radius:999px; background:#4ade80; }
+.wx-aqi-bar[data-band="moderate"] i { background:#facc15; }
+.wx-aqi-bar[data-band="unhealthy-for-sensitive-groups"] i { background:#fb923c; }
+.wx-aqi-bar[data-band="unhealthy"] i { background:var(--red); }
+.wx-aqi-bar[data-band="very-unhealthy"] i { background:#a855f7; }
+.wx-aqi-bar[data-band="hazardous"] i { background:#9f1239; }
