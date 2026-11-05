@@ -35,7 +35,7 @@ registerSpace({
     else if (wxView() === 'globe') globe.turn(true);
   },
   // A ping left open is cancelled; the page stays, to come back to
-  leave() { if (wxView() === 'ping') wxCancel(); globe.stop(); },
+  leave() { ++wxSearchToken; if (wxView() === 'ping') wxCancel(); globe.stop(); },
   ready: () => globe.drawn,
   readout: () => (wxView() === 'page' && wxPayload ? String(wxPayload.place.name || '').toUpperCase() : 'GLOBE ONLINE'),
 });
@@ -81,6 +81,7 @@ function wxDetail(r) {
 async function wxSearch() {
   const q = wxQuery.value.trim();
   if (!q) return;
+  if (wxBusy) { wxSay('One moment, still opening that place.'); return; }
   const token = ++wxSearchToken;
   wxSay('Searching\u2026');
   const r = await wxPost('/weather/places', { query: q });
@@ -177,9 +178,11 @@ async function wxConfirm() {
 // Zoom in and show the page (the panels are drawn by drawWeather)
 async function weatherShowPayload(payload) {
   wxPayload = payload;
+  const token = ++wxSpinToken;
   globe.clearPing();
   globe.turn(false);
   await globe.zoomTo(payload.place.lat, payload.place.lon);
+  if (token !== wxSpinToken) return;   // cancelled during the zoom: stay on the globe
   drawWeather(payload);
   wxShowHome();
   wxSetView('page');
@@ -192,12 +195,14 @@ wxNo.addEventListener('click', wxNext);
 
 // Escape: cancels the ping, or goes back to the globe from the page. Not while typing (the
 // first Escape only leaves the box, spaces.js) or while an access sequence plays.
+// It listens in the capture phase, so it runs before app.js's Escape, which skips an access
+// sequence and can finish it before a normal listener would see seq set (final review).
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape' || currentSpace !== 'weather') return;
   if (typeof seq !== 'undefined' && seq) return;
-  if (typingIn(e.target)) return;
+  if (typingIn(e.target) || wxBusy) return;
   if (wxView() !== 'globe') { e.preventDefault(); wxCancel(); }
-});
+}, true);
 
 // ---------- the weather page (every figure comes worked out from weather.py) ----------
 const SVG_NS = 'http://www.w3.org/2000/svg';

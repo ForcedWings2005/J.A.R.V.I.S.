@@ -40,8 +40,13 @@ function makeGlobe(canvas) {
   const ctx = canvas.getContext('2d');
   const state = { lat: 20, lon: 0, zoom: 1, lines: [], ping: null, running: false, turning: false };
   let anim = null;        // { from, to, start, ms, done }: a spin or a zoom in progress
-  let frame = null;
+  let frame = null;       // a requestAnimationFrame id
+  let wait = null;        // a setTimeout id, while hidden or dimmed (kept apart from frame:
+                          // the two kinds of id are separate numbers, and cancelling one as
+                          // the other could cancel someone else's timer)
   let last = 0;
+  let dirty = true;       // something changed that a still globe must show once
+  let drawnSize = '';
   const css = getComputedStyle(document.documentElement);
   const accent = css.getPropertyValue('--accent').trim() || '#4cc9f0';
 
@@ -131,18 +136,27 @@ function makeGlobe(canvas) {
     // A hidden tab or the idle dimming: draw nothing, look again in a second
     if (document.hidden || document.body.classList.contains('fx-ambient')) {
       last = 0;
-      frame = setTimeout(() => { frame = null; if (state.running) frame = requestAnimationFrame(step); }, 1000);
+      dirty = true;
+      wait = setTimeout(() => { wait = null; if (state.running) frame = requestAnimationFrame(step); }, 1000);
       return;
     }
     if (anim) {
       const t = Math.min(1, (now - anim.start) / anim.ms);
       const e = globeMath.ease(t);
       for (const k of Object.keys(anim.to)) state[k] = anim.from[k] + (anim.to[k] - anim.from[k]) * e;
-      if (t >= 1) { const done = anim.done; anim = null; done(true); }
+      if (t >= 1) { const done = anim.done; anim = null; dirty = true; done(true); }
     } else if (state.turning && !globeCalm()) {
       state.lon = ((state.lon + GLOBE_TURN_DEG_PER_S * dt + 540) % 360) - 180;
     }
-    draw(now);
+    // A still globe (behind the weather page, or with Reduce motion) is drawn once, not
+    // 60 times a second
+    const sizeNow = canvas.clientWidth + 'x' + canvas.clientHeight;
+    const moving = anim || state.ping || (state.turning && !globeCalm());
+    if (moving || dirty || sizeNow !== drawnSize) {
+      draw(now);
+      dirty = false;
+      drawnSize = sizeNow;
+    }
     frame = requestAnimationFrame(step);
   }
 
@@ -164,6 +178,7 @@ function makeGlobe(canvas) {
         if (anim !== mine) return;
         Object.assign(state, to);
         anim = null;
+        dirty = true;
         done(true);
       }, ms + 250);
       const mine = { from, to, start: performance.now(), ms, done: ok => { clearTimeout(safety); done(ok); } };
@@ -174,16 +189,18 @@ function makeGlobe(canvas) {
   const globe = {
     drawn: false,
     get center() { return { lat: state.lat, lon: state.lon, zoom: state.zoom }; },
-    setLines(lines) { state.lines = Array.isArray(lines) ? lines : []; },
+    setLines(lines) { state.lines = Array.isArray(lines) ? lines : []; dirty = true; },
     start() {
       if (state.running) return;
       state.running = true;
       last = 0;
+      dirty = true;
       frame = requestAnimationFrame(step);
     },
     stop() {
       state.running = false;
-      if (frame) { cancelAnimationFrame(frame); clearTimeout(frame); frame = null; }
+      if (frame) { cancelAnimationFrame(frame); frame = null; }
+      if (wait) { clearTimeout(wait); wait = null; }
       if (anim) { const done = anim.done; anim = null; done(false); }
     },
     turn(on) { state.turning = on; },
@@ -200,6 +217,7 @@ function makeGlobe(canvas) {
       state.turning = false;
       state.lat = lat;
       state.lon = lon;
+      dirty = true;
     },
     zoomTo(lat, lon) {
       state.turning = false;
@@ -208,9 +226,10 @@ function makeGlobe(canvas) {
     unzoom() {
       if (anim) { const done = anim.done; anim = null; done(false); }
       state.zoom = 1;
+      dirty = true;
     },
     ping(lat, lon) { state.ping = { lat, lon }; },
-    clearPing() { state.ping = null; },
+    clearPing() { state.ping = null; dirty = true; },
     // CSS pixels inside the canvas
     screenPoint(lat, lon) {
       const w = canvas.clientWidth, hgt = canvas.clientHeight;

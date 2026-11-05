@@ -1128,7 +1128,7 @@ The third stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`):
   - **Not this one** goes to the next match. After the last, it goes back to the globe with a hint ("Try adding the country, like "Paris, Texas"").
   - **Confirming** sends the id the server issued. JARVIS says, and speaks, the line `weather.py` wrote, and the server has already added it to the conversation.
   - **Escape** cancels, except while you are typing, where it only leaves the box, as everywhere.
-  - **Safety:** the newest search wins, a double click sends one confirm, and leaving in the middle of a spin, a ping or a zoom is safe.
+  - **Safety:** the newest search wins. The exception is while a place is opening (a confirm or Open on home is out): a search waits with "One moment, still opening that place.", so the page always matches the place the server has on screen and has told the conversation about. A double click sends one confirm. Leaving in the middle of a spin, a ping or a zoom is safe, and a search reply that arrives after you left no longer pulls you back.
   - **For stage 4:** `weatherShowMatches()` is ready for the chat to use.
 - **The weather page**, over the dimmed globe, with JARVIS docked on the right:
   - **Now:** °F large, °C small, feels like, high and low.
@@ -1140,6 +1140,7 @@ The third stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`):
   - **Icons** are SVG drawn in code. The helper `svg()` refuses `style` and `on...` attributes: the security policy would block them silently, and its tests cannot see attributes set while the page runs (stage 1's review).
   - **A missing value** shows as "–".
 - **Home settings**: SET AS HOME keeps the place in this browser (never `jarvis.db`). The Open on home switch (off by default) makes Weather open straight on its page. A saved home that is not valid is ignored, and with storage unavailable (a private window) both simply do nothing.
+- **The zoom comes first, then the page.** The spec has the panels fading in during the zoom; here they appear when it ends. That is simpler, and a cancel during the zoom simply stays on the globe.
 - **A bug found in the demo, fixed**: with the browser pane hidden, the page got no animation frames, so the spin and zoom never finished. The live search had gone through, and JARVIS had said Rome's weather, but the page stayed on the ping. The globe's animations now have a safety timeout, as `motion.js`'s sequences already do (a hidden tab pauses animations). With animation frames switched off completely, a spin still finished in 1.75 s and a zoom in 1.05 s, landing on the place.
 - **Weather joins the spaces list** (`config.SPACES`, and a mention in `open_space`'s description), so "open the weather" works and the stamp can say "· Weather". That is a prompt change, so the full eval ran before and after:
   - **Before:** 201/204, prompt `578af8545a1c`.
@@ -1153,6 +1154,16 @@ The third stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`):
   - **Home settings:** all of them, including storage that throws.
   - **Reduce motion:** everything instant.
   - **Live:** Rome, after the fix: "Rome?" with "Lazio · Italy, 1 of 5", then 58°F, overcast, AQI 67 "Moderate".
+- **Final review** (a fresh reviewer of the whole branch, kept to the project folder, reading the code; there is no JavaScript test runner): nothing critical. Each problem was first reproduced in the demo, then fixed and checked again:
+  - **A late reply overrode what you did since.** A search during a slow confirm was lost and the old place's page won. Escape during the zoom still showed the page, over an unzoomed globe. Now a search waits while a place is opening, and the page is shown only if nothing happened during the zoom.
+  - **Escape to skip the opening animation into Weather could also throw away the page.** `app.js`'s Escape skips the animation and can finish it before the weather code checks. The weather code now hears Escape first (the capture phase). This one did not reproduce here (the hidden pane gives no frames), so it was fixed as a precaution, following the reviewer's reading of the code.
+  - **The globe kept two kinds of timer id in one variable.** Stopping it could cancel someone else's timer with the same number, such as the idle dimming or a safety timeout. They are now kept apart.
+  - **The globe redrew about 60 times a second behind a still page.** It now draws a still globe once; measured at 0 redraws a second on the page, against 55 before.
+  - **A search reply that came back after you left pulled you back to Weather.** Now it is ignored.
+  - **Left for later:**
+    - the local-time clock keeps ticking after you leave Weather with the page shown;
+    - when JARVIS opens Weather from another space (stage 4), the keyboard focus may land on the ping's button before it is visible;
+    - extra blank lines in one test.
 - **Not checked**: Safari; how it looks in motion, by eye (most checks were measured, because the hidden pane gives no frames); phone width (left for later by the owner); and a real hidden tab rather than a simulated one.
 - **Noticed**: the browser asks for `/favicon.ico`, which JARVIS has never had (a 404 in the console on every load, unrelated to Weather).
 
