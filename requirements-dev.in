@@ -12,3 +12,4 @@ python-multipart
 ollama
 cryptography
 httpx2             # the test client (fastapi's TestClient) needs it
+truststore         # weather.py imports it

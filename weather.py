@@ -10,6 +10,7 @@ import json
 import logging
 import math
 import secrets
+import ssl
 import threading
 import time
 import unicodedata
@@ -19,6 +20,8 @@ import urllib.request
 from collections import OrderedDict
 from datetime import date
 from time import monotonic   # its own name, so tests can move the cache's clock
+
+import truststore
 
 import config
 
@@ -40,7 +43,12 @@ class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
         return None
 
 
-_OPENER = urllib.request.build_opener(_RefuseRedirects)
+# HTTPS proves it is really Open-Meteo by a certificate, checked against a list of trusted
+# signers. python.org's Python ships without such a list, so every request was refused.
+# truststore checks against macOS's own list, the one Safari uses (the owner's choice,
+# 2026-11-05), and keeps both checks on: the certificate and the host name.
+_TLS = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+_OPENER = urllib.request.build_opener(_RefuseRedirects, urllib.request.HTTPSHandler(context=_TLS))
 
 
 def _fetch(address: str) -> bytes:

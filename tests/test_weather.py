@@ -5,10 +5,13 @@ needs a reply puts a made-up one in its place (spec: docs/specs/2026-11-05-weath
 """
 import http.server
 import logging
+import ssl
 import threading
 import urllib.error
+import urllib.request
 
 import pytest
+import truststore
 
 import config
 import weather
@@ -93,6 +96,17 @@ def test_redirects_are_refused():
         server.shutdown()
         server.server_close()
 
+
+
+def test_https_checks_certificates_against_the_macs_trust_list():
+    """python.org's Python has no list of trusted certificate signers of its own, so every
+    request failed (CHANGELOG section 56). The opener checks against macOS's own list, the
+    one Safari uses (the owner's choice), and never skips the check."""
+    https = [h for h in weather._OPENER.handlers if isinstance(h, urllib.request.HTTPSHandler)]
+    assert len(https) == 1
+    context = https[0]._context
+    assert isinstance(context, truststore.SSLContext)
+    assert context.verify_mode == ssl.CERT_REQUIRED and context.check_hostname is True
 
 def test_each_request_is_logged_without_its_address(monkeypatch, caplog):
     fake_fetch(monkeypatch, b"{}")

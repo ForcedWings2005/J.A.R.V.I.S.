@@ -8,3 +8,4 @@ cryptography       # encrypted backups
 numpy              # handles speech audio
 kokoro-onnx        # JARVIS's voice (text to speech)
 mlx-whisper        # speech to text
+truststore         # checks HTTPS certificates against macOS's own list (weather.py)
