@@ -21,6 +21,7 @@ import server
 import speech
 import tasks
 import urllib.error
+import weather
 import weather_data as data
 from fakes import FakeModel, call, say, use
 
@@ -601,3 +602,14 @@ def test_weather_endpoints_refuse_plain_text(client, path):
 @pytest.mark.parametrize("path", WEATHER_PATHS)
 def test_weather_endpoints_only_take_post(client, path):
     assert client.get(path).status_code == 405
+
+
+def test_a_malformed_reply_is_a_502_not_a_crash(client, model, monkeypatch):
+    """Final review: wrong types in a reply used to give a 500."""
+    model()
+    reply = data.forecast()
+    reply["current"] = [1, 2]
+    monkeypatch.setattr(weather, "_summary", lambda *a: (_ for _ in ()).throw(TypeError("x")))
+    data.serve(monkeypatch, forecast=reply, air=data.air())
+    r = client.post("/weather/home", json={"name": "Home", "lat": 1, "lon": 2})
+    assert r.status_code == 502 and r.json()["detail"] == "Couldn't reach the weather service."

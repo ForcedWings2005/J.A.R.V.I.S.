@@ -57,6 +57,11 @@ def _fetch(address: str) -> bytes:
         return reply.read(config.WEATHER_MAX_BYTES + 1)
 
 
+def _refuse_constant(name: str):
+    """Python's json reads NaN and Infinity, which are not real JSON and not real weather."""
+    raise ValueError(f"{name} in a reply")
+
+
 def _get(base: str, params: dict) -> dict:
     """Ask one of the three fixed addresses; any failure becomes one plain WeatherError."""
     if base not in ADDRESSES:
@@ -69,11 +74,12 @@ def _get(base: str, params: dict) -> dict:
         body = _fetch(address)
         if len(body) > config.WEATHER_MAX_BYTES:
             raise ValueError("reply too large")
-        data = json.loads(body)
+        data = json.loads(body, parse_constant=_refuse_constant)
         if not isinstance(data, dict):
             raise ValueError("reply is not a JSON object")
         return data
-    except (OSError, ValueError) as e:   # URLError, HTTPError and timeouts are OSErrors
+    # URLError, HTTPError and timeouts are OSErrors; RecursionError: absurdly nested JSON
+    except (OSError, ValueError, RecursionError) as e:
         outcome = type(e).__name__
         raise WeatherError(UNREACHABLE) from e
     finally:
@@ -285,6 +291,45 @@ def _round(x: float) -> float:
     return round(float(x), config.WEATHER_COORD_DECIMALS)
 
 
+# A reply is outside data: it is read only through these, so a value of the wrong type (a
+# word where a number belongs, a list where a table belongs) becomes "missing", never a
+# crash, and never text that reaches the page or the conversation (final review).
+
+def _num(x) -> int | float | None:
+    """x if it is a real, finite number, else None (True counts as a bool, not a 1)."""
+    if isinstance(x, bool) or not isinstance(x, (int, float)):
+        return None
+    return x if math.isfinite(x) else None
+
+
+def _text(x) -> str:
+    return x if isinstance(x, str) else ""
+
+
+def _obj(x) -> dict:
+    return x if isinstance(x, dict) else {}
+
+
+def _at(values, i):
+    """values[i], or None when the list is missing, too short or holds null there."""
+    if not isinstance(values, list) or i is None or not 0 <= i < len(values):
+        return None
+    return values[i]
+
+
+def _weekday(day: str) -> str | None:
+    try:
+        return WEEKDAYS[date.fromisoformat(day).weekday()]
+    except ValueError:
+        return None
+
+
+def _clock(stamp) -> str | None:
+    """'2026-11-05T07:45' -> '07:45'; anything else -> None."""
+    text = _text(stamp)
+    return text[11:16] if len(text) >= 16 and text[13] == ":" else None
+
+
 def find_places(query: str) -> list[dict]:
     """Up to WEATHER_MATCHES places for the words, largest first, each with a short id the
     page sends back to confirm (so neither the page nor the model can invent a place)."""
@@ -293,15 +338,16 @@ def find_places(query: str) -> list[dict]:
         raise ValueError("a place to search for must be 1 to 80 characters")
     results = _cached(("geo", q.lower()), lambda: _get(config.WEATHER_GEOCODE_URL, {
         "name": q, "count": config.WEATHER_MATCHES, "language": "en", "format": "json",
-    }).get("results") or [])
+    }).get("results"))
+    found = [r for r in (results if isinstance(results, list) else []) if isinstance(r, dict)]
     places = []
-    for r in sorted(results, key=lambda r: -(r.get("population") or -1)):
-        try:
-            places.append({"name": clean(r.get("name")), "region": clean(r.get("admin1")),
-                           "country": clean(r.get("country")),
-                           "lat": _round(r["latitude"]), "lon": _round(r["longitude"])})
-        except (KeyError, TypeError, ValueError):
-            continue                  # a result without coordinates cannot be shown
+    for r in sorted(found, key=lambda r: -(_num(r.get("population")) or -1)):
+        lat, lon = _num(r.get("latitude")), _num(r.get("longitude"))
+        if lat is None or lon is None or not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            continue                  # a result without real coordinates cannot be shown
+        places.append({"name": clean(_text(r.get("name"))), "region": clean(_text(r.get("admin1"))),
+                       "country": clean(_text(r.get("country"))),
+                       "lat": _round(lat), "lon": _round(lon)})
     matches = []
     with _lock:
         for place in places[:config.WEATHER_MATCHES]:
@@ -311,73 +357,68 @@ def find_places(query: str) -> list[dict]:
     return matches
 
 
-def _at(values, i):
-    """values[i], or None when the list is missing, too short or holds null there."""
-    try:
-        return values[i]
-    except (IndexError, TypeError):
-        return None
-
-
 def _summary(place: dict, f: dict, a: dict | None) -> dict:
     """Open-Meteo's replies turned into what the page draws. 'Now' is the forecast's own
-    time, already in the place's time zone, never this Mac's clock."""
-    current, hourly, daily = f.get("current") or {}, f.get("hourly") or {}, f.get("daily") or {}
-    now_time = str(current.get("time") or "")
-    words, icon = condition(current.get("weather_code"), bool(current.get("is_day")))
-    now = {"time": now_time[11:16], "temp_c": round_half_up(current.get("temperature_2m")),
-           "temp_f": to_f(current.get("temperature_2m")),
-           "feels_c": round_half_up(current.get("apparent_temperature")),
-           "feels_f": to_f(current.get("apparent_temperature")),
-           "condition": words, "icon": icon, "is_day": bool(current.get("is_day"))}
+    time, already in the place's time zone, never this Mac's clock. Every number is read
+    through _num, every text through _text or clean."""
+    current, hourly, daily = _obj(f.get("current")), _obj(f.get("hourly")), _obj(f.get("daily"))
+    now_time = _text(current.get("time"))
+    temp, feels = _num(current.get("temperature_2m")), _num(current.get("apparent_temperature"))
+    words, icon = condition(_num(current.get("weather_code")), _num(current.get("is_day")) == 1)
+    now = {"time": _clock(now_time), "temp_c": round_half_up(temp), "temp_f": to_f(temp),
+           "feels_c": round_half_up(feels), "feels_f": to_f(feels),
+           "condition": words, "icon": icon, "is_day": _num(current.get("is_day")) == 1}
 
-    times = hourly.get("time") or []
+    times = [_text(t) for t in hourly.get("time")] if isinstance(hourly.get("time"), list) else []
     this_hour = now_time[:13] + ":00"
-    first = next((i for i, t in enumerate(times) if t >= this_hour), len(times))
+    first = next((i for i, t in enumerate(times) if t and t >= this_hour), None)
     hours = []
-    for i in range(first, min(first + 24, len(times))):
-        is_day = bool(_at(hourly.get("is_day"), i))
-        temp = _at(hourly.get("temperature_2m"), i)
-        hours.append({"time": times[i][11:16], "temp_c": round_half_up(temp),
-                      "temp_f": to_f(temp),
-                      "rain_chance": _at(hourly.get("precipitation_probability"), i),
-                      "icon": condition(_at(hourly.get("weather_code"), i), is_day)[1],
+    for i in range(first, min(first + 24, len(times))) if first is not None else ():
+        if _clock(times[i]) is None:
+            continue
+        is_day = _num(_at(hourly.get("is_day"), i)) == 1
+        h_temp = _num(_at(hourly.get("temperature_2m"), i))
+        hours.append({"time": _clock(times[i]), "temp_c": round_half_up(h_temp),
+                      "temp_f": to_f(h_temp),
+                      "rain_chance": _num(_at(hourly.get("precipitation_probability"), i)),
+                      "icon": condition(_num(_at(hourly.get("weather_code"), i)), is_day)[1],
                       "is_day": is_day})
 
     days = []
-    for i, day in enumerate((daily.get("time") or [])[:7]):
-        high, low = _at(daily.get("temperature_2m_max"), i), _at(daily.get("temperature_2m_min"), i)
-        d_words, d_icon = condition(_at(daily.get("weather_code"), i), True)
-        days.append({"date": day, "weekday": WEEKDAYS[date.fromisoformat(day).weekday()],
+    day_list = daily.get("time") if isinstance(daily.get("time"), list) else []
+    for i, day in enumerate(day_list[:7]):
+        high = _num(_at(daily.get("temperature_2m_max"), i))
+        low = _num(_at(daily.get("temperature_2m_min"), i))
+        d_words, d_icon = condition(_num(_at(daily.get("weather_code"), i)), True)
+        days.append({"date": _text(day)[:10] or None, "weekday": _weekday(_text(day)[:10]),
                      "condition": d_words, "icon": d_icon,
                      "high_c": round_half_up(high), "high_f": to_f(high),
                      "low_c": round_half_up(low), "low_f": to_f(low),
-                     "rain_chance": _at(daily.get("precipitation_probability_max"), i)})
+                     "rain_chance": _num(_at(daily.get("precipitation_probability_max"), i))})
 
-    at_now = first if first < len(times) else None
-    uv = _at(hourly.get("uv_index"), at_now) if at_now is not None else None
-    seen = _at(hourly.get("visibility"), at_now) if at_now is not None else None
-    wind, pressure = current.get("wind_speed_10m"), current.get("pressure_msl")
+    uv = _num(_at(hourly.get("uv_index"), first))
+    seen = _num(_at(hourly.get("visibility"), first))
+    wind, pressure = _num(current.get("wind_speed_10m")), _num(current.get("pressure_msl"))
     details = {"wind_kmh": round_half_up(wind), "wind_mph": kmh_to_mph(wind),
-               "wind_dir": current.get("wind_direction_10m"),
-               "humidity": current.get("relative_humidity_2m"),
+               "wind_dir": _num(current.get("wind_direction_10m")),
+               "humidity": _num(current.get("relative_humidity_2m")),
                "uv": uv, "uv_label": uv_label(uv),
-               "sunrise": str(_at(daily.get("sunrise"), 0) or "")[11:16] or None,
-               "sunset": str(_at(daily.get("sunset"), 0) or "")[11:16] or None,
+               "sunrise": _clock(_at(daily.get("sunrise"), 0)),
+               "sunset": _clock(_at(daily.get("sunset"), 0)),
                "pressure_hpa": round_half_up(pressure), "pressure_inhg": hpa_to_inhg(pressure),
                "visibility_km": m_to_km(seen), "visibility_mi": m_to_mi(seen)}
 
     air = None
     if a is not None:
-        now_air = a.get("current") or {}
-        pollen = {kind: now_air[f"{kind}_pollen"] for kind in POLLEN
-                  if now_air.get(f"{kind}_pollen") is not None}
-        aqi = round_half_up(now_air.get("us_aqi"))
-        air = {"aqi": aqi, "aqi_label": aqi_label(aqi), "pm2_5": now_air.get("pm2_5"),
-               "ozone": now_air.get("ozone"), "pollen": pollen or None}
+        now_air = _obj(a.get("current"))
+        pollen = {kind: _num(now_air.get(f"{kind}_pollen")) for kind in POLLEN
+                  if _num(now_air.get(f"{kind}_pollen")) is not None}
+        aqi = round_half_up(_num(now_air.get("us_aqi")))
+        air = {"aqi": aqi, "aqi_label": aqi_label(aqi), "pm2_5": _num(now_air.get("pm2_5")),
+               "ozone": _num(now_air.get("ozone")), "pollen": pollen or None}
 
-    full_place = {**place, "timezone": clean(f.get("timezone")),
-                  "utc_offset_seconds": f.get("utc_offset_seconds")}
+    full_place = {**place, "timezone": clean(_text(f.get("timezone"))),
+                  "utc_offset_seconds": _num(f.get("utc_offset_seconds"))}
     return {"place": full_place, "now": now, "hours": hours,
             "rain": rain_windows([(int(h["time"][:2]), h["rain_chance"]) for h in hours]),
             "days": days, "details": details, "air": air}
@@ -396,7 +437,16 @@ def forecast_for(place: dict) -> dict:
             **where, "current": AIR, "timezone": "auto"}))
     except WeatherError:
         a = None
-    return _summary(place, f, a)
+    try:
+        return _summary(place, f, a)
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError) as e:
+        # Belt and braces: a reply this code still cannot read is not kept for 10 minutes,
+        # and the user gets the same plain message as for any other failure
+        with _lock:
+            _cache.pop(("forecast", *key), None)
+            _cache.pop(("air", *key), None)
+        log.warning("weather reply could not be read: %s", type(e).__name__)
+        raise WeatherError(UNREACHABLE) from e
 
 
 def _show(place: dict) -> dict:

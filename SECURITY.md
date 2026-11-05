@@ -67,7 +67,7 @@ Each of these is in the code or the system and has been checked.
 | `TrustedHostMiddleware` allows only `127.0.0.1` and `localhost` | DNS rebinding (a website pretending to be this Mac). |
 | JSON endpoints refuse `text/plain` bodies (pinned by a test) | Other websites driving `/chat`, `/confirm` or `/tasks`. |
 | Every POST whose `Origin` is not JARVIS's own address is refused with 403, before any work (`server.py`, pinned by tests) | Other websites making JARVIS act or work, such as running Whisper through `/transcribe`. A second, independent lock on the JSON endpoints. Shown with `experiments/attack_page.html`: before, "transcribed 32044 bytes"; after, 403. |
-| Outside requests go only to three fixed HTTPS addresses in `config.py`, built by code, through one function (`weather._get`), with redirects refused, certificates checked against macOS's own list (`truststore`), a 5 s timeout, a 1 MB cap and coordinates rounded to 2 decimals (pinned by tests) | JARVIS being sent anywhere else, by the model or by a reply; someone between this Mac and the service pretending to be it. Checked live: an expired certificate and a wrong host name were refused (CHANGELOG section 56). |
+| Outside requests go only to three fixed HTTPS addresses in `config.py`, built by code, through one function (`weather._get`), with redirects refused, certificates checked against macOS's own list (`truststore`), a 5 s limit on connecting and on each wait for data (not on the whole request), a 1 MB cap and coordinates rounded to 2 decimals (pinned by tests) | JARVIS being sent anywhere else, by the model or by a reply; someone between this Mac and the service pretending to be it. Checked live: an expired certificate and a wrong host name were refused (CHANGELOG section 56). |
 | Outside names (places, regions, countries) are cleaned of control and invisible characters and cut to 60 characters before use (`weather.clean`) | Odd or hidden text from a reply reaching the page or, later, the model. |
 | Every response carries a Content Security Policy (`server.py`, pinned by tests): only JARVIS's own scripts, styles, images, fonts and connections; audio also from `blob:` and `data:`; no plug-ins; never inside another site's page. (Except a crash's plain-text 500 reply, which has nothing to protect.) | Injected code running or sending data to another site, and clickjacking (a site hiding JARVIS under its own buttons so a click lands on Confirm). Checked in a demo: an inline script, an inline style, `eval`, a fetch to another site and a frame were all blocked (CHANGELOG section 55). |
 | Deletes and edits only through a confirmation card and `POST /confirm` | The model deleting or changing events by itself. |
@@ -180,8 +180,12 @@ agreed for Sports and kept for Weather):
 - **Nothing new is stored**: the cache, the match ids and the place on screen live in memory
   only, so no weather data reaches `jarvis.db` or the backups.
 - **Outside text and the model**: place, region and country names are the first outside text
-  JARVIS shows, and the model will read them from stage 4. They are short, cleaned and capped
-  (section 4). Anything longer, such as news, needs its own prompt-injection design first.
+  JARVIS shows. The model already reads some: the spoken line after a confirm joins the
+  conversation, and holds the place's name (cleaned, at most 60 characters) and numbers that
+  code checked are real numbers, nothing else from the reply. Every value in a reply is read
+  as a real number or as cleaned text, or treated as missing (`weather._num`, pinned by tests),
+  so the page and the conversation never get raw reply text. Anything longer, such as news,
+  needs its own prompt-injection design first.
 
 ## 6. Known gaps
 
