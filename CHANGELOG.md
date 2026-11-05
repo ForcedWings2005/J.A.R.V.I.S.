@@ -16,6 +16,7 @@ jarvis/
 ├── tasks.py            To-do list tools
 ├── spaces.py           The open_space tool: changes the space on screen (section 52)
 ├── workday.py          The Work space's figures: free time, what's next, deadlines (section 51)
+├── weather.py          Weather from Open-Meteo: fixed addresses, figures, cache (section 56)
 ├── calc.py             The calculate tool (safe, no eval)
 ├── notes.py            Notes and memory: remember, recall, forget (FTS5 search)
 ├── config.py           Settings: model, paths, limits, voice
@@ -63,6 +64,8 @@ jarvis/
 │   ├── test_notes.py   Tests for remember, recall and forget
 │   ├── test_workday.py Tests for the Work space's figures
 │   ├── test_spaces.py  Tests for open_space
+│   ├── test_weather.py Tests for weather.py (never online)
+│   ├── weather_data.py Made-up Open-Meteo replies for the tests
 │   └── test_backup.py  Tests for backups: plain, encrypted, restore, keys
 ├── evals/              Model evaluation suite (python -m evals)
 │   ├── cases.py        The 68 cases
@@ -1079,6 +1082,30 @@ The first stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`),
 - **Final review** (a fresh reviewer of the whole branch, kept to the project folder): no critical or important findings. Fixed: the docs said "every response", but a crash's 500 reply comes from Starlette's own error handler, outside every middleware, so it has no policy (plain text, nothing to protect; the docs now say so); and CLAUDE.md's wording now names the audio exceptions and says exactly what the scans cover. Left for later: a test that pins the middleware's order directly (today only a comment stops a future middleware from being added after it); and the scans' blind spots (attributes set at run time, such as a `style` key passed to an SVG helper like `orb.js`'s, HTML strings in `innerHTML`, `javascript:` in `index.html`), so the Weather stages keep the violation listener in their demos.
 - **Not checked**: Safari, the microphone (its upload goes to JARVIS's own address, which the policy allows), and a frame from a truly different site (the built-in browser could not open a blank page; the page framing itself tests the same rule, which refuses every parent alike).
 
+## 56. Weather, stage 2: the server
+
+The second stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`): JARVIS can now look up places and fetch their forecast and air quality from Open-Meteo, and serve them to the page. Nothing on screen yet, and no tools yet, so the model's prompt is unchanged (a test pins it) and no eval was needed. Plan: `docs/plans/2026-11-05-weather-stage-2.md`.
+
+- **The first outside data, and a new privacy rule.** Until now nothing left the Mac except the encrypted backup copy. The rule is now: nothing *personal* leaves unencrypted; JARVIS may fetch public data over HTTPS from a short list of fixed addresses, written in code, carrying only what the service needs, and the model never chooses the address. Written into `SECURITY.md` section 5 (with what goes out, what Open-Meteo keeps, and why it is accepted), `CLAUDE.md` and README.
+- **One door to the internet** (`weather.py`). `_fetch` is the only function that touches the network, and `_get`, the only one that calls it, takes one of three fixed addresses from `config.py` and builds the rest with `urlencode`, so no text can change the address ("Paris&count=100" stays inside the search). Redirects are refused (Python normally follows a "go over there instead" reply, which could take JARVIS elsewhere); a reply over 1 MB, a timeout after 5 s, or anything that is not JSON becomes one plain error, "Couldn't reach the weather service." Each request is logged with its host, time and outcome, never its address, which holds the place.
+- **Certificates, and a surprise.** The first live request failed: `CERTIFICATE_VERIFY_FAILED`. HTTPS proves a site is who it says by a certificate, checked against a list of trusted signers, and the python.org Python for Mac ships without one (its "Install Certificates" step was never run). The check was working; it had nothing to check against. Turning it off was never an option. The owner chose `truststore`, which checks against macOS's own list, the one Safari uses. It was already installed (pulled in by `httpx2`), so it is now named in both `.in` files and the lock files changed only in their "# via" lines, same version and fingerprints. Checked: Open-Meteo connects, and two public test pages with bad certificates (expired, and for the wrong name) are refused.
+- **Coordinates rounded to 2 decimals** (about 1 km) before any request, the owner's choice: the forecast is the same, but a street is not named.
+- **Worked out in code, never by the model**: °F from °C rounded once, half up (Python's `round()` sends 0.5 to the nearest even number, so 0.5 °F would have been 0); mph, miles, inches of mercury, each beside its metric figure; weather codes to words and icons; the US AQI and UV labels; "from 2 pm to 5 pm" for hours with a rain chance of 40 % or more; and the spoken line, which says "minus 3" and leaves out anything missing. Outside names are cleaned of control and invisible characters (one can make text read backwards) and cut to 60 characters.
+- **Places and "now".** A search gives up to 5 matches, largest population first, each with a short random id the server made; only an id it issued can be confirmed, for 10 minutes. "Now" for a place is the forecast's own time, already in that place's time zone, never this Mac's clock, so Paris showed 19:30 while the Mac said 13:30. A missing value stays empty (shown as a dash later), never a crash.
+- **Cache, in memory only**: matches, forecasts and air quality are kept 10 minutes, at most 50 entries, errors never kept. The place on screen is set only after its forecast arrived, so a failure changes nothing. Nothing reaches `jarvis.db` or the backups; no schema change.
+- **Endpoints**: `POST /weather/places`, `/weather/confirm` and `/weather/home`. POST, though they only read, so the `Origin` check and the JSON-only rule cover every request that makes JARVIS go online. Confirming adds the spoken line to the conversation (`Assistant.add_reply`, called only by the page, like `/confirm`), so a later "will it rain there?" knows the place; a new conversation forgets it. Service down: 502. Unknown or expired id: 404 "That place has expired. Search again."
+- **A bug the tests found**: sending `NaN` or `Infinity` to `/weather/home` was refused, but FastAPI quotes the bad value back in its 422 reply, and `NaN` cannot be written as JSON, so the refusal itself crashed with a 500. Such numbers now become "no value" first and are refused cleanly.
+- **Tests** (626 in all, 96 new): never online (`conftest.py`'s `no_internet` makes the door fail loudly); made-up replies shaped like Open-Meteo's real ones (field names from its docs) in `tests/weather_data.py`; a real little server on `127.0.0.1` that answers with a redirect, to prove it is not followed; every endpoint's `Origin` and `text/plain` refusals in separate tests.
+- **Checked live** (a demo server with its own database, backups and log; made-up places, never the owner's home):
+  - "Paris": five matches, France first (48.85, 2.35), then Texas, Tennessee, Kentucky and Illinois. "Xqzzv": none.
+  - "Paris, Texas": the first try took over 5 seconds and was cut off with the clean 502, as designed; the retry gave one match in Texas.
+  - Confirming Paris: 11 °C, 51 °F, feels like 8 °C, 47 °F, overcast; today's high 12 °C, 53 °F; 24 hours from 19:00; 7 days; AQI 66 "Moderate". Spoken: "Paris: 51 degrees, 11 Celsius, and overcast. High of 53, 15 percent chance of rain." Open-Meteo's own reply for the same moment: 10.6 °C, feels like 8.3 °C, code 3 (overcast), high 11.6 °C, which match once rounded.
+  - The home button with Rome (41.902782, 12.496366): sent and shown as 41.9, 12.5, in Europe/Rome.
+  - The demo's log has a line per request with host, time and outcome, and none names a place or coordinates.
+  - Paris's pollen came back as zeros (Europe in November), not as missing, so it is shown as zeros.
+- **Noticed**: the owner's own JARVIS (started with `--reload`) restarts whenever a file in the folder changes, so it ran this branch's code during the work, and its restarts wrote to the real log. The demo itself wrote only to its own folder; `jarvis.db` and the backups were untouched.
+- **Not checked**: anything on screen (stage 3), the tools and the model (stage 4), and a slow Open-Meteo holding up other requests (each waits in its own thread, by design, but this was not measured).
+
 ---
 
 ## Status
@@ -1105,6 +1132,7 @@ The first stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`),
 | Spaces, stage 3: switching by voice (section 52) | Done: evals 202/204 (prompt `578af8545a1c`), checked in a demo with the real model; not yet checked in Safari or with the microphone |
 | Spaces, stage 4: the transition (section 53) | Done in a demo, measured stage by stage and with the real model; not yet seen in motion or in Safari |
 | Content Security Policy (section 55) | Done; checked in a demo, including that it blocks; not yet checked in Safari or with the microphone |
+| Weather, stage 2: the server (section 56) | Done; checked live against Open-Meteo; no page or tools yet |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; all four views checked in a demo, on Home and in Work (section 51) |

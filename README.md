@@ -1,8 +1,10 @@
 # JARVIS
 
 A private personal assistant that runs entirely on this Mac: a web dashboard with a
-calendar, to-do list, notes, voice input and spoken replies. Nothing leaves the machine
-unencrypted (only the encrypted backups, see below).
+calendar, to-do list, notes, voice input and spoken replies. Nothing personal leaves the
+machine unencrypted (only the encrypted backups, see below). The one exception to "nothing
+leaves" is public data fetched over HTTPS from fixed addresses: for Weather, JARVIS asks
+Open-Meteo about the places you look up (SECURITY.md section 5).
 
 ## How the pieces fit
 
@@ -15,6 +17,7 @@ server.py (FastAPI)
    |     `-- the tools: jcal.py (calendar), tasks.py (to-do list), calc.py (calculator),
    |                    notes.py (notes), spaces.py (changing space)  -->  jarvis.db (SQLite)
    |-- workday.py the Work space's figures: free time, what's next, deadlines
+   |-- weather.py places, forecasts and air quality from Open-Meteo (HTTPS, fixed addresses)
    |-- speech.py  text to speech (Kokoro)
    `-- mlx-whisper                   speech to text
 ```
@@ -173,7 +176,7 @@ not leave this Mac).
 
 ## Dependencies
 
-What JARVIS uses directly is listed in `requirements.in` (about 8 packages), and what the
+What JARVIS uses directly is listed in `requirements.in` (about 9 packages), and what the
 checks need in `requirements-dev.in`. The two `.txt` files are generated from them by
 `pip-compile` (from `pip-tools`): every package that gets installed, its exact version, why
 it is there (`# via ...`), and a fingerprint (hash) of every file. Never edit the `.txt`

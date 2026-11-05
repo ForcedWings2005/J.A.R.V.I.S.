@@ -45,12 +45,15 @@ A threat actor is anyone or anything that could cause harm, including accidents.
 
 ## 3. Ways in (attack surface)
 
-- **The HTTP endpoints**: `/chat`, `/confirm`, `/calendar`, `/tasks`, `/transcribe`, `/speak`.
+- **The HTTP endpoints**: `/chat`, `/confirm`, `/calendar`, `/tasks`, `/transcribe`, `/speak`,
+  `/weather/places`, `/weather/confirm`, `/weather/home`.
   Reachable only from this Mac, but including from other browser tabs.
 - **Files on disk**: `jarvis.db`, `backups/`, `logs/`. Readable by anything running as me.
 - **The model**: anything it reads can try to steer it.
-- **Dependencies**: 80 packages, 8 chosen directly for JARVIS (`requirements.in`) and a few for the checks (`requirements-dev.in`).
+- **Dependencies**: 80 packages, 9 chosen directly for JARVIS (`requirements.in`; `truststore`, already installed, became the ninth for Weather) and a few for the checks (`requirements-dev.in`).
 - **Off-disk backups** (planned, see section 5): a new copy of the data outside this Mac.
+- **Outside data** (Weather, section 5): replies from Open-Meteo, read by JARVIS's code, and
+  the places asked about, sent to it.
 
 ## 4. Controls in place today
 
@@ -64,6 +67,8 @@ Each of these is in the code or the system and has been checked.
 | `TrustedHostMiddleware` allows only `127.0.0.1` and `localhost` | DNS rebinding (a website pretending to be this Mac). |
 | JSON endpoints refuse `text/plain` bodies (pinned by a test) | Other websites driving `/chat`, `/confirm` or `/tasks`. |
 | Every POST whose `Origin` is not JARVIS's own address is refused with 403, before any work (`server.py`, pinned by tests) | Other websites making JARVIS act or work, such as running Whisper through `/transcribe`. A second, independent lock on the JSON endpoints. Shown with `experiments/attack_page.html`: before, "transcribed 32044 bytes"; after, 403. |
+| Outside requests go only to three fixed HTTPS addresses in `config.py`, built by code, through one function (`weather._get`), with redirects refused, certificates checked against macOS's own list (`truststore`), a 5 s timeout, a 1 MB cap and coordinates rounded to 2 decimals (pinned by tests) | JARVIS being sent anywhere else, by the model or by a reply; someone between this Mac and the service pretending to be it. Checked live: an expired certificate and a wrong host name were refused (CHANGELOG section 56). |
+| Outside names (places, regions, countries) are cleaned of control and invisible characters and cut to 60 characters before use (`weather.clean`) | Odd or hidden text from a reply reaching the page or, later, the model. |
 | Every response carries a Content Security Policy (`server.py`, pinned by tests): only JARVIS's own scripts, styles, images, fonts and connections; audio also from `blob:` and `data:`; no plug-ins; never inside another site's page. (Except a crash's plain-text 500 reply, which has nothing to protect.) | Injected code running or sending data to another site, and clickjacking (a site hiding JARVIS under its own buttons so a click lands on Confirm). Checked in a demo: an inline script, an inline style, `eval`, a fetch to another site and a frame were all blocked (CHANGELOG section 55). |
 | Deletes and edits only through a confirmation card and `POST /confirm` | The model deleting or changing events by itself. |
 | Input limits (upload size, text length, date ranges, calculator) | Requests that use up memory or time. |
@@ -144,6 +149,40 @@ Built in `notes.py` (CHANGELOG section 34).
 - Notes stay searchable with SQLite FTS5. They are not encrypted on their own: at this
   sensitivity, FileVault is enough on this Mac, and the backups are encrypted (above).
 
+### Outside data: Weather (Phase 5, item 6)
+
+Weather is the first time JARVIS reads anything from the internet
+(`docs/specs/2026-11-05-weather-space.md`, CHANGELOG section 56). Until then the rule was
+"nothing leaves the Mac except the encrypted backup copy". The rule now is (my wording,
+agreed for Sports and kept for Weather):
+
+> Nothing personal leaves the Mac unencrypted, and only I hold the key. JARVIS may fetch public
+> data over HTTPS from a short list of fixed addresses, written in code. Those requests carry
+> only what the service needs to answer, and the model never chooses the address.
+
+- **What goes out**, to Open-Meteo only: the words of a place search ("Paris"), and a place's
+  coordinates rounded to 2 decimal places (about 1 km), the home place's included each time it
+  is opened. The forecast is the same at that size, but it does not pinpoint a street.
+- **What Open-Meteo sees and keeps**: the Mac's IP address, as every website does, and the
+  requests. Its terms (read 2026-11-05) say its server logs "may contain sensitive information
+  such as geographical coordinates" and are deleted after 90 days. Accepted (section 7): the
+  requests name a place, not a person, and no account links them to me.
+- **The address is never the model's choice.** The three addresses are fixed in `config.py`;
+  code builds every request; redirects are refused. A new outside service needs my agreement
+  and the same rules.
+- **HTTPS is checked.** python.org's Python ships without a list of trusted certificate
+  signers, so at first every request failed. `truststore` checks against macOS's own list, the
+  one Safari uses (my choice), with both checks on. Turning the check off was never an option:
+  anyone between the Mac and the service could then pretend to be it.
+- **The log** records each request's host, time and outcome, never its address (which holds the
+  place). What I say to JARVIS is logged as before, so a place I ask about by voice is in the
+  log like any message.
+- **Nothing new is stored**: the cache, the match ids and the place on screen live in memory
+  only, so no weather data reaches `jarvis.db` or the backups.
+- **Outside text and the model**: place, region and country names are the first outside text
+  JARVIS shows, and the model will read them from stage 4. They are short, cleaned and capped
+  (section 4). Anything longer, such as news, needs its own prompt-injection design first.
+
 ## 6. Known gaps
 
 In rough order of importance.
@@ -173,13 +212,19 @@ In rough order of importance.
   versions.
 - **AI coding tools can read personal data in this folder.** Accepted because I approve
   what they run and CLAUDE.md sets the rules.
+- **Open-Meteo sees the Mac's IP address and the places I ask about**, and keeps its logs up to
+  90 days (section 5, Outside data). Accepted: a place, not a person, with coordinates rounded
+  to about 1 km.
 
 ## 8. When to revisit
 
 - Before Phase 6 (anything leaving `127.0.0.1`): the network becomes an attack surface, and
   a login and HTTPS are needed first. The `Origin` check compares against the address the
   request was sent to; HTTPS or a new address (Tailscale) means checking it again.
-- Before adding a tool that reads outside content (news, weather, web): prompt injection
-  becomes real.
+- Before adding a tool that reads outside content (news, web, sports): prompt injection
+  becomes real. Weather's short place names are handled (section 5, Outside data); longer
+  outside text needs its own design.
+- Before adding any outside service: it joins the fixed list only with my agreement and the
+  same rules (section 5, Outside data).
 - If JARVIS is ever asked to hold something more sensitive than it does today.
 - If someone else starts using this Mac.

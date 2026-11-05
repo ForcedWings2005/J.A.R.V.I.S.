@@ -2,9 +2,11 @@
 
 JARVIS is a private assistant that runs entirely on one Mac: a FastAPI server, a single-page
 dashboard (calendar, to-do list, chat, voice), a local language model through Ollama, and
-SQLite. Nothing leaves the machine unencrypted, and only the owner holds the key (today the
-only thing that leaves is the encrypted backup copy). The owner is learning Python and software
-engineering, so explanations matter as much as the code.
+SQLite. Nothing personal leaves the machine unencrypted, and only the owner holds the key (the
+encrypted backup copy). JARVIS may fetch public data over HTTPS from a short list of fixed
+addresses, written in code; those requests carry only what the service needs to answer, and the
+model never chooses the address (today: Open-Meteo, for Weather; `SECURITY.md` section 5). The
+owner is learning Python and software engineering, so explanations matter as much as the code.
 
 Read `README.md` (setup, running), `CHANGELOG.md` (history, incidents, status), `plan.md`
 (the roadmap, by phase) and `SECURITY.md` (the threat model and security decisions) when you
@@ -23,6 +25,7 @@ static/index.html ──HTTP, 127.0.0.1 only──> server.py (FastAPI)
                                               │          └─ spaces.py open_space (only changes the view)
                                               ├─ speech.py (Kokoro, loaded on first use) + speech_text.py
                                               ├─ workday.py (GET /day: free time, what's next, deadlines; reads jcal and tasks)
+                                              ├─ weather.py (POST /weather/*: places, forecast, air quality; HTTPS to Open-Meteo only)
                                               ├─ mlx_whisper (imported on first /transcribe)
                                               └─ backup_db.py (runs at import, before the database opens)
             jcal.py, tasks.py, notes.py ──> database.py (one connection + one lock) ──> jarvis.db
@@ -40,10 +43,11 @@ is checked in code, never left to the model.** The model chooses tools; code val
 | `jcal.py` | Calendar logic: durations, repeats (stored as one row, expanded on read), exceptions, conflicts, finished/upcoming labels. |
 | `tasks.py`, `calc.py` | To-do list; safe arithmetic (parses the expression with `ast`, never `eval`). |
 | `workday.py` | The Work space's figures, worked out in code: free time today, what's next, deadline states (settings `WORK_*` and `DEADLINE_WINDOW_DAYS` in `config.py`). |
+| `weather.py` | Weather from Open-Meteo: the one door to the internet (`_fetch`, called only by `_get`, which takes one of the three fixed `WEATHER_*_URL` addresses), the figures worked out in code (units, labels, rain windows, the spoken line), place search with server-issued ids, the forecast summary, a 10-minute in-memory cache, and the place on screen. No tools yet (Weather stage 4). Spec: `docs/specs/2026-11-05-weather-space.md`. |
 | `spaces.py` | The `open_space` tool: checks the name against `config.SPACES` and returns `ShowSpace`; the page switches on the `space` event. |
 | `notes.py` | Notes and memory (FTS5 search). Trivial preferences only; secrets refused; saving and forgetting go through the confirmation card. |
 | `static/` | The dashboard: `index.html` (structure), `css/jarvis.css`, `css/motion.css`, `js/*.js` (plain scripts loaded in order and sharing globals: orb, chat, tasks, notes, voice, calendar, app, spaces, space-work, motion; no build step). Spaces: `<body data-space>` says which is shown and CSS lays it out; each space calls `registerSpace` (`spaces.js`), optionally with `ready` and `readout` for its opening animation, and its own files are `space-<name>.js` and `css/space-<name>.css` (design: `docs/specs/2026-10-27-spaces-and-work.md`). `jarvis.css` is the glass look (tint, blur and rim in `--glass`, `--blur`, `--rim`). `motion.js` only wraps existing functions to add animations (`switchSpace` too: the real switch runs once, mid-sequence); its classes start with `fx-`. Served by `/` and `/static`. |
-| `server.py` | Endpoints `/`, `/static` (the page's files), `/chat` (NDJSON stream; takes the space on screen, checked against `config.SPACES`), `/confirm`, `/calendar`, `/tasks`, `/tasks/{id}`, `/notes`, `/day` and `/info` (read-only; `/day` gives the Work space's summary from `workday.py`; `/info` gives the model, whether Ollama answers with a 1 s timeout, and the last backup time), `/transcribe`, `/speak`; the Content Security Policy on every response; logging setup at start-up. |
+| `server.py` | Endpoints `/`, `/static` (the page's files), `/chat` (NDJSON stream; takes the space on screen, checked against `config.SPACES`), `/confirm`, `/calendar`, `/tasks`, `/tasks/{id}`, `/notes`, `/day` and `/info` (read-only; `/day` gives the Work space's summary from `workday.py`; `/info` gives the model, whether Ollama answers with a 1 s timeout, and the last backup time), `/transcribe`, `/speak`, `/weather/places`, `/weather/confirm` and `/weather/home` (POST though they only read, so the `Origin` check covers every request that goes online; confirming adds the spoken line to the conversation through `Assistant.add_reply`); the Content Security Policy on every response; logging setup at start-up. |
 | `speech.py`, `speech_text.py` | Kokoro synthesis; text clean-up before speaking (numbers, pronunciations). |
 | `backup_db.py` | Daily SQLite backup via the backup API, integrity-checked, 7 kept; the nightly run (`main()`) then makes an encrypted copy, 30 kept. |
 | `backup_crypto.py`, `backup_keys.py`, `restore_backup.py` | Encrypted backups: lock/unlock and the file format; making the key pair (owner only); restoring (owner only). |
@@ -111,6 +115,12 @@ of the risk and the owner's agreement first.
   policy and scans `index.html` and `static/js/` for code it would block; the scans miss
   attributes set at run time, so a demo with a violation listener is the real check. Loosening
   it needs the owner's agreement.
+- Outside requests go only through `weather._get`, to the three fixed HTTPS addresses in
+  `config.py` (`WEATHER_*_URL`). Code builds every request; the model never supplies an
+  address or coordinates; redirects are refused; certificates are checked against macOS's list
+  (`truststore`), and that check is never turned off; coordinates are rounded to 2 decimals;
+  the log records hosts and times, never addresses. A new outside service, or more data in a
+  request, needs the owner's agreement and the same rules (`SECURITY.md` section 5).
 - Input limits: uploads 10 MB (unknown file extensions are saved as `.webm`), the temporary
   audio file is always deleted;
   `/speak` text capped at 2000 characters; `/calendar` range at most 400 days; `get_events` at
@@ -157,6 +167,9 @@ python -m evals         # full suite, 68 cases x 3 runs, about 12 minutes, with 
 - Tests run with a frozen clock (Monday 2030-01-07 08:00, `jcal.datetime` is patched) and an
   in-memory database emptied before each test. Use `fakes.FakeModel` instead of a real model,
   and `TestClient(server.app, base_url="http://127.0.0.1")` (other hosts are refused).
+- Tests never go online: `conftest.py`'s `no_internet` makes `weather._fetch` fail loudly and
+  clears weather's cache and place. Weather tests use `tests/weather_data.py` (made-up replies
+  shaped like Open-Meteo's, and `serve`, which answers `_fetch` with them).
 - **Prompt or tool-description changes:** run the full eval before and after, and put both
   scores and the prompt hash in the commit message. The eval prints the hash; if it is
   unchanged, the model saw identical input and score differences are run-to-run variation.
