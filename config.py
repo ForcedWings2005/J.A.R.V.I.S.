@@ -64,6 +64,21 @@ WORK_DAY_END = "22:00"
 WORK_MIN_GAP_MINUTES = 30
 DEADLINE_WINDOW_DAYS = 14
 
+# Weather (docs/specs/2026-11-05-weather-space.md): the only outside addresses JARVIS may
+# fetch from, fixed here so the model can never choose one (SECURITY.md section 5).
+WEATHER_GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
+WEATHER_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+WEATHER_AIR_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
+WEATHER_TIMEOUT_SECONDS = 5
+WEATHER_MAX_BYTES = 1_000_000      # a reply larger than this is refused
+WEATHER_CACHE_SECONDS = 600        # matches, forecasts and air quality are kept 10 minutes
+WEATHER_CACHE_ENTRIES = 50
+WEATHER_MATCHES = 5                # places offered for one search
+WEATHER_QUERY_MAX = 80             # characters in a search
+WEATHER_NAME_MAX = 60              # characters kept of each outside name
+WEATHER_COORD_DECIMALS = 2         # about 1 km: the forecast is the same, a street is not named
+WEATHER_RAIN_CHANCE = 40           # percent; hours at or above this count as rain
+
 # Notes and memory (SECURITY.md section 5): trivial preferences, never secrets
 NOTE_MAX_CHARS = 300
 NOTES_RECALL_LIMIT = 5     # notes given to the model per recall

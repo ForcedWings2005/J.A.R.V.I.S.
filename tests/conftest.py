@@ -15,6 +15,7 @@ import pytest  # noqa: E402
 
 import database  # noqa: E402
 import jcal  # noqa: E402
+import weather  # noqa: E402
 # Registers every tool in the order the app uses, whichever test file runs first
 import brain  # noqa: E402, F401
 
@@ -49,3 +50,12 @@ def clock(monkeypatch):
 
     monkeypatch.setattr(jcal, "datetime", FakeDateTime)
     return fake
+
+
+@pytest.fixture(autouse=True)
+def no_internet(monkeypatch):
+    """Runs before every test: weather's one door to the internet fails loudly, so no test
+    can depend on Open-Meteo (CI has no network to count on, and tests must stay offline)."""
+    def refuse(address):
+        raise AssertionError(f"a test tried to reach the internet: {address}")
+    monkeypatch.setattr(weather, "_fetch", refuse)
