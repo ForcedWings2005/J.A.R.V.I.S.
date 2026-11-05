@@ -62,15 +62,25 @@ Open http://127.0.0.1:8000 and hard refresh with Cmd+Shift+R. The header shows w
 Ollama answers (green or red dot) and when the last backup was made; press / to jump to
 the command box.
 
-The header's space names (**1 HOME · 2 WORK**) switch between spaces: Home is the dashboard,
+The header's space names (**1 HOME · 2 WORK · 3 WEATHER**) switch between spaces: Home is the dashboard,
 and Work has your day worked out (free time, what's next, the nearest deadline), deadlines with
 countdown bars, the to-do list and the calendar in week view, with JARVIS docked on the right
-(CHANGELOG sections 50 and 51). Click a name, press `1` or `2`, or open `127.0.0.1:8000/#work`; Back returns to the
+(CHANGELOG sections 50 and 51). Click a name, press `1`, `2` or `3`, or open `127.0.0.1:8000/#work`; Back returns to the
 previous space. The command box usually has the cursor, and keys typed there stay text: press
-Esc first to leave it, then `1` or `2`. Or just ask JARVIS, in any words: "let's get some work
+Esc first to leave it, then `1`, `2` or `3`. Or just ask JARVIS, in any words: "let's get some work
 done", "time to study", "take me back home" (CHANGELOG section 52). He knows which space is on
 screen when you talk to him. Changing space plays a short "access" animation; click anywhere or
 press Escape to skip it, and Reduce motion makes it instant (CHANGELOG section 53).
+
+**Weather** opens on a slowly turning globe. Type a place in the search box (or "Paris, Texas"
+to narrow it down): the globe spins there and asks "Paris?". Press Enter or click **This one**
+to see its weather, **Not this one** for the next match, or Esc to cancel. The page shows now,
+the next 24 hours, 7 days, details and air quality, °F first with °C beside it; **Back to
+globe** or Esc returns. **Set as home** remembers the place in this browser, and the **Open on
+home** switch (bottom right of the globe) opens Weather straight on it. Weather asks
+Open-Meteo, the only outside service JARVIS uses, about the places you look up (SECURITY.md
+section 5); nothing else leaves the Mac. Or ask JARVIS to "open the weather" (CHANGELOG
+sections 56 and 57).
 
 Clicking a panel opens it with a short "access" animation; click anywhere or press
 Escape to skip it. After 3 minutes without the mouse or keyboard the panels dim and the

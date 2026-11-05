@@ -35,8 +35,13 @@ jarvis/
 │   ├── css/jarvis.css  Its styles: the glass look (section 43)
 │   ├── css/motion.css  The animations' styles (section 42)
 │   ├── css/space-work.css  The Work space's styles (section 50)
+│   ├── css/space-weather.css  The Weather space's styles (section 57)
+│   ├── data/coastlines.json  The globe's coastlines, from Natural Earth (section 57)
 │   └── js/             Its scripts, loaded in order: orb, chat, tasks, notes, voice, calendar, app,
-│                       spaces (the spaces and switching), space-work (the Work space), motion
+│                       spaces (the spaces and switching), space-work (the Work space),
+│                       globe (draws the globe), space-weather (the Weather space), motion
+├── scripts/
+│   └── make_coastlines.py  Makes data/coastlines.json from Natural Earth (section 57)
 ├── docs/
 │   ├── specs/          Designs agreed before building (spaces and Work: section 50)
 │   └── plans/          Step-by-step plans that carry them out
@@ -65,6 +70,7 @@ jarvis/
 │   ├── test_workday.py Tests for the Work space's figures
 │   ├── test_spaces.py  Tests for open_space
 │   ├── test_weather.py Tests for weather.py (never online)
+│   ├── test_coastlines.py Tests for the coastline script and file
 │   ├── weather_data.py Made-up Open-Meteo replies for the tests
 │   └── test_backup.py  Tests for backups: plain, encrypted, restore, keys
 ├── evals/              Model evaluation suite (python -m evals)
@@ -1111,6 +1117,45 @@ The second stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`)
 - **Noticed**: the owner's own JARVIS (started with `--reload`) restarts whenever a file in the folder changes, so it ran this branch's code during the work, and its restarts wrote to the real log. The demo itself wrote only to its own folder; `jarvis.db` and the backups were untouched.
 - **Not checked**: anything on screen (stage 3), the tools and the model (stage 4), and a slow Open-Meteo holding up other requests (each waits in its own thread, by design, but this was not measured).
 
+## 57. Weather, stage 3: the page
+
+The third stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`): key 3 opens it. Plan: `docs/plans/2026-11-05-weather-stage-3.md`.
+
+- **The globe** (`static/js/globe.js`). A wireframe Earth drawn on a canvas in plain JavaScript, with no library and no map tiles. It uses an orthographic projection: the Earth as seen from far away, where only the near side shows. It has a grid every 30°, a soft rim glow, and coastlines from Natural Earth (public domain). At rest it turns once a minute. To reach a place it spins the short way round in 1.5 s, so 170° to −170° is a 20° turn, not 340°, and easing makes it start and stop gently. Confirming zooms in four times in 0.8 s. The maths sits in `globeMath`, apart from the drawing, so it can be tested on its own if a JavaScript test runner is ever added. To save battery, it draws nothing while Weather is not shown, while the tab is hidden, and while the page is dimmed after 3 idle minutes. With Reduce motion it does not turn, and spins and zooms become jumps.
+- **The coastlines** come from Natural Earth's 1:110m file (v4.1.0), downloaded with the owner's permission: 139,907 bytes, its SHA-256 recorded in the script. `scripts/make_coastlines.py` (standard library only, run with `python -I`, so a downloaded file is read as data and never run) cuts it down to `static/data/coastlines.json`: 134 lines, 5,121 points rounded to 1 decimal, 67 KB. Tests check the script and the file's size and shape.
+- **Search, the ping and confirming** (`static/js/space-weather.js`):
+  - **Asking:** type a place and the globe spins to the largest match. A glass card beside the ping asks "Paris?" with "Île-de-France · France, 1 of 3". The keyboard focus moves to THIS ONE, so Enter confirms with no key handling of its own.
+  - **Not this one** goes to the next match. After the last, it goes back to the globe with a hint ("Try adding the country, like "Paris, Texas"").
+  - **Confirming** sends the id the server issued. JARVIS says, and speaks, the line `weather.py` wrote, and the server has already added it to the conversation.
+  - **Escape** cancels, except while you are typing, where it only leaves the box, as everywhere.
+  - **Safety:** the newest search wins, a double click sends one confirm, and leaving in the middle of a spin, a ping or a zoom is safe.
+  - **For stage 4:** `weatherShowMatches()` is ready for the chat to use.
+- **The weather page**, over the dimmed globe, with JARVIS docked on the right:
+  - **Now:** °F large, °C small, feels like, high and low.
+  - **The next 24 hours:** a temperature line with rain-chance bars and labels every 3 hours; the line breaks where a value is missing.
+  - **7 days:** each day's low-to-high bar sits on one scale for the whole week, so days compare honestly.
+  - **Details:** wind with an arrow showing where it blows, humidity, UV, sunrise and sunset, pressure and visibility, US units first.
+  - **Air quality:** the AQI bar coloured by its band, PM2.5, ozone, and pollen where there is some.
+  - **Also:** the place's own local time, and Open-Meteo's credit line. Its licence page asks for "Weather data by Open-Meteo.com" with a link; CC BY 4.0 also asks for a licence link and a note of changes, hence "· CC BY 4.0 · rounded and converted by JARVIS".
+  - **Icons** are SVG drawn in code. The helper `svg()` refuses `style` and `on...` attributes: the security policy would block them silently, and its tests cannot see attributes set while the page runs (stage 1's review).
+  - **A missing value** shows as "–".
+- **Home settings**: SET AS HOME keeps the place in this browser (never `jarvis.db`). The Open on home switch (off by default) makes Weather open straight on its page. A saved home that is not valid is ignored, and with storage unavailable (a private window) both simply do nothing.
+- **A bug found in the demo, fixed**: with the browser pane hidden, the page got no animation frames, so the spin and zoom never finished. The live search had gone through, and JARVIS had said Rome's weather, but the page stayed on the ping. The globe's animations now have a safety timeout, as `motion.js`'s sequences already do (a hidden tab pauses animations). With animation frames switched off completely, a spin still finished in 1.75 s and a zoom in 1.05 s, landing on the place.
+- **Weather joins the spaces list** (`config.SPACES`, and a mention in `open_space`'s description), so "open the weather" works and the stamp can say "· Weather". That is a prompt change, so the full eval ran before and after:
+  - **Before:** 201/204, prompt `578af8545a1c`.
+  - **After:** 207/210, prompt `7e42e25bef37`. Both new cases ("Open the weather." opens it, "I love rainy weather." does not) passed every run.
+  - **The misses:** each eval had three cases that missed one run in three. Before: `ask_am_pm`, `delete_repeating_no_date_no_false_card` and `task_complete`. After: `ask_am_pm`, `delete_repeating_no_date_no_false_card` and `tonight_dinner`. `tonight_dinner`'s miss was a real wrong reply ("nothing left this evening" with dinner at 20:00). It has missed one run in three before, twice on an unchanged prompt, so it is run-to-run variation.
+- **Checked in a demo** (its own database, backups and log; made-up weather replies from `tests/weather_data.py`, plus live runs; a listener for security-policy violations throughout, which recorded none):
+  - **The maths:** the projection and the shortest turn give the expected values.
+  - **The globe:** it turns 6° a second. It does not redraw on Home, while dimmed, while the tab is hidden (simulated) or after leaving, and it draws the grid and rim when the coastline file is missing.
+  - **The search and the ping:** the ping card and its three matches; no match; the service down (the note and the ticker); the two Escapes; the newest search winning; one confirm for a double click; an expired id; leaving mid-way.
+  - **The page:** every figure as expected for the made-up Paris, and the credit links opening safely. With missing values there is no "null", "NaN" or "undefined" anywhere, and the chart line breaks.
+  - **Home settings:** all of them, including storage that throws.
+  - **Reduce motion:** everything instant.
+  - **Live:** Rome, after the fix: "Rome?" with "Lazio · Italy, 1 of 5", then 58°F, overcast, AQI 67 "Moderate".
+- **Not checked**: Safari; how it looks in motion, by eye (most checks were measured, because the hidden pane gives no frames); phone width (left for later by the owner); and a real hidden tab rather than a simulated one.
+- **Noticed**: the browser asks for `/favicon.ico`, which JARVIS has never had (a 404 in the console on every load, unrelated to Weather).
+
 ---
 
 ## Status
@@ -1138,6 +1183,7 @@ The second stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`)
 | Spaces, stage 4: the transition (section 53) | Done in a demo, measured stage by stage and with the real model; not yet seen in motion or in Safari |
 | Content Security Policy (section 55) | Done; checked in a demo, including that it blocks; not yet checked in Safari or with the microphone |
 | Weather, stage 2: the server (section 56) | Done; checked live against Open-Meteo; no page or tools yet |
+| Weather, stage 3: the page (section 57) | Done: evals 207/210 (prompt `7e42e25bef37`); checked in a demo and live; not yet in Safari or seen in motion; no tools yet |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; all four views checked in a demo, on Home and in Work (section 51) |
