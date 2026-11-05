@@ -43,7 +43,7 @@ is checked in code, never left to the model.** The model chooses tools; code val
 | `spaces.py` | The `open_space` tool: checks the name against `config.SPACES` and returns `ShowSpace`; the page switches on the `space` event. |
 | `notes.py` | Notes and memory (FTS5 search). Trivial preferences only; secrets refused; saving and forgetting go through the confirmation card. |
 | `static/` | The dashboard: `index.html` (structure), `css/jarvis.css`, `css/motion.css`, `js/*.js` (plain scripts loaded in order and sharing globals: orb, chat, tasks, notes, voice, calendar, app, spaces, space-work, motion; no build step). Spaces: `<body data-space>` says which is shown and CSS lays it out; each space calls `registerSpace` (`spaces.js`), optionally with `ready` and `readout` for its opening animation, and its own files are `space-<name>.js` and `css/space-<name>.css` (design: `docs/specs/2026-10-27-spaces-and-work.md`). `jarvis.css` is the glass look (tint, blur and rim in `--glass`, `--blur`, `--rim`). `motion.js` only wraps existing functions to add animations (`switchSpace` too: the real switch runs once, mid-sequence); its classes start with `fx-`. Served by `/` and `/static`. |
-| `server.py` | Endpoints `/`, `/static` (the page's files), `/chat` (NDJSON stream; takes the space on screen, checked against `config.SPACES`), `/confirm`, `/calendar`, `/tasks`, `/tasks/{id}`, `/notes`, `/day` and `/info` (read-only; `/day` gives the Work space's summary from `workday.py`; `/info` gives the model, whether Ollama answers with a 1 s timeout, and the last backup time), `/transcribe`, `/speak`; logging setup at start-up. |
+| `server.py` | Endpoints `/`, `/static` (the page's files), `/chat` (NDJSON stream; takes the space on screen, checked against `config.SPACES`), `/confirm`, `/calendar`, `/tasks`, `/tasks/{id}`, `/notes`, `/day` and `/info` (read-only; `/day` gives the Work space's summary from `workday.py`; `/info` gives the model, whether Ollama answers with a 1 s timeout, and the last backup time), `/transcribe`, `/speak`; the Content Security Policy on every response; logging setup at start-up. |
 | `speech.py`, `speech_text.py` | Kokoro synthesis; text clean-up before speaking (numbers, pronunciations). |
 | `backup_db.py` | Daily SQLite backup via the backup API, integrity-checked, 7 kept; the nightly run (`main()`) then makes an encrypted copy, 30 kept. |
 | `backup_crypto.py`, `backup_keys.py`, `restore_backup.py` | Encrypted backups: lock/unlock and the file format; making the key pair (owner only); restoring (owner only). |
@@ -103,6 +103,11 @@ of the risk and the owner's agreement first.
 - Every POST whose `Origin` header is not JARVIS's own address gets 403 before any work
   (`refuse_other_websites` in `server.py`); no `Origin` is allowed, `GET` is unaffected. This
   is what protects `/transcribe`, a form upload. Each lock has its own tests; keep them separate.
+- Every response carries the Content Security Policy in `server.py` (`CONTENT_SECURITY_POLICY`,
+  set by `add_security_policy`, which must stay the last middleware so refusals carry it too).
+  The page may load and talk only to its own address, so it has no inline scripts or styles and
+  no `eval`; `tests/test_server.py` pins the policy and scans `static/` for both. Loosening it
+  needs the owner's agreement.
 - Input limits: uploads 10 MB (unknown file extensions are saved as `.webm`), the temporary
   audio file is always deleted;
   `/speak` text capped at 2000 characters; `/calendar` range at most 400 days; `get_events` at

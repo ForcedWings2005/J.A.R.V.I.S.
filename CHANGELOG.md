@@ -3,7 +3,7 @@
 A local, private personal assistant with a web dashboard, calendar, to-do list and voice.
 Runs on a MacBook Pro (M3 Max, 64 GB). Everything runs on this machine.
 
-Written 2026-10-08, last updated 2026-11-03. Entries are in the order the work was done.
+Written 2026-10-08, last updated 2026-11-05. Entries are in the order the work was done.
 
 ---
 
@@ -1061,6 +1061,23 @@ A check of everything here that describes the project as it is now, against the 
 - **`CLAUDE.md` contradicted itself**: "commit after each step that works" and "commit only when asked". The owner chose: commit on a work branch without asking, never on `main`; push, merge and deleting branches still wait for the owner.
 - Checked: each count against the code (`pytest --co`: 521 tests, 112 in `test_jcal.py`; 68 cases in `evals/cases.py`) and each file against `git ls-files`. Every Known limit was checked against the code and still holds.
 
+## 55. Weather, stage 1: a Content Security Policy
+
+The first stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`), done first and on its own so a problem with it is never mixed up with weather code. Plan: `docs/plans/2026-11-05-weather-stage-1.md`.
+
+- **What a Content Security Policy is**: a header the server sends with the page, telling the browser what that page may do: where its scripts, styles and other files may come from, and which addresses it may talk to. If something harmful ever got into the page, the browser itself would refuse to run it or let it send data away.
+- **The policy**: scripts, styles, images and fonts only from JARVIS itself, with no inline code and no `eval`; `fetch` only to JARVIS; audio from JARVIS, plus `blob:` (the spoken reply, made in the page by `voice.js`) and `data:` (the short silent clip that unlocks audio); no plug-ins, no `<base>` tag, forms only to JARVIS; and `frame-ancestors 'none'`, so no other site can show JARVIS inside its own page. That last part stops clickjacking: a site hiding JARVIS under its own buttons so a click lands on Confirm.
+- **How it works**: `CONTENT_SECURITY_POLICY` in `server.py`, one commented line per part, and a small middleware, `add_security_policy`, that puts it on every response. It lives in `server.py`, not `config.py`, because it is a lock like the `Origin` check, not a setting to tune. The middleware must be the **last** one in the file: each middleware wraps the ones before it, so the last is the outermost and also reaches the answers the other locks give without going further in (403 for another website, 400 for another host name).
+- **Tests** (530 in all, 9 new): the exact policy on the page, a script, a stylesheet and a JSON reply; on refused requests (403 and 400); on a missing file (404); on the streamed `/chat` reply. The policy is written out in full in the test, so a quiet change to it fails. Two more tests scan `static/` for anything the policy would block: inline `<script>` or `<style>`, `style=` or `on...=` attributes in `index.html`, and `eval(`, `new Function`, `setAttribute('style'`, `insertAdjacentHTML` or `javascript:` in the scripts. These two passed before the policy existed, on purpose: today's page is already clean, and they are there to catch future code such as the Weather scripts. The order of the middleware was checked by moving it first for a moment: the refused-request test then failed (the 403 had no policy), and passed again once it was moved back.
+- **Checked in a demo** (made-up data, port 8016, 1440x900, the real model; the real `jarvis.db`, backups and log were untouched). A listener recorded every policy violation, and there were none while:
+  - loading the page, with the boot sequence;
+  - opening Schedule with its animation, in Month, Week and Day views, with the made-up events drawn (the week's blocks are placed by code through `style.cssText`, which the policy allows);
+  - ticking and unticking a task;
+  - switching to Work and back with the access sequence, and instantly with Reduce motion;
+  - turning voice on (the silent `data:` clip played) and getting a real reply, "Good afternoon, sir.", spoken from a `blob:` address.
+- **And it really blocks**: an injected inline script did not run, `eval` threw an error, a `fetch` to example.com was refused before any request left the Mac, an injected `<style>` was not applied, and the page trying to show itself in a frame was refused ("frame-ancestors 'none'"). Those five were the only errors in the console.
+- **Not checked**: Safari, the microphone (its upload goes to JARVIS's own address, which the policy allows), and a frame from a truly different site (the built-in browser could not open a blank page; the page framing itself tests the same rule, which refuses every parent alike).
+
 ---
 
 ## Status
@@ -1086,6 +1103,7 @@ A check of everything here that describes the project as it is now, against the 
 | Spaces, stage 2: the Work panels (section 51) | Done in a demo; not yet checked in Safari |
 | Spaces, stage 3: switching by voice (section 52) | Done: evals 202/204 (prompt `578af8545a1c`), checked in a demo with the real model; not yet checked in Safari or with the microphone |
 | Spaces, stage 4: the transition (section 53) | Done in a demo, measured stage by stage and with the real model; not yet seen in motion or in Safari |
+| Content Security Policy (section 55) | Done; checked in a demo, including that it blocks; not yet checked in Safari or with the microphone |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; all four views checked in a demo, on Home and in Work (section 51) |
