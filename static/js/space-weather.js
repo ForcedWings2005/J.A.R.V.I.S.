@@ -31,6 +31,7 @@ registerSpace({
     globe.start();
     if (wxPending) { const m = wxPending; wxPending = null; wxShowMatchesNow(m); }
     else if (wxView() === 'page' && wxPayload) globe.zoomTo(wxPayload.place.lat, wxPayload.place.lon);
+    else if (wxView() === 'globe' && wxReadOpenHome() && wxReadHome()) wxOpenHomePage(wxReadHome());
     else if (wxView() === 'globe') globe.turn(true);
   },
   // A ping left open is cancelled; the page stays, to come back to
@@ -179,7 +180,8 @@ async function weatherShowPayload(payload) {
   globe.clearPing();
   globe.turn(false);
   await globe.zoomTo(payload.place.lat, payload.place.lon);
-  if (typeof drawWeather === 'function') drawWeather(payload);
+  drawWeather(payload);
+  wxShowHome();
   wxSetView('page');
 }
 
@@ -384,3 +386,66 @@ function wxDrawDays(days) {
 }
 
 document.getElementById('wx-back').addEventListener('click', wxCancel);
+
+// ---------- home settings: kept in this browser only, never in jarvis.db ----------
+// Every read and write is in a try: storage can be missing (a private window), and then
+// these settings simply do nothing.
+const wxOpenHome = document.getElementById('wx-open-home');
+const wxHomeName = document.getElementById('wx-home-name');
+const wxSetHome = document.getElementById('wx-sethome');
+
+// Anything else in storage (edited by hand, or old) is ignored, as if no home were set
+function wxValidHome(home) {
+  return !!home && typeof home.name === 'string' && home.name.trim().length >= 1 &&
+    home.name.length <= 60 && Number.isFinite(home.lat) && Number.isFinite(home.lon) &&
+    Math.abs(home.lat) <= 90 && Math.abs(home.lon) <= 180;
+}
+function wxReadHome() {
+  try {
+    const home = JSON.parse(localStorage.getItem('weatherHome'));
+    return wxValidHome(home) ? home : null;
+  } catch (e) { return null; }
+}
+function wxReadOpenHome() {
+  try { return localStorage.getItem('weatherOpenOnHome') === '1'; } catch (e) { return false; }
+}
+
+function wxShowHome() {
+  const home = wxReadHome();
+  wxHomeName.textContent = home ? 'Home: ' + home.name : '';
+  wxOpenHome.checked = wxReadOpenHome();
+  const place = wxPayload && wxPayload.place;
+  const isHome = !!(home && place && home.lat === place.lat && home.lon === place.lon);
+  wxSetHome.textContent = isHome ? 'HOME ✓' : 'SET AS HOME';
+}
+
+wxSetHome.addEventListener('click', () => {
+  const place = wxPayload && wxPayload.place;
+  if (!place) return;
+  const home = { name: place.name, lat: place.lat, lon: place.lon };
+  if (!wxValidHome(home)) return;
+  try { localStorage.setItem('weatherHome', JSON.stringify(home)); } catch (e) { return; }
+  wxShowHome();
+});
+
+wxOpenHome.addEventListener('change', () => {
+  try { localStorage.setItem('weatherOpenOnHome', wxOpenHome.checked ? '1' : '0'); } catch (e) { /* nothing to keep it in */ }
+  wxShowHome();
+});
+
+// Open on home: straight to the page, no ping (the place was chosen when it was saved)
+async function wxOpenHomePage(home) {
+  if (wxBusy) return;
+  wxBusy = true;
+  ++wxSpinToken;
+  globe.turn(false);
+  globe.jumpTo(home.lat, home.lon);
+  const r = await wxPost('/weather/home', { name: home.name, lat: home.lat, lon: home.lon });
+  wxBusy = false;
+  if (!r.ok) { wxError(wxDetail(r)); globe.turn(true); return; }
+  say(r.data.spoken);
+  speak(r.data.spoken).catch(() => {});
+  weatherShowPayload(r.data);
+}
+
+wxShowHome();
