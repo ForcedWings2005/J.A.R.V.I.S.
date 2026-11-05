@@ -5,6 +5,7 @@ The model, Whisper and Kokoro are all replaced by fakes, so these run anywhere.
 import json
 import logging
 import os
+import re
 from datetime import datetime
 import sys
 import types
@@ -126,6 +127,63 @@ def test_json_sent_as_plain_text_is_refused(client):
     assert tasks.tasks_list()[0]["done"] is False
     r = client.post("/chat", content='{"message": "hi"}', headers={"Content-Type": "text/plain"})
     assert r.status_code == 422
+
+
+# ---------- the Content Security Policy (spec: docs/specs/2026-11-05-weather-space.md) ----------
+
+# Written out in full, not read from server.py, so a quiet change to the policy fails here
+POLICY = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+          "font-src 'self'; connect-src 'self'; media-src 'self' blob: data:; "
+          "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
+
+
+@pytest.mark.parametrize("path", ["/", "/static/js/app.js", "/static/css/jarvis.css", "/tasks"])
+def test_every_response_carries_the_security_policy(client, path):
+    response = client.get(path)
+    assert response.status_code == 200
+    assert response.headers["content-security-policy"] == POLICY
+
+
+def test_refused_requests_carry_the_security_policy(client):
+    """The policy must be the outermost middleware to reach the locks' own refusals."""
+    other_site = client.post("/reset", json={}, headers={"Origin": "http://evil.example"})
+    assert other_site.status_code == 403
+    assert other_site.headers["content-security-policy"] == POLICY
+    other_host = TestClient(server.app, base_url="http://evil.example").get("/")
+    assert other_host.status_code == 400
+    assert other_host.headers["content-security-policy"] == POLICY
+
+
+def test_missing_files_carry_the_security_policy(client):
+    response = client.get("/static/js/no-such-file.js")
+    assert response.status_code == 404
+    assert response.headers["content-security-policy"] == POLICY
+
+
+def test_streamed_chat_carries_the_security_policy(client, model):
+    model(say("Hello."))
+    response = client.post("/chat", json={"message": "hello"})
+    assert response.status_code == 200
+    assert response.headers["content-security-policy"] == POLICY
+
+
+def test_the_page_has_nothing_inline():
+    """The policy forbids inline code, so any would silently stop working."""
+    page = (config.STATIC_DIR / "index.html").read_text()
+    assert re.search(r"<script(?![^>]*\bsrc=)[^>]*>", page) is None
+    assert "<style" not in page
+    assert re.search(r"\sstyle\s*=", page) is None
+    assert re.search(r"\son[a-z]+\s*=", page) is None
+
+
+def test_the_scripts_use_nothing_the_policy_blocks():
+    """eval and friends fail only in the browser, so catch them here first."""
+    blocked = ["eval(", "new Function", "setAttribute('style'", 'setAttribute("style"',
+               "insertAdjacentHTML", "javascript:"]
+    for script in (config.STATIC_DIR / "js").glob("*.js"):
+        text = script.read_text()
+        for word in blocked:
+            assert word not in text, f"{script.name} uses {word}"
 
 
 @pytest.fixture

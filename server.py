@@ -66,6 +66,24 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost
 # Methods that only read. Everything else can change something or start work.
 READ_ONLY = {"GET", "HEAD", "OPTIONS"}
 
+# What the browser lets this page do (docs/specs/2026-11-05-weather-space.md, "The Content
+# Security Policy"). A security lock like READ_ONLY, not a setting to tune, so it lives here
+# rather than in config.py. Loosening any part needs the owner's agreement (CLAUDE.md).
+CONTENT_SECURITY_POLICY = "; ".join([
+    "default-src 'self'",           # anything not named below: only JARVIS's own files
+    "script-src 'self'",            # only /static scripts: no inline code, no eval
+    "style-src 'self'",             # only /static stylesheets: no inline styles
+    "img-src 'self'",
+    "font-src 'self'",
+    "connect-src 'self'",           # fetch talks only to JARVIS, so nothing can send data away
+    "media-src 'self' blob: data:", # blob: the spoken reply (voice.js, playBlob);
+                                    # data: the silent clip that unlocks audio (voice.js, SILENCE)
+    "object-src 'none'",            # no plug-ins
+    "base-uri 'none'",              # no <base> tag sending relative links elsewhere
+    "form-action 'self'",           # forms submit only to JARVIS
+    "frame-ancestors 'none'",       # no other site may show JARVIS in a frame (clickjacking)
+])
+
 
 @app.middleware("http")
 async def refuse_other_websites(request, call_next):
@@ -131,6 +149,17 @@ async def check_page_files_again(request, call_next):
     response = await call_next(request)
     if request.url.path == "/" or request.url.path.startswith("/static/"):
         response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
+# Keep this the last middleware in the file. Each one added wraps the ones before it, so the
+# last is the outermost: it also sees the responses that refuse_other_websites (403) and
+# TrustedHostMiddleware (400) make without calling further in.
+@app.middleware("http")
+async def add_security_policy(request, call_next):
+    """Every response carries the Content Security Policy, whatever its path or status."""
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
     return response
 
 
