@@ -10,7 +10,8 @@ from tools import ShowSpace, tool
 
 
 @tool("Show one of the dashboard's spaces on screen. home is the welcome dashboard; work has "
-      "the calendar, the to-do list and deadlines, for work, study and projects. Call it when "
+      "the calendar, the to-do list and deadlines, for work, study and projects; weather has a "
+      "globe and the weather for a place. Call it when "
       "the user wants to start working or studying, or asks for a space, in any words, such "
       "as 'let's get some work done' or 'time to study', and still answer the rest of their "
       "message. Do not call it when work is only mentioned, such as 'I had a long day at "

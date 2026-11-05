@@ -164,7 +164,7 @@ def test_an_unknown_space_streams_no_space_event():
     model = FakeModel(use(call("open_space", name="gym")), say("There is no gym, sir."))
     events, _ = run(brain.Assistant(chat=model), "Open the gym")
     assert "space" not in [e["type"] for e in events]
-    assert model.seen[1][-1]["content"].endswith("Spaces: home, work.")   # no NO_CARD note
+    assert model.seen[1][-1]["content"].endswith("Spaces: home, work, weather.")   # no NO_CARD note
 
 
 def test_a_space_is_shown_only_on_its_own_turn():

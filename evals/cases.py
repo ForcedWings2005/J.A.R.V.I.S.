@@ -313,6 +313,10 @@ CASES = [
          expect=[("get_events", {"date": TODAY})], forbid=["open_space"]),
     Case("space_back_home", "Take me back to the home screen.", space="work",
          expect=[("open_space", {"name": "home"})], max_calls={"open_space": 1}),
+    # Weather joins the spaces (docs/specs/2026-11-05-weather-space.md, stage 3)
+    Case("space_weather", "Open the weather.",
+         expect=[("open_space", {"name": "weather"})], max_calls={"open_space": 1}),
+    Case("space_weather_mentioned_no_switch", "I love rainy weather.", forbid=["open_space"]),
 ]
 
 # The same requests sent from Work, whose stamp says '· Work': a sentence about the stamp

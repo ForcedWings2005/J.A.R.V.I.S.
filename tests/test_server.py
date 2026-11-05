@@ -302,6 +302,13 @@ def test_chat_without_a_space_is_home(client, model):
     assert "·" not in fake.seen[0][-1]["content"]
 
 
+
+def test_chat_accepts_the_weather_space(client, model):
+    model(say("Hello."))
+    r = client.post("/chat", json={"message": "hi", "space": "weather"})
+    assert r.status_code == 200
+    assert " · Weather] hi" in server.assistant.messages[1]["content"]
+
 def test_chat_refuses_an_unknown_space(client, model):
     model()
     assert client.post("/chat", json={"message": "hi", "space": "gym"}).status_code == 422
