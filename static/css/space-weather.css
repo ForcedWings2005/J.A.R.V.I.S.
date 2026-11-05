@@ -1,0 +1,41 @@
+/* The Weather space (static/js/space-weather.js, static/js/globe.js): the globe fills the
+   space, with the search box and home settings floating over it as glass; the weather page
+   replaces it once a place is confirmed. JARVIS's dock is beside it (jarvis.css). */
+#space-weather { position:relative; overflow:hidden; }
+#space-weather[hidden] { display:none; }
+#space-weather .panel { cursor:default; }
+
+#wx-globe-view { position:relative; flex:1; min-height:0; }
+#wx-globe { position:absolute; inset:0; width:100%; height:100%; display:block; }
+#space-weather[data-view="page"] #wx-globe-view { opacity:.18; pointer-events:none; transition:opacity .8s ease; }
+#space-weather[data-view="page"] .wx-search,
+#space-weather[data-view="page"] .wx-home { visibility:hidden; }
+
+/* Glass, as the panels (jarvis.css) */
+.wx-search, .wx-ping, .wx-home {
+  position:absolute; z-index:2; border-radius:18px; border:1px solid var(--line);
+  background-color:var(--glass); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
+  box-shadow:var(--rim);
+}
+.wx-search { top:0; left:50%; transform:translateX(-50%); width:min(460px, 100%); padding:10px;
+  display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+#wx-query { flex:1; min-width:0; padding:10px 12px; border-radius:12px; border:1px solid var(--line);
+  background:rgba(0,0,0,.18); color:var(--text); font-size:15px; font-family:inherit; outline:none; }
+#wx-query:focus { border-color:rgba(76,201,240,.6); box-shadow:0 0 0 3px rgba(76,201,240,.25); }
+#wx-note { flex-basis:100%; font-size:13px; min-height:0; }
+#wx-note:empty { display:none; }
+
+.wx-home { bottom:0; right:0; padding:8px 14px; font-size:13px; display:flex; gap:10px; align-items:center; }
+.wx-home label { cursor:pointer; display:flex; gap:6px; align-items:center; }
+
+/* The ping card, placed beside the ping by space-weather.js (style.left / style.top) */
+.wx-ping { padding:12px 14px; min-width:220px; max-width:300px; }
+.wx-ping[hidden] { display:none; }
+#wx-ping-name { font-size:20px; font-weight:600; color:var(--accent); }
+#wx-ping-where { font-size:13px; margin:2px 0 10px; }
+.wx-ping-buttons { display:flex; gap:8px; flex-wrap:wrap; }
+.wx-ping .btn { padding:8px 14px; font-size:12px; }
+#wx-yes { border-color:var(--accent); color:var(--accent); }
+
+#wx-page { display:none; }
+#space-weather[data-view="page"] #wx-page { display:grid; }

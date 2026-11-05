@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/static/css/jarvis.css">
 <link rel="stylesheet" href="/static/css/motion.css">
 <link rel="stylesheet" href="/static/css/space-work.css">
+<link rel="stylesheet" href="/static/css/space-weather.css">
 </head>
 <body data-state="idle" data-space="home">
 <!-- Shown once per browser session, never with Reduce motion (app.js) -->
@@ -76,6 +77,28 @@
   <div class="panel" id="work-tasks-panel"><div class="h"><span class="l">TO-DO</span></div><div id="work-tasks" class="task-list"></div></div>
   <div class="panel" id="work-cal-panel"><div class="h"><span class="l">CALENDAR</span></div><div id="work-cal"></div></div>
 </section>
+<!-- Weather (static/js/space-weather.js): the globe, then the page for the place you confirm.
+     data-view says which: globe, ping or page -->
+<section class="space" id="space-weather" data-space="weather" data-view="globe" aria-label="Weather" hidden>
+  <div id="wx-globe-view">
+    <canvas id="wx-globe" aria-label="Globe"></canvas>
+    <div class="wx-search">
+      <input id="wx-query" maxlength="80" placeholder="Search a place" aria-label="Search a place" autocomplete="off">
+      <button id="wx-go" class="btn ghost">SEARCH</button>
+      <div id="wx-note" class="muted" aria-live="polite"></div>
+    </div>
+    <div id="wx-ping" class="wx-ping" role="dialog" aria-label="Is this the place?" hidden>
+      <div id="wx-ping-name"></div>
+      <div id="wx-ping-where" class="muted"></div>
+      <div class="wx-ping-buttons"><button id="wx-yes" class="btn ghost">THIS ONE</button><button id="wx-no" class="btn ghost">NOT THIS ONE</button></div>
+    </div>
+    <div class="wx-home">
+      <label><input type="checkbox" id="wx-open-home"> Open on home</label>
+      <span id="wx-home-name" class="muted"></span>
+    </div>
+  </div>
+  <div id="wx-page"></div>
+</section>
 
 <script src="/static/js/orb.js"></script>
 <script src="/static/js/chat.js"></script>
@@ -86,6 +109,8 @@
 <script src="/static/js/app.js"></script>
 <script src="/static/js/spaces.js"></script>
 <script src="/static/js/space-work.js"></script>
+<script src="/static/js/globe.js"></script>
+<script src="/static/js/space-weather.js"></script>
 <script src="/static/js/motion.js"></script>
 </body>
 </html>
