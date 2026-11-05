@@ -3,18 +3,19 @@ import tempfile
 import threading
 import json
 import logging
+import math
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
-from typing import Literal
+from typing import Annotated, Literal
 
 import ollama
 from fastapi import FastAPI, HTTPException, UploadFile, File, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, BeforeValidator, Field, StringConstraints
 
 import backup_db
 import config
@@ -29,6 +30,7 @@ import jcal  # noqa: E402
 import notes  # noqa: E402
 import speech  # noqa: E402
 import tasks  # noqa: E402
+import weather  # noqa: E402
 import workday  # noqa: E402
 
 log = logging.getLogger("jarvis.server")
@@ -132,6 +134,32 @@ class ResetRequest(BaseModel):
     """Empty, but requiring a JSON body keeps other websites from sending this request."""
 
 
+class PlacesRequest(BaseModel):
+    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
+                                            max_length=config.WEATHER_QUERY_MAX)]
+
+
+class PlaceChoice(BaseModel):
+    id: Annotated[str, StringConstraints(min_length=1, max_length=32)]
+
+
+def _finite_or_none(value):
+    """JSON from Python may hold NaN or Infinity. Refusing them is easy, but the 422 reply
+    quotes the bad value back, and NaN cannot be written as JSON, so the refusal itself
+    crashed (500). As None, it is refused as "not a number" and the reply can be written."""
+    return None if isinstance(value, float) and not math.isfinite(value) else value
+
+
+class HomePlace(BaseModel):
+    """The one place the page sends itself (its saved home), so every part is checked."""
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
+                                           max_length=config.WEATHER_NAME_MAX)]
+    lat: Annotated[float, BeforeValidator(_finite_or_none),
+                   Field(ge=-90, le=90, allow_inf_nan=False)]
+    lon: Annotated[float, BeforeValidator(_finite_or_none),
+                   Field(ge=-180, le=180, allow_inf_nan=False)]
+
+
 @app.get("/")
 def home():
     return FileResponse(config.STATIC_DIR / "index.html")
@@ -214,6 +242,39 @@ def list_tasks_endpoint():
 def day_endpoint():
     """The Work space's free time, what's next and deadlines. Read-only."""
     return workday.day_summary()
+
+
+# Weather (docs/specs/2026-11-05-weather-space.md). POST although they only read, so the
+# Origin check and the JSON-only rule cover every request that makes JARVIS go online.
+# Plain def: they wait on the network, so FastAPI runs them in its thread pool.
+def _weather(call):
+    try:
+        return call()
+    except weather.WeatherError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except LookupError as e:
+        raise HTTPException(status_code=404,
+                            detail="That place has expired. Search again.") from e
+
+
+@app.post("/weather/places")
+def weather_places(req: PlacesRequest):
+    return {"matches": _weather(lambda: weather.find_places(req.query))}
+
+
+@app.post("/weather/confirm")
+def weather_confirm(req: PlaceChoice):
+    """"This one" on the ping. What JARVIS says joins the conversation, as /confirm's does."""
+    payload = _weather(lambda: weather.confirm(req.id))
+    assistant.add_reply(payload["spoken"])
+    return payload
+
+
+@app.post("/weather/home")
+def weather_home(req: HomePlace):
+    payload = _weather(lambda: weather.open_home(req.name, req.lat, req.lon))
+    assistant.add_reply(payload["spoken"])
+    return payload
 
 
 def _ollama_ok() -> bool:

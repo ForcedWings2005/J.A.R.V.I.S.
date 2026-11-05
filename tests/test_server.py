@@ -20,6 +20,8 @@ import notes
 import server
 import speech
 import tasks
+import urllib.error
+import weather_data as data
 from fakes import FakeModel, call, say, use
 
 
@@ -512,3 +514,90 @@ def test_reset_cannot_be_sent_by_another_website(client, model):
     r = client.post("/reset", content="{}", headers={"Content-Type": "text/plain"})
     assert r.status_code == 422
     assert len(server.assistant.messages) == 3                           # still there
+
+
+# ---------- the weather endpoints (docs/specs/2026-11-05-weather-space.md) ----------
+
+WEATHER_PATHS = ["/weather/places", "/weather/confirm", "/weather/home"]
+
+
+def test_places_endpoint(client, monkeypatch):
+    data.serve(monkeypatch, geo=data.geocode(data.PARIS_FR, data.PARIS_TX))
+    r = client.post("/weather/places", json={"query": "Paris"})
+    assert r.status_code == 200
+    matches = r.json()["matches"]
+    assert [m["region"] for m in matches] == ["Île-de-France", "Texas"]
+    assert set(matches[0]) == {"id", "name", "region", "country", "lat", "lon"}
+
+
+@pytest.mark.parametrize("query", ["", "   ", "x" * 81])
+def test_places_refuses_empty_or_long_queries(client, query):
+    assert client.post("/weather/places", json={"query": query}).status_code == 422
+
+
+def test_confirm_adds_the_spoken_line_to_the_conversation(client, model, monkeypatch):
+    model()
+    data.serve(monkeypatch, geo=data.geocode(data.PARIS_FR), forecast=data.forecast(),
+               air=data.air())
+    pid = client.post("/weather/places", json={"query": "Paris"}).json()["matches"][0]["id"]
+    r = client.post("/weather/confirm", json={"id": pid})
+    assert r.status_code == 200
+    spoken = r.json()["spoken"]
+    assert spoken.startswith("Paris: 65 degrees") and len(r.json()["hours"]) == 24
+    assert server.assistant.messages[-1] == {"role": "assistant", "content": spoken}
+
+
+def test_confirm_refuses_an_unknown_id(client, model):
+    model()
+    before = list(server.assistant.messages)
+    r = client.post("/weather/confirm", json={"id": "nope"})
+    assert r.status_code == 404
+    assert r.json()["detail"] == "That place has expired. Search again."
+    assert server.assistant.messages == before
+
+
+def test_the_service_down_is_a_502(client, monkeypatch):
+    data.serve(monkeypatch, geo=urllib.error.URLError("down"))
+    r = client.post("/weather/places", json={"query": "Paris"})
+    assert r.status_code == 502 and r.json()["detail"] == "Couldn't reach the weather service."
+
+
+def test_home_endpoint(client, model, monkeypatch):
+    model()
+    data.serve(monkeypatch, forecast=data.forecast(), air=data.air())
+    r = client.post("/weather/home", json={"name": " Rome ", "lat": 41.902782, "lon": 12.496366})
+    assert r.status_code == 200 and r.json()["place"]["name"] == "Rome"
+    assert server.assistant.messages[-1]["content"] == r.json()["spoken"]
+
+
+@pytest.mark.parametrize("body", [
+    {"name": "Home", "lat": 91, "lon": 0}, {"name": "Home", "lat": -91, "lon": 0},
+    {"name": "Home", "lat": 0, "lon": 181}, {"name": "x" * 61, "lat": 0, "lon": 0},
+    {"name": "", "lat": 0, "lon": 0}, {"name": "  ", "lat": 0, "lon": 0},
+    {"name": "Home", "lat": "north", "lon": 0}, {"name": "Home", "lat": 0}])
+def test_home_refuses_bad_coordinates(client, body):
+    assert client.post("/weather/home", json=body).status_code == 422
+
+
+@pytest.mark.parametrize("number", ["NaN", "Infinity", "-Infinity"])
+def test_home_refuses_nan_and_infinity(client, number):
+    r = client.post("/weather/home", content='{"name": "Home", "lat": %s, "lon": 0}' % number,
+                    headers={"Content-Type": "application/json"})
+    assert r.status_code == 422
+
+
+@pytest.mark.parametrize("path", WEATHER_PATHS)
+def test_weather_endpoints_refuse_other_websites(client, path):
+    r = client.post(path, json={"query": "Paris"}, headers={"Origin": "http://evil.example"})
+    assert r.status_code == 403
+
+
+@pytest.mark.parametrize("path", WEATHER_PATHS)
+def test_weather_endpoints_refuse_plain_text(client, path):
+    r = client.post(path, content='{"query": "Paris"}', headers={"Content-Type": "text/plain"})
+    assert r.status_code == 422
+
+
+@pytest.mark.parametrize("path", WEATHER_PATHS)
+def test_weather_endpoints_only_take_post(client, path):
+    assert client.get(path).status_code == 405

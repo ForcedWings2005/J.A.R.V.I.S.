@@ -14,6 +14,8 @@ import jcal
 import notes
 import tasks
 import tools
+import weather
+import weather_data
 from fakes import FakeModel, call, say, use
 
 
@@ -586,6 +588,28 @@ def test_reset_starts_a_new_conversation():
     assert a.resolve_pending(pid, True) == "That request has expired or was already handled."
     assert "Dentist" in jcal.get_events("2030-01-08")
 
+
+
+def test_reset_forgets_the_place_on_screen(monkeypatch):
+    weather_data.serve(monkeypatch, forecast=weather_data.forecast(), air=weather_data.air())
+    weather.open_home("Home", 48.85, 2.35)
+    brain.Assistant(chat=FakeModel()).reset()
+    assert weather.place_on_screen() is None
+
+
+def test_add_reply_joins_the_conversation():
+    """Only the page's buttons call it (the weather confirm), like resolve_pending."""
+    a = brain.Assistant(chat=FakeModel())
+    a.add_reply("Paris: 65 degrees, 18 Celsius, and clear.")
+    assert a.messages[-1] == {"role": "assistant",
+                              "content": "Paris: 65 degrees, 18 Celsius, and clear."}
+
+
+def test_weather_adds_no_tools_yet():
+    """Stage 2 changes nothing the model sees, so no eval is needed (stage 4 adds the tools)."""
+    names = [s["function"]["name"] for s in tools.SCHEMAS]
+    assert "find_place" not in names and "get_forecast" not in names
+    assert names[-1] == "open_space"
 
 # --- changing an event goes through the same confirmation ---------------------
 

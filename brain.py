@@ -20,6 +20,9 @@ import tasks  # noqa: F401, E402
 import calc  # noqa: F401, E402
 import notes  # noqa: F401, E402
 import spaces  # noqa: F401, E402  (last, so the tools above keep their order)
+# Registers no tools yet (Weather stage 4 adds them), so the prompt is unchanged. Imported
+# here so a new conversation also forgets the place on screen.
+import weather  # noqa: E402
 
 log = logging.getLogger("jarvis.brain")
 
@@ -351,7 +354,15 @@ class Assistant:
             self.pending = None
             self.confirm = None
             self.last_prompt_tokens = None
+        weather.clear_place()               # "there" means nothing in a new conversation
         log.info("conversation reset")
+
+    def add_reply(self, text: str) -> None:
+        """Called only by the page's buttons (the weather confirm), never by the model, like
+        resolve_pending: what JARVIS said on screen joins the conversation, so a follow-up
+        such as "will it rain there tomorrow?" knows which place is meant."""
+        with self.lock:
+            self.messages.append({"role": "assistant", "content": text})
 
     def resolve_pending(self, pid: str, approve: bool) -> str:
         """Called only by the Confirm and Cancel buttons, never by the model."""
