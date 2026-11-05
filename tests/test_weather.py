@@ -12,6 +12,8 @@ import pytest
 
 import config
 import weather
+import weather_data as data
+from weather_data import serve
 
 
 def fake_fetch(monkeypatch, reply):
@@ -184,3 +186,191 @@ def test_spoken_line_without_a_current_temperature():
     now = {"temp_f": None, "temp_c": None, "condition": "clear"}
     assert weather.spoken_line("Paris", now, {"high_f": 70, "rain_chance": 10}) == \
         "Paris: clear. High of 70, 10 percent chance of rain."
+
+
+# ---------- places, summaries, the cache and the place on screen ----------
+
+class FakeMonotonic:
+    def __init__(self):
+        self.t = 1000.0
+
+    def __call__(self):
+        return self.t
+
+
+@pytest.fixture
+def clock_s(monkeypatch):
+    """The cache's clock, in seconds, moved by hand."""
+    fake = FakeMonotonic()
+    monkeypatch.setattr(weather, "monotonic", fake)
+    return fake
+
+
+def paris(monkeypatch, **forecast_kwargs):
+    """Serve Paris, France and Paris, Texas, and return Paris, France's confirmed payload."""
+    served = serve(monkeypatch, geo=data.geocode(data.PARIS_FR, data.PARIS_TX),
+                   forecast=data.forecast(**forecast_kwargs), air=data.air())
+    return weather.confirm(weather.find_places("Paris")[0]["id"]), served
+
+
+def test_matches_are_sorted_by_population_and_cleaned(monkeypatch):
+    serve(monkeypatch, geo=data.geocode(data.PARIS_TX, data.NO_POPULATION, data.PARIS_FR))
+    matches = weather.find_places("  Paris ")
+    assert [m["region"] for m in matches] == ["Île-de-France", "Texas", "Nowhere"]
+    first = matches[0]
+    assert first["name"] == "Paris" and first["country"] == "France"
+    assert first["lat"] == 48.85 and first["lon"] == 2.35 and len(first["id"]) == 8
+    assert set(first) == {"id", "name", "region", "country", "lat", "lon"}
+
+
+def test_the_search_asks_for_five_matches_in_english(monkeypatch):
+    served = serve(monkeypatch, geo=data.geocode(data.PARIS_FR))
+    weather.find_places("Paris")
+    assert "count=5" in served.addresses[0] and "language=en" in served.addresses[0]
+
+
+@pytest.mark.parametrize("query", ["", "   ", "x" * 81])
+def test_a_bad_query_is_refused_before_going_online(query):
+    with pytest.raises(ValueError):
+        weather.find_places(query)
+
+
+def test_no_match_is_an_empty_list(monkeypatch):
+    serve(monkeypatch, geo=data.geocode())
+    assert weather.find_places("Xqzzv") == []
+
+
+def test_requests_carry_only_rounded_coordinates(monkeypatch):
+    _, served = paris(monkeypatch)
+    later = served.addresses[1:]
+    assert len(later) == 2
+    for address in later:
+        assert "latitude=48.85&" in address and "longitude=2.35&" in address
+        assert "48.853" not in address
+
+
+def test_payload_now_and_details(monkeypatch):
+    payload, _ = paris(monkeypatch)
+    assert payload["now"] == {"time": "21:45", "temp_c": 18, "temp_f": 65, "feels_c": 16,
+                              "feels_f": 61, "condition": "clear", "icon": "moon",
+                              "is_day": False}
+    details = payload["details"]
+    assert details["wind_kmh"] == 20 and details["wind_mph"] == 12 and details["wind_dir"] == 225
+    assert details["humidity"] == 70 and details["uv"] == 2.0 and details["uv_label"] == "Low"
+    assert details["sunrise"] == "07:45" and details["sunset"] == "17:20"
+    assert details["pressure_hpa"] == 1015 and details["pressure_inhg"] == 29.98
+    assert details["visibility_km"] == 24 and details["visibility_mi"] == 15
+    assert payload["place"]["timezone"] == "Europe/Paris"
+    assert payload["place"]["utc_offset_seconds"] == 3600
+    assert payload["spoken"] == \
+        "Paris: 65 degrees, 18 Celsius, and clear. High of 71, 10 percent chance of rain."
+
+
+def test_next_24_hours_start_at_the_current_hour_and_cross_midnight(monkeypatch):
+    payload, _ = paris(monkeypatch, current_time="2026-11-05T21:45")
+    hours = payload["hours"]
+    assert len(hours) == 24
+    assert hours[0]["time"] == "21:00" and hours[3]["time"] == "00:00"
+    assert hours[0]["temp_c"] == 21 and hours[0]["temp_f"] == 69     # 20.5 °C rounds up
+    assert hours[0]["is_day"] is False and hours[0]["icon"] == "cloud"
+    assert payload["rain"] == "from 2 pm to 5 pm"
+
+
+def test_seven_days(monkeypatch):
+    payload, _ = paris(monkeypatch)
+    days = payload["days"]
+    assert len(days) == 7 and [d["weekday"] for d in days][:2] == ["Thu", "Fri"]
+    assert days[0] == {"date": "2026-11-05", "weekday": "Thu", "condition": "overcast",
+                       "icon": "cloud", "high_c": 22, "high_f": 71, "low_c": 10, "low_f": 50,
+                       "rain_chance": 10}
+
+
+def test_missing_values_stay_none(monkeypatch):
+    payload, _ = paris(monkeypatch, nulls=True)
+    assert payload["hours"][0]["rain_chance"] is None
+    assert payload["days"][0]["rain_chance"] is None
+    assert payload["spoken"].endswith("High of 71.")
+
+
+def test_air_quality(monkeypatch):
+    payload, _ = paris(monkeypatch)
+    assert payload["air"] == {"aqi": 42, "aqi_label": "Good", "pm2_5": 8.5, "ozone": 61.0,
+                              "pollen": None}
+
+
+def test_pollen_only_where_there_is_some(monkeypatch):
+    serve(monkeypatch, forecast=data.forecast(), air=data.air(pollen=True))
+    assert weather.open_home("Home", 48.85, 2.35)["air"]["pollen"] == {"grass": 12.0}
+
+
+def test_air_quality_failing_leaves_the_forecast(monkeypatch):
+    serve(monkeypatch, geo=data.geocode(data.PARIS_FR), forecast=data.forecast(),
+          air=urllib.error.URLError("down"))
+    payload = weather.confirm(weather.find_places("Paris")[0]["id"])
+    assert payload["air"] is None and payload["now"]["temp_f"] == 65
+
+
+def test_a_failed_forecast_leaves_the_place_on_screen_alone(monkeypatch):
+    serve(monkeypatch, geo=data.geocode(data.PARIS_FR, data.PARIS_TX),
+          forecast=data.forecast(), air=data.air())
+    france, texas = weather.find_places("Paris")
+    weather.confirm(france["id"])
+    serve(monkeypatch, forecast=urllib.error.URLError("down"), air=data.air())
+    with pytest.raises(weather.WeatherError):
+        weather.confirm(texas["id"])
+    assert weather.place_on_screen()["region"] == "Île-de-France"
+
+
+def test_the_cache_avoids_asking_twice_within_10_minutes(monkeypatch, clock_s):
+    served = serve(monkeypatch, forecast=data.forecast(), air=data.air())
+    weather.open_home("Home", 48.85, 2.35)
+    clock_s.t += 599
+    weather.open_home("Home", 48.85, 2.35)
+    assert served.count("api.open-meteo.com/v1/forecast") == 1
+    clock_s.t += 2
+    weather.open_home("Home", 48.85, 2.35)
+    assert served.count("api.open-meteo.com/v1/forecast") == 2
+
+
+def test_errors_are_not_cached(monkeypatch):
+    serve(monkeypatch, forecast=urllib.error.URLError("down"), air=data.air())
+    with pytest.raises(weather.WeatherError):
+        weather.open_home("Home", 48.85, 2.35)
+    serve(monkeypatch, forecast=data.forecast(), air=data.air())
+    assert weather.open_home("Home", 48.85, 2.35)["now"]["temp_f"] == 65
+
+
+def test_the_cache_holds_at_most_50_entries(monkeypatch):
+    serve(monkeypatch, forecast=data.forecast(), air=data.air())
+    for i in range(60):
+        weather.open_home("Home", 10 + i / 10, 20)
+    assert len(weather._cache) <= 50
+    assert ("forecast", 10.0, 20.0) not in weather._cache
+
+
+def test_an_expired_id_is_refused(monkeypatch, clock_s):
+    serve(monkeypatch, geo=data.geocode(data.PARIS_FR), forecast=data.forecast(),
+          air=data.air())
+    match = weather.find_places("Paris")[0]
+    clock_s.t += 601
+    with pytest.raises(LookupError):
+        weather.confirm(match["id"])
+    assert weather.place_on_screen() is None
+    with pytest.raises(LookupError):
+        weather.confirm("never-issued")
+
+
+def test_home_place(monkeypatch):
+    serve(monkeypatch, forecast=data.forecast(), air=data.air())
+    payload = weather.open_home("Rome\x07", 41.902782, 12.496366)
+    assert payload["place"]["name"] == "Rome" and payload["place"]["lat"] == 41.9
+    assert payload["place"]["lon"] == 12.5 and payload["place"]["region"] == ""
+    assert payload["spoken"].startswith("Rome: 65 degrees")
+    assert weather.place_on_screen()["name"] == "Rome"
+
+
+def test_clear_place(monkeypatch):
+    serve(monkeypatch, forecast=data.forecast(), air=data.air())
+    weather.open_home("Home", 48.85, 2.35)
+    weather.clear_place()
+    assert weather.place_on_screen() is None

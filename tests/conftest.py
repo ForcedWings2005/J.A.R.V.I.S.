@@ -59,3 +59,4 @@ def no_internet(monkeypatch):
     def refuse(address):
         raise AssertionError(f"a test tried to reach the internet: {address}")
     monkeypatch.setattr(weather, "_fetch", refuse)
+    weather.forget_everything()     # no cache, ids or place carried over from another test
