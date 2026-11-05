@@ -157,7 +157,10 @@ async def check_page_files_again(request, call_next):
 # TrustedHostMiddleware (400) make without calling further in.
 @app.middleware("http")
 async def add_security_policy(request, call_next):
-    """Every response carries the Content Security Policy, whatever its path or status."""
+    """Every response carries the Content Security Policy, whatever its path or status.
+
+    Except a crash: Starlette's own 500 reply comes from outside every middleware. It is
+    plain text with no script, so there is nothing for the policy to protect."""
     response = await call_next(request)
     response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
     return response

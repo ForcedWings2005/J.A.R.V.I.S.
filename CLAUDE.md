@@ -105,9 +105,12 @@ of the risk and the owner's agreement first.
   is what protects `/transcribe`, a form upload. Each lock has its own tests; keep them separate.
 - Every response carries the Content Security Policy in `server.py` (`CONTENT_SECURITY_POLICY`,
   set by `add_security_policy`, which must stay the last middleware so refusals carry it too).
-  The page may load and talk only to its own address, so it has no inline scripts or styles and
-  no `eval`; `tests/test_server.py` pins the policy and scans `static/` for both. Loosening it
-  needs the owner's agreement.
+  The one exception is a crash: Starlette's own 500 reply is plain text without it. The page
+  may load files from and talk only to its own address (audio may also come from `blob:` and
+  `data:`), so it has no inline scripts or styles and no `eval`. `tests/test_server.py` pins the
+  policy and scans `index.html` and `static/js/` for code it would block; the scans miss
+  attributes set at run time, so a demo with a violation listener is the real check. Loosening
+  it needs the owner's agreement.
 - Input limits: uploads 10 MB (unknown file extensions are saved as `.webm`), the temporary
   audio file is always deleted;
   `/speak` text capped at 2000 characters; `/calendar` range at most 400 days; `get_events` at
