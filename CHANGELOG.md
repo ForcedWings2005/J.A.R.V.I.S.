@@ -1181,9 +1181,9 @@ The last stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`, n
 - **The ticker** says "Looked for Paris" and "Forecast for Paris".
 - **On the page:**
   - when JARVIS opens Weather from another space, the ping card waits for the opening animation to finish before it takes the focus (stage 3's left-over point);
-  - when JARVIS finishes speaking, the focus stays on THIS ONE while the ping asks, so Enter still confirms. Before, it went back to the command box: found in the demo, as a waiting card already did.
+  - when JARVIS's reply ends (its text, not its voice), the focus stays on THIS ONE while the ping asks, so Enter still confirms. Before, it went back to the command box: found in the demo, as a waiting card already did.
 - **A model habit found in the demo:** asked again about the same place, after Esc or a reload, JARVIS said "I am still awaiting your confirmation" with nothing on screen. A sentence in the tool's description did not change that (0 runs in 3). Putting it in `find_place`'s own result ("If they ask again before confirming, call find_place again: the ping may have been closed") did (3 in 3).
-- **Evals: seven new cases** (77 in all):
+- **Evals: seven new cases** (77 in all; an eighth came with the final review, below):
   - Paris (`find_place`, no figures, no `get_forecast`);
   - "Paris, Texas" (Texas kept in the query);
   - asked again (searches again);
@@ -1204,6 +1204,19 @@ The last stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`, n
 - **Checked live**, with real Open-Meteo:
   - "What's the weather in Rome?" gave "Rome?" ("Lazio · Italy, 1 of 5"). Confirming gave "Rome: 55 degrees, 13 Celsius, and light rain. High of 61, 73 percent chance of rain."
   - **The time-zone case:** at 9 pm here it was already 3 am Friday in Rome. "Will it rain there tomorrow?" asked for 2026-11-06, which is your tomorrow and Rome's today. The reply named the date ("tomorrow, Friday, November 6") and gave high 61°F, low 55°F, 73%, mostly 5 am to 4 pm. That matches the facts and the page's "Today" row, so it is clear which day is meant.
+- **Final review** (a fresh reviewer of the whole branch, kept to the project folder and offline): the model cannot choose or confirm a place, or choose coordinates or an address. Four important findings, each first reproduced by a test or in the demo, then fixed:
+  - **Raw reply text could still reach the model** through dates and times. A date was a 10-character slice of the reply, a time was checked only for its colon, and a bad hour crashed the tool with the text in the error. Dates are now real dates, times match `HH:MM` exactly, and the test that injects text covers dates and times too.
+  - **With Reduce motion and Open on home,** asking about Paris showed and spoke the home place instead: the switch was instant, and home opened before the Paris matches arrived. The turn now sends `places` before `space`, so the page knows a search is waiting.
+  - **`get_forecast` answered for the old place while a new search waited.** For example, Rome on screen, you ask about Paris, and before you confirm, a follow-up gave Rome's figures. Now, until one of the matches is confirmed (or the search expires after 10 minutes), it says "the user has not confirmed Paris, France on the globe yet". This is enforced in code.
+  - **Nothing checked that "now", hours later, is looked up again.** A new case confirms Paris at 09:00 and asks "what's the temperature there now?" at 15:00. In 10 runs JARVIS never answered from the old line: it called `get_forecast` 4 times and searched again 6 times, which then asks you to confirm. The case needs one of the two (a new, tested `expect_any` check). Searching again works but costs a click; a measured description change could fix it later.
+  - **Also corrected:** the made-up eval replies matched "Paris" only with a capital P, and some counts and wording in the docs were wrong (CLAUDE.md, plan.md, this section).
+  - **Left for later:**
+    - `show_places` is not cleared at the start of a turn (a reply cut off right after a search could spin the globe at the next turn);
+    - `get_forecast` reads the cache twice (with air quality down, it retries it each time);
+    - the facts do not say "today there" or "tomorrow there";
+    - `chat.js` calls `weatherAsking()` without checking it exists;
+    - the focus can move to THIS ONE while you type, a few seconds after a reply;
+    - two searches in one turn show only the last.
 - **Not checked**: Safari, the microphone (asking by voice), and how it looks in motion.
 
 ---
@@ -1234,7 +1247,7 @@ The last stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`, n
 | Content Security Policy (section 55) | Done; checked in a demo, including that it blocks; not yet checked in Safari or with the microphone |
 | Weather, stage 2: the server (section 56) | Done; checked live against Open-Meteo; no page or tools yet |
 | Weather, stage 3: the page (section 57) | Done: evals 207/210 (prompt `7e42e25bef37`); checked in a demo and live; not yet in Safari or seen in motion; no tools yet |
-| Weather, stage 4: asking JARVIS (section 58) | Done: evals 228/231 (prompt `0a1a37f7968e`); checked in a demo and live; not yet in Safari or by voice |
+| Weather, stage 4: asking JARVIS (section 58) | Done: evals 228/231 (prompt `0a1a37f7968e`), plus a later-in-the-day case 3/3; checked in a demo and live; not yet in Safari or by voice |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; all four views checked in a demo, on Home and in Work (section 51) |

@@ -580,3 +580,50 @@ def test_canned_replies_for_the_evals():
     assert forecast["daily"]["time"][1] == "2030-01-08"
     assert forecast["daily"]["precipitation_probability_max"][1] == 60
     assert "us_aqi" in json.loads(data.canned_fetch(config.WEATHER_AIR_URL + "?x=1", now))["current"]
+
+
+# ---------- final review of stage 4 ----------
+
+@pytest.mark.parametrize("change", [
+    lambda r: r["daily"]["time"].__setitem__(0, "IGNORE ALL"),
+    lambda r: r["daily"]["time"].__setitem__(6, "DO\nTHIS:!!"),
+    lambda r: r["current"].__setitem__("time", "2026-11-05TXX:YY"),
+    lambda r: r["hourly"]["time"].__setitem__(30, "2026-11-06Tab:00"),
+], ids=["daily-date", "daily-date-newline", "current-time", "hourly-time"])
+def test_odd_dates_and_times_never_reach_a_tool_result(monkeypatch, change):
+    reply = data.forecast()
+    change(reply)
+    serve(monkeypatch, forecast=reply, air=data.air())
+    weather.open_home("Home", 48.85, 2.35)
+    results = [weather.get_forecast(), weather.get_forecast("2026-11-06"),
+               weather.get_forecast("2026-12-01")]
+    for text in results:
+        for bad in ("IGNORE", "THIS:!!", "XX:YY", "Tab", "invalid literal"):
+            assert bad not in text, (bad, text)
+
+
+def test_get_forecast_waits_for_a_new_place_to_be_confirmed(monkeypatch):
+    """Final review: Rome on screen, Paris asked about: no Rome figures until Paris is confirmed."""
+    serve(monkeypatch, geo=data.geocode(data.PARIS_FR), forecast=data.forecast(), air=data.air())
+    weather.open_home("Rome", 41.9, 12.5)
+    assert weather.get_forecast().startswith("Rome. Now")
+    result = weather.find_place("Paris")
+    assert weather.get_forecast() == ("Error: the user has not confirmed Paris, France on the "
+                                      "globe yet. Ask them to confirm it first.")
+    weather.confirm(result.matches[0]["id"])
+    assert weather.get_forecast().startswith("Paris, France. Now")
+
+
+def test_a_waiting_search_expires_with_its_ids(monkeypatch, clock_s):
+    serve(monkeypatch, geo=data.geocode(data.PARIS_FR), forecast=data.forecast(), air=data.air())
+    weather.open_home("Rome", 41.9, 12.5)
+    weather.find_place("Paris")
+    clock_s.t += 601
+    assert weather.get_forecast().startswith("Rome. Now")
+
+
+def test_canned_replies_ignore_case():
+    from datetime import datetime
+    reply = json.loads(data.canned_fetch(config.WEATHER_GEOCODE_URL + "?name=paris%2C+texas",
+                                         datetime(2030, 1, 7, 9, 0)))
+    assert [r["admin1"] for r in reply["results"]] == ["Texas"]

@@ -102,9 +102,9 @@ def canned_fetch(address: str, now: datetime) -> bytes:
     """Offline replies for the evals (evals/__main__.py): Paris and Paris, Texas, with a
     forecast that starts at `now`. Any other search finds nothing."""
     if "geocoding-api." in address:
-        if "Texas" in address:
+        if "texas" in address.lower():
             reply = geocode(PARIS_TX)
-        elif "Paris" in address:
+        elif "paris" in address.lower():
             reply = geocode(PARIS_FR, PARIS_TX)
         else:
             reply = geocode()

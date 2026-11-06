@@ -342,6 +342,13 @@ CASES = [
     # right too, so get_forecast is not required here; the figure must still be the real one
     Case("weather_now_there", "What's the temperature right now?", place=PARIS,
          space="weather", forbid=["find_place"], includes_any=["65", "18"]),
+    # Hours after the confirm, the line it added is out of date: JARVIS must look again, by
+    # get_forecast or by searching again (which then asks to confirm), never answer from that
+    # line (final review of stage 4). In 10 runs it searched again 6 times, never answered
+    # from memory.
+    Case("weather_now_hours_later", "What's the temperature there now?", place=PARIS,
+         space="weather", before=[("09:00", "Thanks, that's all for now.")], clock="15:00",
+         expect_any=["get_forecast", "find_place"]),
     Case("weather_no_place_asks", "Will it rain tomorrow?", forbid=["find_place"], asks=True,
          excludes=["°", "percent"]),
     Case("weather_idiom_no_tool", "I'm feeling a bit under the weather today.",

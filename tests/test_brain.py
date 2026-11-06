@@ -607,12 +607,14 @@ def test_add_reply_joins_the_conversation():
 
 # --- weather: find_place opens the globe, get_forecast names the place ---------------
 
-def test_find_place_streams_space_then_places(monkeypatch):
+def test_find_place_streams_places_then_space(monkeypatch):
+    """places comes first, so the page knows a search is waiting before Weather opens: with
+    Reduce motion the switch is instant, and Open on home would win otherwise (final review)."""
     weather_data.serve(monkeypatch, geo=weather_data.geocode(weather_data.PARIS_FR))
     model = FakeModel(use(call("find_place", query="Paris")), say("Please confirm on the globe."))
     events, _ = run(brain.Assistant(chat=model), "What's the weather in Paris?")
     kinds = [e["type"] for e in events]
-    assert kinds.index("step") < kinds.index("space") < kinds.index("places")
+    assert kinds.index("step") < kinds.index("places") < kinds.index("space")
     space = next(e for e in events if e["type"] == "space")
     places = next(e for e in events if e["type"] == "places")
     assert space["name"] == "weather" and places["matches"][0]["region"] == "Île-de-France"

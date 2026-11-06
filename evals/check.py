@@ -18,6 +18,7 @@ class Case:
     # when several argument combinations lead to the same correct outcome.
     expect: list = field(default_factory=list)
     forbid: list = field(default_factory=list)      # tools that must NOT be called
+    expect_any: list = field(default_factory=list)  # at least one of these tools must be called
     no_tools: bool = False                          # no tool at all
     max_calls: dict = field(default_factory=dict)   # {tool: most calls allowed}
     includes: list = field(default_factory=list)    # reply must contain all of these
@@ -143,6 +144,9 @@ def check(case: Case, calls: list, reply: str) -> list:
                 failures.append(f"{tool}: " + "; ".join(closest))
             else:
                 failures.append(f"no {tool} call (got {made})")
+
+    if case.expect_any and not any(c["tool"] in case.expect_any for c in calls):
+        failures.append(f"none of {', '.join(case.expect_any)} called (got {made})")
 
     for tool, most in case.max_calls.items():
         n = sum(1 for c in calls if c["tool"] == tool)

@@ -77,6 +77,15 @@ def test_no_tools_forbid_and_max_calls():
     assert check(capped, [call("add_event"), call("add_event")], "") != []
 
 
+
+def test_expect_any_needs_one_of_the_tools():
+    """Weather, hours after a confirm: looking again either way is right, answering from
+    memory is not (final review of stage 4)."""
+    case = Case("c", "m", expect_any=["get_forecast", "find_place"])
+    assert check(case, [call("get_forecast", day="")], "") == []
+    assert check(case, [call("find_place", query="Paris")], "") == []
+    assert check(case, [], "It is 65 degrees.") == ["none of get_forecast, find_place called (got no tools)"]
+
 def test_reply_checks():
     case = Case("c", "m", includes=["7006652"], includes_any=["sir", "madam"],
                 excludes=["deleted"])

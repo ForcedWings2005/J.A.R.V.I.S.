@@ -11,6 +11,7 @@ Spec: docs/specs/2026-11-05-weather-space.md.
 import json
 import logging
 import math
+import re
 import secrets
 import ssl
 import threading
@@ -244,15 +245,17 @@ _lock = threading.Lock()
 _cache: OrderedDict = OrderedDict()   # key -> (expires_at, value)
 _ids: OrderedDict = OrderedDict()     # match id -> (expires_at, place)
 _place = None                         # the place on screen, once confirmed
+_waiting = None                       # (expires_at, place): a search not yet confirmed
 
 
 def forget_everything() -> None:
     """For the tests: no cache, no ids, no place."""
-    global _place
+    global _place, _waiting
     with _lock:
         _cache.clear()
         _ids.clear()
         _place = None
+        _waiting = None
 
 
 def place_on_screen() -> dict | None:
@@ -261,9 +264,10 @@ def place_on_screen() -> dict | None:
 
 
 def clear_place() -> None:
-    global _place
+    global _place, _waiting
     with _lock:
         _place = None
+        _waiting = None
 
 
 def _keep(store: OrderedDict, key, value) -> None:
@@ -327,10 +331,24 @@ def _weekday(day: str) -> str | None:
         return None
 
 
+_STAMP = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d")
+
+
 def _clock(stamp) -> str | None:
-    """'2026-11-05T07:45' -> '07:45'; anything else -> None."""
+    """'2026-11-05T07:45' -> '07:45'; anything else -> None (final review: a stamp that only
+    looked right, such as 'TXX:YY', reached the model)."""
     text = _text(stamp)
-    return text[11:16] if len(text) >= 16 and text[13] == ":" else None
+    return text[11:16] if _STAMP.match(text) else None
+
+
+def _iso_date(day) -> str | None:
+    """A real 'YYYY-MM-DD' date, or None: dates from a reply reach the model (get_forecast)."""
+    text = _text(day)[:10]
+    try:
+        date.fromisoformat(text)
+    except ValueError:
+        return None
+    return text if re.fullmatch(r"\d{4}-\d\d-\d\d", text) else None
 
 
 def find_places(query: str) -> list[dict]:
@@ -351,12 +369,16 @@ def find_places(query: str) -> list[dict]:
         places.append({"name": clean(_text(r.get("name"))), "region": clean(_text(r.get("admin1"))),
                        "country": clean(_text(r.get("country"))),
                        "lat": _round(lat), "lon": _round(lon)})
+    global _waiting
     matches = []
     with _lock:
         for place in places[:config.WEATHER_MATCHES]:
             pid = secrets.token_urlsafe(6)
             _keep(_ids, pid, place)
             matches.append({"id": pid, **place})
+        # Until one of these is confirmed, "there" is not the old place any more (final review)
+        if matches:
+            _waiting = (monotonic() + config.WEATHER_CACHE_SECONDS, places[0])
     return matches
 
 
@@ -393,7 +415,7 @@ def _summary(place: dict, f: dict, a: dict | None) -> dict:
         high = _num(_at(daily.get("temperature_2m_max"), i))
         low = _num(_at(daily.get("temperature_2m_min"), i))
         d_words, d_icon = condition(_num(_at(daily.get("weather_code"), i)), True)
-        days.append({"date": _text(day)[:10] or None, "weekday": _weekday(_text(day)[:10]),
+        days.append({"date": _iso_date(day), "weekday": _weekday(_text(day)[:10]),
                      "condition": d_words, "icon": d_icon,
                      "high_c": round_half_up(high), "high_f": to_f(high),
                      "low_c": round_half_up(low), "low_f": to_f(low),
@@ -461,12 +483,13 @@ def forecast_for(place: dict) -> dict:
 
 def _show(place: dict) -> dict:
     """Fetch first, and only then make it the place on screen, so a failure changes nothing."""
-    global _place
+    global _place, _waiting
     payload = forecast_for(place)
     payload["spoken"] = spoken_line(place["name"], payload["now"],
                                     payload["days"][0] if payload["days"] else {})
     with _lock:
         _place = payload["place"]
+        _waiting = None
     return payload
 
 
@@ -523,6 +546,11 @@ def _full_weekday(day: str) -> str:
 
 def forecast_facts(day: str = "") -> str:
     """The facts get_forecast gives the model, all worked out here (both units)."""
+    with _lock:
+        waiting = _waiting[1] if _waiting and _waiting[0] > monotonic() else None
+    if waiting:
+        return (f"Error: the user has not confirmed {_place_words(waiting)} on the globe yet. "
+                "Ask them to confirm it first.")
     place = place_on_screen()
     if place is None:
         return NO_PLACE
@@ -543,9 +571,9 @@ def forecast_facts(day: str = "") -> str:
                     "Give a date in that range as YYYY-MM-DD.")
         hourly = _obj(f.get("hourly"))
         times = hourly.get("time") if isinstance(hourly.get("time"), list) else []
-        hours = [(int(_text(t)[11:13]), _num(_at(hourly.get("precipitation_probability"), i)))
+        hours = [(int(_clock(t)[:2]), _num(_at(hourly.get("precipitation_probability"), i)))
                  for i, t in enumerate(times)
-                 if _text(t).startswith(wanted["date"]) and _clock(t)]
+                 if _clock(t) and _text(t).startswith(wanted["date"])]
         text = f"{name}, {_full_weekday(wanted['date'])}{wanted['date']}: " + \
             ", ".join(_day_words(wanted)) + "."
         rain = rain_windows(hours)

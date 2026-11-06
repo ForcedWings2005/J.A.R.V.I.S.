@@ -12,8 +12,8 @@ nothing measured the model, `brain.py` could not be tested, the conversation gre
 tool schemas and functions lived in two places, and the server only worked from its own
 folder. Phases 2 to 4 fixed all five (CHANGELOG sections 21 to 27). Today:
 
-- **The code around the model is well tested**: 521 tests, under a second, run by CI on
-  every push. The evals measure the model: 68 cases, run before and after every prompt change.
+- **The code around the model is well tested**: 684 tests, under a second, run by CI on
+  every push. The evals measure the model: 78 cases, run before and after every prompt change.
 - **The model is still the least reliable part**, but its habits are now measured: it
   sometimes mentions a card that was never shown (about 1 run in 3 for a repeating event
   without a date), now and then assumes AM or PM instead of asking, and a change to one

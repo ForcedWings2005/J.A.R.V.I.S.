@@ -486,12 +486,14 @@ class Assistant:
                             "content": result,
                         })
                         yield {"type": "step", "step": step}
-                        if self.show_space:
-                            yield {"type": "space", "name": self.show_space}
-                            self.show_space = None
+                        # places first: the page must know a search is waiting before
+                        # Weather opens, or Open on home wins when the switch is instant
                         if self.show_places:
                             yield {"type": "places", "matches": self.show_places}
                             self.show_places = None
+                        if self.show_space:
+                            yield {"type": "space", "name": self.show_space}
+                            self.show_space = None
                     yield {"type": "break"}
 
                 if not wrote_text:
