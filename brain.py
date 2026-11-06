@@ -19,9 +19,9 @@ import jcal  # noqa: F401, E402
 import tasks  # noqa: F401, E402
 import calc  # noqa: F401, E402
 import notes  # noqa: F401, E402
-import spaces  # noqa: F401, E402  (last, so the tools above keep their order)
-# Registers no tools yet (Weather stage 4 adds them), so the prompt is unchanged. Imported
-# here so a new conversation also forgets the place on screen.
+import spaces  # noqa: F401, E402
+# Last: find_place and get_forecast come after the tools above. A new conversation also
+# forgets the place on screen (reset), and the ticker names it (_forecast_words).
 import weather  # noqa: E402
 
 log = logging.getLogger("jarvis.brain")
@@ -192,6 +192,11 @@ def _calendar_words(a: dict) -> str:
     return f"Checked the calendar for {_day(a.get('date'))}"
 
 
+def _forecast_words() -> str:
+    place = weather.place_on_screen()
+    return f"Forecast for {place['name']}" if place else "Forecast"
+
+
 # What each tool did, in plain words for the activity line on the page (the model never
 # sees these). The note tools name no words: notes are private (SECURITY.md).
 _STEP_WORDS = {
@@ -207,6 +212,8 @@ _STEP_WORDS = {
     "recall": lambda a: "Looked through your notes",
     "forget": lambda a: "A note to forget",
     "open_space": lambda a: f"Showed the {str(a.get('name', '')).strip().title()} space",
+    "find_place": lambda a: f"Looked for {_short(str(a.get('query', '')).strip(), 60)}",
+    "get_forecast": lambda a: _forecast_words(),
 }
 
 
@@ -271,6 +278,7 @@ class Assistant:
         self.pending = None         # (id, NeedsConfirmation, made at) waiting for the buttons
         self.confirm = None         # the card to show for the current turn, if any
         self.show_space = None      # a space the last tool asked the page to show, if any
+        self.show_places = None     # places find_place asked the globe to show, if any
         self.last_prompt_tokens = None  # tokens the model read on its last call (from Ollama)
         self.lock = threading.Lock()
 
@@ -294,6 +302,12 @@ class Assistant:
         if isinstance(result, tools.ShowSpace):
             # Only the view changes, so no card: the page switches on the `space` event
             self.show_space = result.name
+            return result.reply
+        if isinstance(result, tools.ShowPlaces):
+            # The globe spins to the first match and the user confirms it on screen (/weather/
+            # confirm); the model hears only the names (weather.find_place)
+            self.show_space = "weather"
+            self.show_places = result.matches
             return result.reply
         if call.function.name in tools.ASKS_FIRST and str(result).startswith("Error:"):
             return result + NO_CARD
@@ -475,6 +489,9 @@ class Assistant:
                         if self.show_space:
                             yield {"type": "space", "name": self.show_space}
                             self.show_space = None
+                        if self.show_places:
+                            yield {"type": "places", "matches": self.show_places}
+                            self.show_places = None
                     yield {"type": "break"}
 
                 if not wrote_text:

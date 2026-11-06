@@ -605,6 +605,43 @@ def test_add_reply_joins_the_conversation():
                               "content": "Paris: 65 degrees, 18 Celsius, and clear."}
 
 
+# --- weather: find_place opens the globe, get_forecast names the place ---------------
+
+def test_find_place_streams_space_then_places(monkeypatch):
+    weather_data.serve(monkeypatch, geo=weather_data.geocode(weather_data.PARIS_FR))
+    model = FakeModel(use(call("find_place", query="Paris")), say("Please confirm on the globe."))
+    events, _ = run(brain.Assistant(chat=model), "What's the weather in Paris?")
+    kinds = [e["type"] for e in events]
+    assert kinds.index("step") < kinds.index("space") < kinds.index("places")
+    space = next(e for e in events if e["type"] == "space")
+    places = next(e for e in events if e["type"] == "places")
+    assert space["name"] == "weather" and places["matches"][0]["region"] == "Île-de-France"
+    step = next(e for e in events if e["type"] == "step")["step"]
+    assert step == {"text": "Looked for Paris", "status": "done"}
+
+
+def test_no_match_streams_no_places(monkeypatch):
+    weather_data.serve(monkeypatch, geo=weather_data.geocode())
+    model = FakeModel(use(call("find_place", query="Xqzzv")), say("I couldn't find it."))
+    events, _ = run(brain.Assistant(chat=model), "Weather in Xqzzv?")
+    assert not any(e["type"] in ("places", "space") for e in events)
+
+
+def test_forecast_step_names_the_place(monkeypatch):
+    weather_data.serve(monkeypatch, forecast=weather_data.forecast(), air=weather_data.air())
+    weather.open_home("Rome", 41.9, 12.5)
+    model = FakeModel(use(call("get_forecast", day="")), say("Clear tonight."))
+    events, _ = run(brain.Assistant(chat=model), "And now?")
+    step = next(e for e in events if e["type"] == "step")["step"]
+    assert step == {"text": "Forecast for Rome", "status": "done"}
+
+
+def test_forecast_step_without_a_place_is_an_error():
+    model = FakeModel(use(call("get_forecast", day="")), say("Which place?"))
+    events, _ = run(brain.Assistant(chat=model), "Will it rain?")
+    step = next(e for e in events if e["type"] == "step")["step"]
+    assert step["status"] == "error" and step["text"].startswith("Forecast")
+
 # --- changing an event goes through the same confirmation ---------------------
 
 def test_changing_an_event_waits_for_confirm_and_cancel_leaves_it():

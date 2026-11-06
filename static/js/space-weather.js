@@ -115,6 +115,11 @@ async function wxPointAt(i) {
   globe.unzoom();
   wxSetView('ping');
   const arrived = await globe.spinTo(m.lat, m.lon);
+  // When JARVIS opened Weather from another space, its access sequence may still be playing:
+  // the card and its focus wait for it (at most 4 s), or the focus would land on a hidden button
+  for (let waited = 0; typeof seq !== 'undefined' && seq && waited < 4000; waited += 100) {
+    await new Promise(r => setTimeout(r, 100));
+  }
   if (!arrived || token !== wxSpinToken || wxView() !== 'ping') return;
   globe.ping(m.lat, m.lon);
   wxPingName.textContent = m.name + '?';
@@ -124,6 +129,12 @@ async function wxPointAt(i) {
   wxPing.hidden = false;
   wxPlacePing();
   wxYes.focus();            // so Enter confirms, with no key handling of its own
+}
+
+// True while the ping card is on screen, asking "Paris?": chat.js then leaves the focus on
+// THIS ONE when JARVIS finishes speaking, so Enter still confirms
+function weatherAsking() {
+  return currentSpace === 'weather' && wxView() === 'ping' && !wxPing.hidden;
 }
 
 // Beside the ping, kept inside the globe's area

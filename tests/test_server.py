@@ -620,3 +620,13 @@ def test_a_malformed_reply_is_a_502_not_a_crash(client, model, monkeypatch):
     data.serve(monkeypatch, forecast=reply, air=data.air())
     r = client.post("/weather/home", json={"name": "Home", "lat": 1, "lon": 2})
     assert r.status_code == 502 and r.json()["detail"] == "Couldn't reach the weather service."
+
+
+def test_chat_streams_places(client, model, monkeypatch):
+    """Stage 4: find_place's matches reach the page, ids included, so it can confirm one."""
+    data.serve(monkeypatch, geo=data.geocode(data.PARIS_FR, data.PARIS_TX))
+    model(use(call("find_place", query="Paris")), say("Please confirm on the globe."))
+    events = chat(client, "What's the weather in Paris?")
+    places = next(e for e in events if e["type"] == "places")
+    assert [m["region"] for m in places["matches"]] == ["Île-de-France", "Texas"]
+    assert all(len(m["id"]) == 8 for m in places["matches"])

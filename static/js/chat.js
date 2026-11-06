@@ -136,6 +136,8 @@ async function send(spoken) {
           showSteps(steps);
         } else if (msg.type === 'space') {
           switchSpaceWhenFree(msg.name);           // JARVIS opened a space (open_space)
+        } else if (msg.type === 'places') {
+          weatherShowMatches(msg.matches);         // find_place: spin the globe and ask
         } else if (msg.type === 'break') {
           feed(true);
           if (full) full += ' ';
@@ -158,7 +160,8 @@ async function send(spoken) {
   }
   endExchange();
   sendBtn.disabled = false;
-  if (!pendingId) input.focus();
+  // A waiting card or ping keeps the focus, so Enter answers it (the ping: space-weather.js)
+  if (!pendingId && !weatherAsking()) input.focus();
   loadEvents();
   loadTasks();
   loadNotes();
