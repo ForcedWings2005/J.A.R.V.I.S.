@@ -1167,6 +1167,45 @@ The third stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`):
 - **Not checked**: Safari; how it looks in motion, by eye (most checks were measured, because the hidden pane gives no frames); phone width (left for later by the owner); and a real hidden tab rather than a simulated one.
 - **Noticed**: the browser asks for `/favicon.ico`, which JARVIS has never had (a 404 in the console on every load, unrelated to Weather).
 
+## 58. Weather, stage 4: asking JARVIS
+
+The last stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`, now built). Ask JARVIS "what's the weather in Paris?" from any space. Weather opens, the globe spins to Paris and asks you to confirm, and follow-ups such as "will it rain there tomorrow?" are answered from figures written by code. Plan: `docs/plans/2026-11-05-weather-stage-4.md`.
+
+- **Two tools**, in `weather.py`, registered last:
+  - **`find_place(query)`** looks up the place and returns `ShowPlaces`, a result that only changes the view (like `open_space`). The turn streams a `space` event (Weather) and a new `places` event with the matches, which `chat.js` hands to the globe.
+    - **What the model hears:** "Asked the user to confirm Paris, France on the globe. Give no weather until they confirm.", plus up to two other matches. The ids stay with the page.
+    - **The model cannot confirm a place.** Only the page's THIS ONE can.
+  - **`get_forecast(day)`** reads the place you confirmed and returns facts written by `weather.py`, in both units, with missing values left out. For example: "Paris, France, Friday 2026-11-06: overcast, high 71°F (22°C), low 50°F (10°C), 60% chance of rain. Rain likely from 2 pm to 5 pm."
+    - **The day must be one of the place's own forecast days.** Otherwise the model is told the range and can try again.
+    - **With no place confirmed,** it says so and tells the model to ask which place.
+- **The ticker** says "Looked for Paris" and "Forecast for Paris".
+- **On the page:**
+  - when JARVIS opens Weather from another space, the ping card waits for the opening animation to finish before it takes the focus (stage 3's left-over point);
+  - when JARVIS finishes speaking, the focus stays on THIS ONE while the ping asks, so Enter still confirms. Before, it went back to the command box: found in the demo, as a waiting card already did.
+- **A model habit found in the demo:** asked again about the same place, after Esc or a reload, JARVIS said "I am still awaiting your confirmation" with nothing on screen. A sentence in the tool's description did not change that (0 runs in 3). Putting it in `find_place`'s own result ("If they ask again before confirming, call find_place again: the ping may have been closed") did (3 in 3).
+- **Evals: seven new cases** (77 in all):
+  - Paris (`find_place`, no figures, no `get_forecast`);
+  - "Paris, Texas" (Texas kept in the query);
+  - asked again (searches again);
+  - "will it rain there tomorrow?" and "what's the temperature right now?" with Paris already on screen;
+  - a rain question with no place (asks where);
+  - "under the weather" (no weather tool).
+  - They run offline: the runner answers `weather._fetch` with the made-up replies the tests use (`tests/weather_data.canned_fetch`), and `Case.place` starts a case with a place on screen and its line in the conversation, as the confirm does.
+  - **One check was too strict and was relaxed:** asked for the temperature "right now", JARVIS answered "18 degrees Celsius" from the line code wrote at the confirm, without calling `get_forecast`. That was correct, so that case now accepts either way and still needs the real figure. **Not covered:** hours after a confirm, that line is out of date, and JARVIS might still quote it.
+- **Full eval before and after** (the prompt changed):
+  - **Before:** 207/210, prompt `7e42e25bef37`. That is the run from section 57; the hash was checked unchanged before starting.
+  - **After:** 228/231, prompt `0a1a37f7968e`. The seven new cases passed every run.
+  - **The three misses**, one run in three each: `ask_am_pm` and `delete_repeating_no_date_no_false_card` (the usual ones), and `task_due_this_week`. That one read the calendar instead of the to-do list. Adding `open_space` once made it miss 5 times in 10 (section 52), so it was run 10 more times: 9 of 10, the same 1 in 10 as before.
+  - **Speed:** the median reply went from 3.0 to 4.1 s in the full run. Re-timing three cases showed about half a second slower each, plus the usual variation from how long the model thinks. Not measured more precisely.
+- **Checked in a demo**, with the real model, made-up weather and the browser pane hidden (so animations finished by their safety timeouts):
+  - **From Home**, "What's the weather in Paris?": the opening animation to Weather, then the ping "Paris?" ("Île-de-France · France, 1 of 3") with the focus on THIS ONE. The reply gave no figures.
+  - **After confirming**, "Will it rain there tomorrow?" called `get_forecast` for 2026-11-06, and every figure in the reply matched the facts.
+  - No console errors and no policy violations.
+- **Checked live**, with real Open-Meteo:
+  - "What's the weather in Rome?" gave "Rome?" ("Lazio · Italy, 1 of 5"). Confirming gave "Rome: 55 degrees, 13 Celsius, and light rain. High of 61, 73 percent chance of rain."
+  - **The time-zone case:** at 9 pm here it was already 3 am Friday in Rome. "Will it rain there tomorrow?" asked for 2026-11-06, which is your tomorrow and Rome's today. The reply named the date ("tomorrow, Friday, November 6") and gave high 61°F, low 55°F, 73%, mostly 5 am to 4 pm. That matches the facts and the page's "Today" row, so it is clear which day is meant.
+- **Not checked**: Safari, the microphone (asking by voice), and how it looks in motion.
+
 ---
 
 ## Status
@@ -1195,6 +1234,7 @@ The third stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`):
 | Content Security Policy (section 55) | Done; checked in a demo, including that it blocks; not yet checked in Safari or with the microphone |
 | Weather, stage 2: the server (section 56) | Done; checked live against Open-Meteo; no page or tools yet |
 | Weather, stage 3: the page (section 57) | Done: evals 207/210 (prompt `7e42e25bef37`); checked in a demo and live; not yet in Safari or seen in motion; no tools yet |
+| Weather, stage 4: asking JARVIS (section 58) | Done: evals 228/231 (prompt `0a1a37f7968e`); checked in a demo and live; not yet in Safari or by voice |
 | Other websites (Origin check) | Done: attack shown and then blocked in the real browser, dashboard unaffected, 406 tests (section 36) |
 | Voice input, voice output, voice mode switch | Tested and working |
 | Calendar views (compact agenda, year/month/week/day) | Layout confirmed good; all four views checked in a demo, on Home and in Work (section 51) |
@@ -1225,9 +1265,9 @@ The third stage of the Weather space (`docs/specs/2026-11-05-weather-space.md`):
 
 The full roadmap, with the reasons and the order, is in `plan.md`. In short:
 
-1. The Sports space, the second space after Work (being designed).
+1. The Sports space, the third space (its brainstorm is paused at the panels; it follows Weather's pattern for outside data).
 2. Reminders (Phase 5, item 2).
 3. A morning briefing: today's events, overdue tasks and reminders in one reply.
-4. Weather, then news and sports, as read-only tools. These are the first to read outside text, so prompt-injection evals come first (SECURITY.md).
+4. News, as read-only outside text: longer than Weather's place names, so it needs its own prompt-injection design first (SECURITY.md).
 5. Sound effects for the dashboard.
 6. Phase 6, using JARVIS from a phone: a login, Tailscale with HTTPS, a phone layout.

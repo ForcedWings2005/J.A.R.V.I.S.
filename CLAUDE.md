@@ -22,7 +22,9 @@ static/index.html ──HTTP, 127.0.0.1 only──> server.py (FastAPI)
                                               │          ├─ tasks.py  add_task, list_tasks, complete_task
                                               │          ├─ calc.py   calculate
                                               │          ├─ notes.py  remember, recall, forget
-                                              │          └─ spaces.py open_space (only changes the view)
+                                              │          ├─ spaces.py open_space (only changes the view)
+                                              │          └─ weather.py find_place (only changes the view: the globe asks to confirm),
+                                              │                        get_forecast (facts for the place the user confirmed)
                                               ├─ speech.py (Kokoro, loaded on first use) + speech_text.py
                                               ├─ workday.py (GET /day: free time, what's next, deadlines; reads jcal and tasks)
                                               ├─ weather.py (POST /weather/*: places, forecast, air quality; HTTPS to Open-Meteo only)
@@ -38,12 +40,12 @@ is checked in code, never left to the model.** The model chooses tools; code val
 |---|---|
 | `config.py` | Every setting: model name, paths (built from the project folder), limits, voice. `JARVIS_DB` env var overrides the database path. |
 | `database.py` | The shared `conn` and `lock`, and `MIGRATIONS` (schema version in `PRAGMA user_version`). |
-| `tools.py` | The `@tool` registry (`FUNCTIONS`, `SCHEMAS`), `NeedsConfirmation`, and `ShowSpace` (a tool result that changes only the view, so no card). |
+| `tools.py` | The `@tool` registry (`FUNCTIONS`, `SCHEMAS`), `NeedsConfirmation`, `ShowSpace` (a tool result that changes only the view, so no card) and `ShowPlaces` (find_place's matches: the page spins the globe and the user confirms one). |
 | `brain.py` | `build_system_prompt()` and `Assistant`: the conversation, the tool loop (capped at `MAX_ROUNDS`), the pending confirmation. |
 | `jcal.py` | Calendar logic: durations, repeats (stored as one row, expanded on read), exceptions, conflicts, finished/upcoming labels. |
 | `tasks.py`, `calc.py` | To-do list; safe arithmetic (parses the expression with `ast`, never `eval`). |
 | `workday.py` | The Work space's figures, worked out in code: free time today, what's next, deadline states (settings `WORK_*` and `DEADLINE_WINDOW_DAYS` in `config.py`). |
-| `weather.py` | Weather from Open-Meteo: the one door to the internet (`_fetch`, called only by `_get`, which takes one of the three fixed `WEATHER_*_URL` addresses), the figures worked out in code (units, labels, rain windows, the spoken line), place search with server-issued ids, the forecast summary, a 10-minute in-memory cache, and the place on screen. No tools yet (Weather stage 4). Spec: `docs/specs/2026-11-05-weather-space.md`. |
+| `weather.py` | Weather from Open-Meteo: the one door to the internet (`_fetch`, called only by `_get`, which takes one of the three fixed `WEATHER_*_URL` addresses), the figures worked out in code (units, labels, rain windows, the spoken line), place search with server-issued ids, the forecast summary, a 10-minute in-memory cache, and the place on screen. Its tools come last: `find_place` (returns `ShowPlaces`; the model hears names only, never ids) and `get_forecast` (facts written here, both units, for the place the user confirmed). Spec: `docs/specs/2026-11-05-weather-space.md`. |
 | `spaces.py` | The `open_space` tool (home, work, weather): checks the name against `config.SPACES` and returns `ShowSpace`; the page switches on the `space` event. |
 | `notes.py` | Notes and memory (FTS5 search). Trivial preferences only; secrets refused; saving and forgetting go through the confirmation card. |
 | `static/` | The dashboard: `index.html` (structure), `css/jarvis.css`, `css/motion.css`, `js/*.js` (plain scripts loaded in order and sharing globals: orb, chat, tasks, notes, voice, calendar, app, spaces, space-work, globe, space-weather, motion; no build step). `data/coastlines.json` is the globe's coastlines, made by `scripts/make_coastlines.py`. Weather: `globe.js` only draws (an orthographic projection on a canvas; its spin and zoom have a safety timeout, as `motion.js`'s sequences do), and `space-weather.js` runs the search, the ping, the page and the home settings (kept in `localStorage`, never `jarvis.db`); its SVG helper `svg()` refuses `style` and `on...` attributes. Spaces: `<body data-space>` says which is shown and CSS lays it out; each space calls `registerSpace` (`spaces.js`), optionally with `ready` and `readout` for its opening animation, and its own files are `space-<name>.js` and `css/space-<name>.css` (design: `docs/specs/2026-10-27-spaces-and-work.md`). `jarvis.css` is the glass look (tint, blur and rim in `--glass`, `--blur`, `--rim`). `motion.js` only wraps existing functions to add animations (`switchSpace` too: the real switch runs once, mid-sequence); its classes start with `fx-`. Served by `/` and `/static`. |
@@ -63,7 +65,8 @@ identical all day and Ollama can reuse its work), appends the user message with 
 `[Monday 2030-01-07 09:01 · Work]`), and streams the model's reply. If the model asks for tools, `run_tool()` runs
 each one, appends the result as a `tool` message, and the model is called again, up to
 `MAX_ROUNDS` tool rounds. Events streamed to the page: `delta`, `step`, `space` (after
-`open_space`'s step: show this space), `break`, `done`, `error`.
+`open_space`'s or `find_place`'s step: show this space), `places` (after `find_place`'s: spin
+the globe to these matches and ask), `break`, `done`, `error`.
 
 ### Destructive actions: the confirmation path
 `delete_event` never deletes, `update_event` never changes anything, and `remember` and
@@ -88,7 +91,7 @@ Any new tool that deletes, overwrites or sends something must use this same path
 - Every database access holds `database.lock` (imported as `lock`).
 - A new tool: write the function with `@tool(description, arg=schema, ...)` in the module that
   owns it. Arguments without a default become required. The import order in `brain.py`
-  (`jcal`, `tasks`, `calc`, `notes`, `spaces`) is the order the model sees the tools; changing it changes
+  (`jcal`, `tasks`, `calc`, `notes`, `spaces`, `weather`) is the order the model sees the tools; changing it changes
   the prompt. A tool that handles private text adds its name to `tools.PRIVATE` (the log then
   records only lengths) and sets `private=True` on its `NeedsConfirmation`.
 - Replies are spoken aloud: the system prompt asks for plain speech, no markdown.

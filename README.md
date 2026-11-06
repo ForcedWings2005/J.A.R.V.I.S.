@@ -79,8 +79,10 @@ the next 24 hours, 7 days, details and air quality, °F first with °C beside it
 globe** or Esc returns. **Set as home** remembers the place in this browser, and the **Open on
 home** switch (bottom right of the globe) opens Weather straight on it. Weather asks
 Open-Meteo, the only outside service JARVIS uses, about the places you look up (SECURITY.md
-section 5); nothing else leaves the Mac. Or ask JARVIS to "open the weather" (CHANGELOG
-sections 56 and 57).
+section 5); nothing else leaves the Mac. Or just ask JARVIS, from any space: "what's the weather
+in Paris?" opens Weather and spins the globe there for you to confirm; then ask "will it rain
+there tomorrow?" and he answers from the forecast for the place you confirmed. He gives no
+weather before you confirm a place (CHANGELOG sections 56 to 58).
 
 Clicking a panel opens it with a short "access" animation; click anywhere or press
 Escape to skip it. After 3 minutes without the mouse or keyboard the panels dim and the

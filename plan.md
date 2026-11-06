@@ -21,10 +21,11 @@ folder. Phases 2 to 4 fixed all five (CHANGELOG sections 21 to 27). Today:
 - **The dashboard's scripts have no automated tests.** They are checked in a demo in the
   browser, then by the owner in Safari; the Safari checks for spaces (sections 50 to 53) are
   still to do. A JavaScript test runner would be a new dependency.
-- **Nothing reads outside content yet.** The Sports space will be the first: data from the
-  internet, so the privacy rule changes (the owner has agreed a new wording, to be written
-  into `SECURITY.md` with the Sports design) and prompt injection becomes real
-  (`SECURITY.md`, section 8).
+- **Weather is the first outside data** (CHANGELOG sections 55 to 58): public forecasts from
+  Open-Meteo, under the new privacy rule in `SECURITY.md` section 5 (fixed HTTPS addresses,
+  only what the service needs, the model never chooses the address). The model reads only
+  cleaned place names and checked numbers from it. Sports will be the second, and longer
+  outside text such as news needs its own prompt-injection design (`SECURITY.md`, section 8).
 
 The order below follows one rule: **measure before changing, and make it testable before
 adding features.** Each phase ends with something that can be checked.
@@ -112,7 +113,7 @@ would need a new tool, such as `pytest-cov`).*
 *Before more features: **spaces** (a welcome screen and separate screens such as Work and
 Sports, JARVIS in every one), so the dashboard does not get cluttered. Design:
 `docs/specs/2026-10-27-spaces-and-work.md`; version 1 done, stages 1 to 4 (CHANGELOG sections
-50 to 53). Sports becomes the second space next.*
+50 to 53). Weather became the second space (CHANGELOG sections 55 to 58); Sports comes next.*
 
 1. **Edit and move events** (`update_event`). *Done: CHANGELOG section 28.* This is the largest gap in the calendar today.
    It needs the same confirmation card as delete, and must handle "this occurrence" versus
@@ -134,8 +135,9 @@ Sports, JARVIS in every one), so the dashboard does not get cluttered. Design:
 5. **Morning briefing.** Today's events, overdue tasks and open reminders in one reply. Most
    of it can be put together in code, with the model only writing the sentences.
 6. **Weather, then news and sports**, as plain read-only tools with a timeout and a cached
-   result, so a slow API never blocks a reply. *Sports comes first, as its own space (see
-   the note above), and is being designed.*
+   result, so a slow API never blocks a reply. *Weather done, as its own space with a globe
+   (spec `docs/specs/2026-11-05-weather-space.md`, CHANGELOG sections 55 to 58). Sports is
+   next (its brainstorm is paused at the panels); news needs a prompt-injection design first.*
 7. **Sound effects for the dashboard.** The animations are done (CHANGELOG section 42);
    the owner chose to leave sound for later. Quiet, short, and off with voice mode off.
 

@@ -1,7 +1,7 @@
 # The Weather space, and a Content Security Policy
 
-Status: designed, not built. Design agreed with the owner in conversation on 2026-11-04 and
-2026-11-05. Builds on `docs/specs/2026-10-27-spaces-and-work.md` (spaces, `registerSpace`,
+Status: built, stages 1 to 4 (CHANGELOG sections 55 to 58). Design agreed with the owner in
+conversation on 2026-11-04 and 2026-11-05. Builds on `docs/specs/2026-10-27-spaces-and-work.md` (spaces, `registerSpace`,
 the access sequence).
 
 ## Why

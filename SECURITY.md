@@ -180,9 +180,10 @@ agreed for Sports and kept for Weather):
 - **Nothing new is stored**: the cache, the match ids and the place on screen live in memory
   only, so no weather data reaches `jarvis.db` or the backups.
 - **Outside text and the model**: place, region and country names are the first outside text
-  JARVIS shows. The model already reads some: the spoken line after a confirm joins the
-  conversation, and holds the place's name (cleaned, at most 60 characters) and numbers that
-  code checked are real numbers, nothing else from the reply. Every value in a reply is read
+  JARVIS shows. The model reads some: the spoken line after a confirm, and the results of
+  `find_place` (place names) and `get_forecast` (the forecast facts). They hold only cleaned
+  names (at most 60 characters) and numbers that code checked are real numbers, written into
+  sentences by `weather.py`, nothing else from a reply (pinned by tests). Every value in a reply is read
   as a real number or as cleaned text, or treated as missing (`weather._num`, pinned by tests),
   so the page and the conversation never get raw reply text. Anything longer, such as news,
   needs its own prompt-injection design first.
