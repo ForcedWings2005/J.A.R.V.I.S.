@@ -489,7 +489,9 @@ def test_find_place_shows_matches_and_asks_to_confirm(monkeypatch):
     result = weather.find_place("Paris")
     assert isinstance(result, tools.ShowPlaces) and len(result.matches) == 2
     assert result.reply == ("Asked the user to confirm Paris, France on the globe. Give no "
-                            "weather until they confirm. Other matches: Paris, Texas, United States.")
+                            "weather until they confirm. If they ask again before confirming, "
+                            "call find_place again: the ping may have been closed. "
+                            "Other matches: Paris, Texas, United States.")
     assert all(m["id"] not in result.reply for m in result.matches)
 
 
@@ -562,3 +564,19 @@ def test_tool_results_hold_no_raw_reply_text(monkeypatch):
 def test_the_tools_come_last():
     names = [s["function"]["name"] for s in tools.SCHEMAS]
     assert names[-3:] == ["open_space", "find_place", "get_forecast"]
+
+
+def test_canned_replies_for_the_evals():
+    """The evals answer weather._fetch with these, offline (evals/__main__.py)."""
+    from datetime import datetime
+    now = datetime(2030, 1, 7, 9, 0)
+    geo = lambda q: json.loads(data.canned_fetch(  # noqa: E731
+        config.WEATHER_GEOCODE_URL + "?name=" + q, now))
+    assert [r["admin1"] for r in geo("Paris")["results"]] == ["Île-de-France", "Texas"]
+    assert [r["admin1"] for r in geo("Paris%2C+Texas")["results"]] == ["Texas"]
+    assert "results" not in geo("Xqzzv")
+    forecast = json.loads(data.canned_fetch(config.WEATHER_FORECAST_URL + "?latitude=48.85", now))
+    assert forecast["current"]["time"] == "2030-01-07T09:00"
+    assert forecast["daily"]["time"][1] == "2030-01-08"
+    assert forecast["daily"]["precipitation_probability_max"][1] == 60
+    assert "us_aqi" in json.loads(data.canned_fetch(config.WEATHER_AIR_URL + "?x=1", now))["current"]

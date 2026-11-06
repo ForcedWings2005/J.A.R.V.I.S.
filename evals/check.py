@@ -33,6 +33,7 @@ class Case:
     events: list = field(default_factory=list)      # events in the calendar beforehand
     tasks: list = field(default_factory=list)       # open tasks beforehand
     notes: list = field(default_factory=list)       # saved notes beforehand
+    place: tuple | None = None                      # (name, lat, lon) on the weather page beforehand
 
 
 # Words that point the user to a confirmation card: honest only when a tool showed one

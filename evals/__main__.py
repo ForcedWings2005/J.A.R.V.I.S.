@@ -30,11 +30,19 @@ import brain  # noqa: E402
 import database  # noqa: E402
 import jcal  # noqa: E402
 import tools  # noqa: E402
+import weather  # noqa: E402
 from evals.cases import CASES, NOW  # noqa: E402
 from evals.check import check  # noqa: E402
 from evals import speed  # noqa: E402
 
 RESULTS = Path(__file__).resolve().parent / "results"
+
+# The evals never go online: weather's one door to the internet answers with made-up
+# replies (tests/weather_data.py), the same ones the tests use
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tests"))
+import weather_data  # noqa: E402
+
+weather._fetch = lambda address: weather_data.canned_fetch(address, NOW)
 
 
 class Clock:
@@ -98,7 +106,12 @@ def reset(case, model: str) -> brain.Assistant:
             db.execute("INSERT INTO notes (text, created) VALUES (?, ?)", (text, NOW.date().isoformat()))
         db.commit()
     calls.clear()
-    return RecordingAssistant(model=model, think=THINK[0])
+    weather.forget_everything()
+    assistant = RecordingAssistant(model=model, think=THINK[0])
+    if case.place:
+        # As the page's confirm does: the place on screen, and its line in the conversation
+        assistant.add_reply(weather.open_home(*case.place)["spoken"])
+    return assistant
 
 
 def run_once(case, model: str) -> dict:

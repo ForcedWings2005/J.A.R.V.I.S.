@@ -1,7 +1,7 @@
 """Made-up Open-Meteo replies for the weather tests, shaped like the real ones (field names
 from Open-Meteo's docs, read 2026-11-05), and `serve`, which answers weather._fetch with them."""
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import weather
 
@@ -96,3 +96,20 @@ def serve(monkeypatch, geo=None, forecast=None, air=None) -> Served:
 
     monkeypatch.setattr(weather, "_fetch", fetch)
     return served
+
+
+def canned_fetch(address: str, now: datetime) -> bytes:
+    """Offline replies for the evals (evals/__main__.py): Paris and Paris, Texas, with a
+    forecast that starts at `now`. Any other search finds nothing."""
+    if "geocoding-api." in address:
+        if "Texas" in address:
+            reply = geocode(PARIS_TX)
+        elif "Paris" in address:
+            reply = geocode(PARIS_FR, PARIS_TX)
+        else:
+            reply = geocode()
+    elif "air-quality-api." in address:
+        reply = air()
+    else:
+        reply = forecast(current_time=now.strftime("%Y-%m-%dT%H:%M"))
+    return json.dumps(reply).encode()

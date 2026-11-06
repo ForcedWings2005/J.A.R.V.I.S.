@@ -50,6 +50,10 @@ CLAIMS_CHANGED = ["i have moved", "i've moved", "i have changed", "i've changed"
                   "has now been changed", "has now been rescheduled"]
 DENTIST = {"title": "Dentist", "date": TUE, "time": "15:00", "end_time": "16:00"}
 
+# Weather: a figure in a reply before the user confirmed a place would be made up
+TEMPERATURE_WORDS = ["°", "degrees", "celsius", "fahrenheit"]
+PARIS = ("Paris", 48.85, 2.35)
+
 CLASS = {"title": "Biological anthropology class", "date": TODAY, "time": "10:00",
          "end_time": "11:15", "repeat": "weekly"}
 PIANO = {"title": "Piano lesson", "date": TUE, "time": "16:00", "end_time": "17:00",
@@ -317,6 +321,31 @@ CASES = [
     Case("space_weather", "Open the weather.",
          expect=[("open_space", {"name": "weather"})], max_calls={"open_space": 1}),
     Case("space_weather_mentioned_no_switch", "I love rainy weather.", forbid=["open_space"]),
+
+    # --- Weather: find_place, then the user confirms; get_forecast for that place ----------
+    # (docs/specs/2026-11-05-weather-space.md, stage 4). Offline: made-up Open-Meteo replies.
+    Case("weather_find_paris", "What's the weather in Paris?",
+         expect=[("find_place", {"query": contains("paris")})], forbid=["get_forecast"],
+         max_calls={"find_place": 1}, excludes=TEMPERATURE_WORDS),
+    Case("weather_find_paris_texas", "What's the weather like in Paris, Texas?",
+         expect=[("find_place", {"query": contains("texas")})], forbid=["get_forecast"]),
+    # Asked again (after Esc on the ping, or a reload): it must look again, not claim the
+    # ping is still waiting (found in stage 4's demo)
+    Case("weather_find_again", "What's the weather in Paris?",
+         before=[("09:00", "What's the weather in Paris?")],
+         expect=[("find_place", {"query": contains("paris")})], forbid=["get_forecast"],
+         excludes=TEMPERATURE_WORDS),
+    Case("weather_rain_tomorrow_there", "Will it rain there tomorrow?", place=PARIS,
+         space="weather", expect=[("get_forecast", {"day": TUE})], forbid=["find_place"],
+         includes_any=["60"]),
+    # Answering from the line code wrote at the confirm (already in the conversation) is
+    # right too, so get_forecast is not required here; the figure must still be the real one
+    Case("weather_now_there", "What's the temperature right now?", place=PARIS,
+         space="weather", forbid=["find_place"], includes_any=["65", "18"]),
+    Case("weather_no_place_asks", "Will it rain tomorrow?", forbid=["find_place"], asks=True,
+         excludes=["°", "percent"]),
+    Case("weather_idiom_no_tool", "I'm feeling a bit under the weather today.",
+         forbid=["find_place", "get_forecast", "open_space"]),
 ]
 
 # The same requests sent from Work, whose stamp says '· Work': a sentence about the stamp

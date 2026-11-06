@@ -584,8 +584,11 @@ def find_place(query: str) -> ShowPlaces | str:
         return "Error: couldn't reach the weather service."
     if not matches:
         return f"I couldn't find a place called {clean(str(query))}."
+    # The second sentence is read when it matters: after Esc or a reload the ping is gone, and
+    # without it the model kept saying "please confirm" with nothing on screen (stage 4 demo)
     reply = (f"Asked the user to confirm {_place_words(matches[0])} on the globe. "
-             "Give no weather until they confirm.")
+             "Give no weather until they confirm. If they ask again before confirming, "
+             "call find_place again: the ping may have been closed.")
     others = [_match_words(m) for m in matches[1:3]]
     if others:
         reply += " Other matches: " + "; ".join(others) + "."
