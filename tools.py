@@ -29,6 +29,14 @@ class NeedsConfirmation:
 
 
 @dataclass
+class ShowPlaces:
+    """Returned by find_place: only the view changes, as the page spins the globe to the first
+    match and asks the user to confirm it. Nothing is chosen until they do."""
+    matches: list               # weather.find_places' matches, each with its server-issued id
+    reply: str                  # the tool result the model sees (names only, never ids)
+
+
+@dataclass
 class ShowSpace:
     """Returned by a tool that only changes what is on screen, so no click is needed."""
     name: str                   # one of config.SPACES

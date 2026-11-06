@@ -605,12 +605,6 @@ def test_add_reply_joins_the_conversation():
                               "content": "Paris: 65 degrees, 18 Celsius, and clear."}
 
 
-def test_weather_adds_no_tools_yet():
-    """Stage 2 changes nothing the model sees, so no eval is needed (stage 4 adds the tools)."""
-    names = [s["function"]["name"] for s in tools.SCHEMAS]
-    assert "find_place" not in names and "get_forecast" not in names
-    assert names[-1] == "open_space"
-
 # --- changing an event goes through the same confirmation ---------------------
 
 def test_changing_an_event_waits_for_confirm_and_cancel_leaves_it():

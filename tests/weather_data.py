@@ -22,14 +22,15 @@ def geocode(*results) -> dict:
 
 
 def forecast(current_time: str = "2026-11-05T21:45", nulls: bool = False) -> dict:
-    first = date(2026, 11, 5)
+    """Seven days from current_time's date. Day 2 has rain from 14:00 to 16:00 (60 %)."""
+    first = date.fromisoformat(current_time[:10])
     days = [(first + timedelta(days=i)).isoformat() for i in range(7)]
     times = [f"{d}T{h:02d}:00" for d in days for h in range(24)]
     hours = [int(t[11:13]) for t in times]
-    rain = [60 if t.startswith("2026-11-06") and 14 <= h <= 16 else 10
+    rain = [60 if t.startswith(days[1]) and 14 <= h <= 16 else 10
             for t, h in zip(times, hours, strict=True)]
     if nulls:
-        rain[times.index("2026-11-05T21:00")] = None
+        rain[times.index(days[0] + "T21:00")] = None
     data = {
         "latitude": 48.86, "longitude": 2.36, "utc_offset_seconds": 3600,
         "timezone": "Europe/Paris", "timezone_abbreviation": "GMT+1",
@@ -46,7 +47,7 @@ def forecast(current_time: str = "2026-11-05T21:45", nulls: bool = False) -> dic
                    "uv_index": [2.0] * len(times)},
         "daily": {"time": days, "weather_code": [3] * 7, "temperature_2m_max": [21.5] * 7,
                   "temperature_2m_min": [10.0] * 7,
-                  "precipitation_probability_max": [10] * 7,
+                  "precipitation_probability_max": [10, 60, 10, 10, 10, 10, 10],
                   "sunrise": [f"{d}T07:45" for d in days],
                   "sunset": [f"{d}T17:20" for d in days],
                   "uv_index_max": [2.0] * 7},

@@ -4,6 +4,8 @@ This is the first module that reads anything from the internet, so it follows th
 rule in SECURITY.md section 5: only three fixed HTTPS addresses (config.py), built here by
 code; requests carry only what the service needs (the place, coordinates rounded to about
 1 km); the model never chooses an address. Every figure is worked out here, never by the model.
+JARVIS's two tools are at the end: find_place (the page then asks the user to confirm) and
+get_forecast (facts for the place the user confirmed). Neither can choose a place itself.
 Spec: docs/specs/2026-11-05-weather-space.md.
 """
 import json
@@ -24,6 +26,7 @@ from time import monotonic   # its own name, so tests can move the cache's clock
 import truststore
 
 import config
+from tools import ShowPlaces, tool
 
 log = logging.getLogger("jarvis.weather")
 
@@ -424,9 +427,9 @@ def _summary(place: dict, f: dict, a: dict | None) -> dict:
             "days": days, "details": details, "air": air}
 
 
-def forecast_for(place: dict) -> dict:
-    """The forecast and air quality for a place (from the cache when recent). A forecast that
-    cannot be fetched raises WeatherError; air quality that cannot only leaves `air` empty."""
+def _replies(place: dict) -> tuple[dict, dict | None]:
+    """The forecast and air quality replies for a place (from the cache when recent). A
+    forecast that cannot be fetched raises WeatherError; air quality that cannot is None."""
     where = {"latitude": _round(place["lat"]), "longitude": _round(place["lon"])}
     key = (where["latitude"], where["longitude"])
     f = _cached(("forecast", *key), lambda: _get(config.WEATHER_FORECAST_URL, {
@@ -437,6 +440,13 @@ def forecast_for(place: dict) -> dict:
             **where, "current": AIR, "timezone": "auto"}))
     except WeatherError:
         a = None
+    return f, a
+
+
+def forecast_for(place: dict) -> dict:
+    """What the page draws for a place. A reply this code cannot read becomes WeatherError."""
+    f, a = _replies(place)
+    key = (_round(place["lat"]), _round(place["lon"]))
     try:
         return _summary(place, f, a)
     except (TypeError, ValueError, AttributeError, KeyError, IndexError) as e:
@@ -474,3 +484,117 @@ def open_home(name: str, lat: float, lon: float) -> dict:
     """The saved home place, sent by the page itself (checked by server.py first)."""
     return _show({"name": clean(name), "region": "", "country": "",
                   "lat": _round(lat), "lon": _round(lon)})
+
+
+# ---------- JARVIS's tools (registered last: brain.py imports this module last) ----------
+NO_PLACE = "Error: no place is confirmed yet. Ask which place, or call find_place."
+FULL_WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+
+def _place_words(place: dict) -> str:
+    """'Paris, France'; 'Rome, Lazio' with no country; 'Home' for a home place."""
+    second = place.get("country") or place.get("region")
+    return f"{place['name']}, {second}" if second else place["name"]
+
+
+def _match_words(match: dict) -> str:
+    """'Paris, Texas, United States': enough for the model to tell the matches apart."""
+    return ", ".join(p for p in (match["name"], match["region"], match["country"]) if p)
+
+
+def _both(f, c, unit_f: str = "°F", unit_c: str = "°C") -> str | None:
+    return None if f is None or c is None else f"{f}{unit_f} ({c}{unit_c})"
+
+
+def _day_words(d: dict) -> list[str]:
+    """'overcast, high 71°F (22°C), low 50°F (10°C), 60% chance of rain', missing parts left out."""
+    high, low = _both(d["high_f"], d["high_c"]), _both(d["low_f"], d["low_c"])
+    parts = [d["condition"], high and f"high {high}", low and f"low {low}",
+             d["rain_chance"] is not None and f"{d['rain_chance']}% chance of rain"]
+    return [p for p in parts if p]
+
+
+def _full_weekday(day: str) -> str:
+    try:
+        return FULL_WEEKDAYS[date.fromisoformat(day).weekday()] + " "
+    except ValueError:
+        return ""
+
+
+def forecast_facts(day: str = "") -> str:
+    """The facts get_forecast gives the model, all worked out here (both units)."""
+    place = place_on_screen()
+    if place is None:
+        return NO_PLACE
+    try:
+        payload = forecast_for(place)
+        f, _ = _replies(place)
+    except WeatherError:
+        return "Error: couldn't reach the weather service."
+    name = _place_words(place)
+    days = payload["days"]
+    dates = [d["date"] for d in days if d["date"]]
+    if day:
+        wanted = next((d for d in days if d["date"] == str(day).strip()), None)
+        if wanted is None:
+            if not dates:
+                return "Error: the forecast has no days. Ask again in a moment."
+            return (f"Error: the forecast covers {dates[0]} to {dates[-1]}. "
+                    "Give a date in that range as YYYY-MM-DD.")
+        hourly = _obj(f.get("hourly"))
+        times = hourly.get("time") if isinstance(hourly.get("time"), list) else []
+        hours = [(int(_text(t)[11:13]), _num(_at(hourly.get("precipitation_probability"), i)))
+                 for i, t in enumerate(times)
+                 if _text(t).startswith(wanted["date"]) and _clock(t)]
+        text = f"{name}, {_full_weekday(wanted['date'])}{wanted['date']}: " + \
+            ", ".join(_day_words(wanted)) + "."
+        rain = rain_windows(hours)
+        return text + (f" Rain likely {rain}." if rain else "")
+
+    now, details = payload["now"], payload["details"]
+    feels = _both(now["feels_f"], now["feels_c"])
+    wind = _both(details["wind_mph"], details["wind_kmh"], " mph", " km/h")
+    first = [_both(now["temp_f"], now["temp_c"]), now["condition"], feels and f"feels like {feels}"]
+    groups = [", ".join(p for p in first if p), wind and f"wind {wind}",
+              details["humidity"] is not None and f"humidity {details['humidity']}%"]
+    when = f" ({now['time']} there)" if now["time"] else ""
+    text = f"{name}. Now{when}: " + "; ".join(g for g in groups if g) + "."
+    if days:
+        text += " Today: " + ", ".join(_day_words(days[0])) + "."
+    if payload["rain"]:
+        text += f" Rain likely {payload['rain']}."
+    air = payload["air"]
+    if air and air["aqi"] is not None:
+        text += f" Air quality: US AQI {air['aqi']}" + (f", {air['aqi_label']}" if air["aqi_label"] else "") + "."
+    return text
+
+
+@tool("Find a place to show its weather, temperature, rain or air quality. Call it when the "
+      "user asks about the weather somewhere, with the place as they said it, adding the "
+      "country or state if they gave one, such as 'Paris, Texas'. The globe then asks the user "
+      "to confirm the place on screen: give no weather until they do.",
+      query={"type": "string",
+             "description": "the place as the user said it, such as 'Paris' or 'Paris, Texas'"})
+def find_place(query: str) -> ShowPlaces | str:
+    try:
+        matches = find_places(str(query))
+    except ValueError:
+        return f"Error: say the place in 1 to {config.WEATHER_QUERY_MAX} characters."
+    except WeatherError:
+        return "Error: couldn't reach the weather service."
+    if not matches:
+        return f"I couldn't find a place called {clean(str(query))}."
+    reply = (f"Asked the user to confirm {_place_words(matches[0])} on the globe. "
+             "Give no weather until they confirm.")
+    others = [_match_words(m) for m in matches[1:3]]
+    if others:
+        reply += " Other matches: " + "; ".join(others) + "."
+    return ShowPlaces(matches, reply)
+
+
+@tool("The weather for the place the user confirmed on the globe: now and today when day is "
+      "empty, or one day of the next 7 as YYYY-MM-DD. Call it for questions about the place on "
+      "screen, such as 'will it rain there tomorrow?'. Use only the figures it returns.",
+      day={"type": "string", "description": "YYYY-MM-DD, or empty for now and today"})
+def get_forecast(day: str = "") -> str:
+    return forecast_facts(str(day or ""))
